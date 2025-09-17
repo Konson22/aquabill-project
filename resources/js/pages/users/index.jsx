@@ -129,12 +129,6 @@ export default function UserManagement({ users, departments }) {
                         <Plus className="mr-2 h-4 w-4" />
                         {showCreateForm ? 'Hide Form' : 'Add User'}
                     </Button>
-                    <Link href="/departments/create">
-                        <Button variant="outline">
-                            <Building2 className="mr-2 h-4 w-4" />
-                            Add Department
-                        </Button>
-                    </Link>
                 </div>
             </div>
 

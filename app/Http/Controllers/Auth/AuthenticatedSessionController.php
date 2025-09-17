@@ -31,6 +31,14 @@ class AuthenticatedSessionController extends Controller
     {
         $request->authenticate();
 
+        // Check if user is active
+        if (Auth::user()->status !== 'active') {
+            Auth::logout();
+            return redirect()->back()->withErrors([
+                'email' => 'Account is inactive. Please contact administrator.'
+            ]);
+        }
+
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard', absolute: false));

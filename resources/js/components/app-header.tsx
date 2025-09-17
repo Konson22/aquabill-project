@@ -168,7 +168,9 @@ export function AppHeader({ breadcrumbs = [] }: AppHeaderProps) {
                                     </Avatar>
                                     <div className="hidden md:flex flex-col items-start">
                                         <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{auth.user.name}</span>
-                                        <span className="text-xs text-slate-500 dark:text-slate-400">Administrator</span>
+                                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                                            {auth.user.department?.name || 'No Department'}
+                                        </span>
                                     </div>
                                 </Button>
                             </DropdownMenuTrigger>

@@ -2,7 +2,15 @@
 
 ## Overview
 
-The AquaBill Billing System is a comprehensive water billing management solution built with Laravel and React. It provides a complete workflow for managing customer bills, meter readings, and revenue tracking.
+The AquaBill Billing System is a comprehensive water billing management solution built with Laravel 10 and React 18. It provides a complete workflow for managing customer bills, meter readings, and revenue tracking with modern UI components and enhanced user experience.
+
+## Recent Updates (December 2024)
+
+- **Enhanced Customer Management**: Redesigned customer show page with modern tabs and export functionality
+- **Improved User Management**: Complete user edit functionality with modern form design
+- **Streamlined Invoice Creation**: Simplified invoice forms with better UX
+- **Security Enhancements**: Active user-only login restrictions
+- **UI/UX Improvements**: Modern card-based designs and responsive layouts
 
 ## Features
 

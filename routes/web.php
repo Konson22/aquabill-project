@@ -40,7 +40,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/billing-range', [BillingController::class, 'range'])->name('billing.range');
     Route::get('/billing-range/export', [BillingController::class, 'exportRange'])->name('billing.range.export');
     Route::get('/billing/{bill}/print', [BillingController::class, 'print'])->whereNumber('bill')->name('billing.print');
-    Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
+    // Test route for department access control
+    Route::get('/test-department-access', function () {
+        $user = auth()->user();
+        return response()->json([
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'department' => $user->department ? $user->department->name : 'No department',
+            'roles' => $user->roles->pluck('name')->toArray(),
+        ]);
+    })->name('test.department.access');
 
     
     // Custom readings routes (must be before resource routes)
@@ -50,16 +59,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Invoice print route
     Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
 
-    Route::resources([
-        '/customers' => CustomerController::class,
-        '/meters' => MeterController::class,
-        '/readings' => MeterReadingController::class,
-        '/invoices' => InvoiceController::class,
-        '/payments' => PaymentController::class,
-        '/areas' => AreaController::class,
-        '/meter-logs' => MeterLogController::class,
-        '/charges' => ChargeController::class,
-    ]);
+    // Apply department restrictions to core resources
+    Route::middleware(['department.restriction'])->group(function () {
+        // Finance route - restricted from Billing department
+        Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
+        Route::resources([
+            '/customers' => CustomerController::class,
+            '/meters' => MeterController::class,
+            '/readings' => MeterReadingController::class,
+            '/invoices' => InvoiceController::class,
+            '/payments' => PaymentController::class,
+            // '/areas' => AreaController::class, // Commented out - AreaController not implemented
+            '/meter-logs' => MeterLogController::class,
+            '/charges' => ChargeController::class,
+        ]);
+    });
 
     // Invoice payment route
     Route::post('/payments/invoice', [PaymentController::class, 'storeInvoicePayment'])->name('payments.invoice');
@@ -99,18 +113,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resources([
         '/users' => UserController::class,
         '/departments' => DepartmentController::class,
-        '/roles' => RoleController::class,
+        // '/roles' => RoleController::class, // Commented out - RoleController not implemented
     ]);
 
     // User export routes
     Route::get('/users/{user}/export-readings', [UserController::class, 'exportReadings'])->name('users.export-readings');
     Route::get('/users/{user}/export-bills', [UserController::class, 'exportBills'])->name('users.export-bills');
 
-    // Legacy routes (keeping for compatibility)
-    Route::resources([
-        '/categories' => CategoryController::class,
-        'types' => TypeController::class,
-    ]);
+    // Legacy routes (keeping for compatibility) - Apply department restrictions
+    Route::middleware(['department.restriction'])->group(function () {
+        Route::resources([
+            '/categories' => CategoryController::class,
+            // 'types' => TypeController::class, // Commented out - TypeController not implemented
+        ]);
+    });
     
 });
 

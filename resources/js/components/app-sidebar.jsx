@@ -2,49 +2,56 @@ import { Link, usePage } from '@inertiajs/react';
 import { Activity, Calculator, ChevronLeft, ChevronRight, DollarSign, Droplets, Home, UserCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 
-const mainNavItems = [
+const allNavItems = [
     {
         title: 'Dashboard',
         href: '/',
         icon: Home,
         description: 'Overview and analytics',
         badge: 'New',
+        key: 'dashboard',
     },
     {
         title: 'Customers',
         href: '/customers',
         icon: Users,
         description: 'Customer management',
+        key: 'customers',
     },
     {
         title: 'Finance',
         href: '/finance',
         icon: DollarSign,
         description: 'overview and management',
+        key: 'finance',
     },
     {
         title: 'Meters',
         href: '/meters',
         icon: Droplets,
         description: 'Water meter management',
+        key: 'meters',
     },
     {
         title: 'Readings',
         href: '/readings',
         icon: Activity,
         description: 'Meter readings',
+        key: 'readings',
     },
     {
         title: 'Categories & Tariffs',
         href: '/categories',
         icon: Calculator,
         description: 'Pricing structures',
+        key: 'tariffs',
     },
     {
         title: 'Users Management',
         href: '/users',
         icon: UserCheck,
         description: 'User management',
+        key: 'users',
     },
     // {
     //     title: 'Inventory',
@@ -58,6 +65,27 @@ export function AppSidebar({ onCollapseChange }) {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [hoveredItem, setHoveredItem] = useState(null);
     const page = usePage();
+    const { auth } = page.props;
+
+    // Filter navigation items based on user department
+    const userDepartment = auth.user?.department?.name;
+    const filteredNavItems = allNavItems.filter((item) => {
+        // Always show dashboard
+        if (item.key === 'dashboard') return true;
+
+        // For Billing department, hide Finance, Categories & Tariffs, and Users Management
+        if (userDepartment === 'Billing') {
+            if (item.key === 'finance' || item.key === 'tariffs' || item.key === 'users') return false;
+        }
+
+        // For Finance department, hide Users Management
+        if (userDepartment === 'Finance') {
+            if (item.key === 'users') return false;
+        }
+
+        // For other departments, show all items (or implement more specific logic)
+        return true;
+    });
 
     const toggleSidebar = () => {
         const newCollapsedState = !isCollapsed;
@@ -96,7 +124,7 @@ export function AppSidebar({ onCollapseChange }) {
             <nav className="h-[calc(100vh-8rem)] overflow-hidden px-2">
                 <div className="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#3d6b9a]/50 hover:scrollbar-thumb-[#3d6b9a]/70 h-full overflow-y-auto">
                     <div className="py-4">
-                        {mainNavItems.map((item) => {
+                        {filteredNavItems.map((item) => {
                             const isActive = item.href === page.url;
 
                             return (

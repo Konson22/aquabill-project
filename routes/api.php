@@ -20,12 +20,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [ApiAuthController::class, 'logout']);
     Route::post('/token/refresh', [ApiAuthController::class, 'refresh']);
     
-    // Customers resource
     Route::get('/customers', [ApiCustomerController::class, 'index']);
-    Route::post('/customers', [ApiCustomerController::class, 'store']);
-
-    // Meter readings resource
     Route::post('/readings', [ApiReadingController::class, 'store']);
+   
 
 });
 

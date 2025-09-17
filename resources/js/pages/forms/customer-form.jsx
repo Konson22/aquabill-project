@@ -52,7 +52,7 @@ export default function CustomerForm({ customer = null, categories = [], neighbo
         }
 
         if (isEditing) {
-            put(route('customers.update', customer.id), {
+            put(`/customers/${customer.id}`, {
                 onSuccess: () => {
                     reset();
                     setCreateNewNeighborhood(false);

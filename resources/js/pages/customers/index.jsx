@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { Activity, Calendar, DollarSign, Download, FileText, Plus, Search, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -16,6 +16,12 @@ const breadcrumbs = [
 ];
 
 export default function Customers({ areas, categories, customers, meters = [] }) {
+    const page = usePage();
+    const { auth } = page.props;
+    const userDepartment = auth.user?.department?.name;
+    const isBillingDepartment = userDepartment === 'Billing';
+    const isFinanceDepartment = userDepartment === 'Finance';
+
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredCustomers, setFilteredCustomers] = useState(customers);
     const [filteredStats, setFilteredStats] = useState({
@@ -121,12 +127,14 @@ export default function Customers({ areas, categories, customers, meters = [] })
                             Export All
                         </Button>
                     </a>
-                    <Link href="/customers/create">
-                        <Button className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            Add Customer
-                        </Button>
-                    </Link>
+                    {!isBillingDepartment && !isFinanceDepartment && (
+                        <Link href="/customers/create">
+                            <Button className="gap-2">
+                                <Plus className="h-4 w-4" />
+                                Add Customer
+                            </Button>
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -256,20 +264,26 @@ export default function Customers({ areas, categories, customers, meters = [] })
                                                             View
                                                         </Button>
                                                     </Link>
-                                                    <Link href={`/customers/${customer.id}/edit`}>
-                                                        <Button variant="outline" size="sm">
-                                                            Edit
-                                                        </Button>
-                                                    </Link>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleCreateInvoice(customer)}
-                                                        className="gap-1"
-                                                    >
-                                                        <FileText className="h-3 w-3" />
-                                                        Invoice
-                                                    </Button>
+                                                    {!isBillingDepartment && (
+                                                        <>
+                                                            {!isFinanceDepartment && (
+                                                                <Link href={`/customers/${customer.id}/edit`}>
+                                                                    <Button variant="outline" size="sm">
+                                                                        Edit
+                                                                    </Button>
+                                                                </Link>
+                                                            )}
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleCreateInvoice(customer)}
+                                                                className="gap-1"
+                                                            >
+                                                                <FileText className="h-3 w-3" />
+                                                                Invoice
+                                                            </Button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

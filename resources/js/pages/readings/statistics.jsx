@@ -1,9 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Activity, ArrowLeft, BarChart3, Calendar, Download, Droplets, FileText, Printer, TrendingUp, Users, Zap } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { BarChart3, Calendar, Download, Droplets, Filter, Printer, Zap } from 'lucide-react';
+import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const breadcrumbs = [
@@ -19,7 +21,81 @@ const breadcrumbs = [
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-export default function ReadingsStatistics({ statistics, monthlyData, sourceData, consumptionTrends, topCustomers, recentReadings }) {
+export default function ReadingsStatistics({
+    statistics,
+    monthlyData,
+    sourceData,
+    consumptionTrends,
+    topCustomers,
+    recentReadings,
+    categories,
+    neighborhoods,
+    filters,
+    categoryConsumption,
+}) {
+    // Filter state
+    const [filterState, setFilterState] = useState({
+        month: filters?.month || 'all',
+        year: filters?.year || new Date().getFullYear().toString(),
+        category: filters?.category || 'all',
+        neighborhood: filters?.neighborhood || 'all',
+    });
+
+    // Generate year options (last 5 years)
+    const yearOptions = Array.from({ length: 5 }, (_, i) => {
+        const year = new Date().getFullYear() - i;
+        return { value: year.toString(), label: year.toString() };
+    });
+
+    // Generate month options
+    const monthOptions = [
+        { value: '1', label: 'January' },
+        { value: '2', label: 'February' },
+        { value: '3', label: 'March' },
+        { value: '4', label: 'April' },
+        { value: '5', label: 'May' },
+        { value: '6', label: 'June' },
+        { value: '7', label: 'July' },
+        { value: '8', label: 'August' },
+        { value: '9', label: 'September' },
+        { value: '10', label: 'October' },
+        { value: '11', label: 'November' },
+        { value: '12', label: 'December' },
+    ];
+
+    // Apply filters
+    const applyFilters = () => {
+        const params = new URLSearchParams();
+
+        if (filterState.month && filterState.month !== 'all') params.append('month', filterState.month);
+        if (filterState.year) params.append('year', filterState.year);
+        if (filterState.category && filterState.category !== 'all') params.append('category', filterState.category);
+        if (filterState.neighborhood && filterState.neighborhood !== 'all') params.append('neighborhood', filterState.neighborhood);
+
+        router.get('/readings/statistics', Object.fromEntries(params), {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    // Clear filters
+    const clearFilters = () => {
+        setFilterState({
+            month: 'all',
+            year: new Date().getFullYear().toString(),
+            category: 'all',
+            neighborhood: 'all',
+        });
+        router.get(
+            '/readings/statistics',
+            {},
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
+    };
+
     const formatNumber = (number) => {
         return new Intl.NumberFormat('en-US', {
             minimumFractionDigits: 2,
@@ -73,6 +149,17 @@ export default function ReadingsStatistics({ statistics, monthlyData, sourceData
         sourceData.forEach((source) => {
             lines.push(`${source.name},${source.value},${source.percentage}%`);
         });
+        lines.push('');
+
+        // Category Consumption Data
+        lines.push('CONSUMPTION BY CUSTOMER CATEGORY');
+        lines.push('Category,Readings,Total Consumption,Average Consumption,Percentage of Total');
+        categoryConsumption?.forEach((category) => {
+            lines.push(
+                `${category.category_name},${category.readings_count},${formatNumber(category.total_consumption)},${formatNumber(category.average_consumption)},${category.percentage_of_total}%`,
+            );
+        });
+        lines.push('');
 
         // Create and download file
         const BOM = '\uFEFF';
@@ -178,6 +265,30 @@ export default function ReadingsStatistics({ statistics, monthlyData, sourceData
                 .join('')}
         </tbody>
     </table>
+    
+    <h3>Consumption by Customer Category</h3>
+    <table>
+        <thead>
+            <tr><th>Category</th><th>Readings</th><th>Total Consumption</th><th>Average Consumption</th><th>Percentage of Total</th></tr>
+        </thead>
+        <tbody>
+            ${
+                categoryConsumption
+                    ?.map(
+                        (category) => `
+                <tr>
+                    <td>${category.category_name}</td>
+                    <td>${category.readings_count}</td>
+                    <td>${formatNumber(category.total_consumption)}</td>
+                    <td>${formatNumber(category.average_consumption)}</td>
+                    <td>${category.percentage_of_total}%</td>
+                </tr>
+            `,
+                    )
+                    .join('') || '<tr><td colspan="5">No category data available</td></tr>'
+            }
+        </tbody>
+    </table>
 </body>
 </html>`;
 
@@ -197,17 +308,9 @@ export default function ReadingsStatistics({ statistics, monthlyData, sourceData
 
             {/* Header */}
             <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" asChild>
-                        <Link href="/readings">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Readings
-                        </Link>
-                    </Button>
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Readings Statistics</h1>
-                        <p className="mt-1 text-slate-600 dark:text-slate-400">Comprehensive analytics and insights for meter readings</p>
-                    </div>
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Readings Statistics</h1>
+                    <p className="mt-1 text-slate-600 dark:text-slate-400">Comprehensive analytics and insights for meter readings</p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={exportStatistics} className="flex items-center gap-2">
@@ -221,27 +324,144 @@ export default function ReadingsStatistics({ statistics, monthlyData, sourceData
                 </div>
             </div>
 
+            {/* Filters */}
+            <Card className="mb-6">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Filter className="h-5 w-5" />
+                        Filters
+                        {(filterState.month !== 'all' || filterState.category !== 'all' || filterState.neighborhood !== 'all') && (
+                            <Badge variant="secondary" className="ml-2">
+                                Active
+                            </Badge>
+                        )}
+                    </CardTitle>
+                    <CardDescription>Filter statistics by month, year, customer category, and neighborhood</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {/* Month Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Month</label>
+                            <Select value={filterState.month} onValueChange={(value) => setFilterState((prev) => ({ ...prev, month: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All months" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All months</SelectItem>
+                                    {monthOptions.map((month) => (
+                                        <SelectItem key={month.value} value={month.value}>
+                                            {month.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Year Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Year</label>
+                            <Select value={filterState.year} onValueChange={(value) => setFilterState((prev) => ({ ...prev, year: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select year" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {yearOptions.map((year) => (
+                                        <SelectItem key={year.value} value={year.value}>
+                                            {year.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Category Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Customer Category</label>
+                            <Select value={filterState.category} onValueChange={(value) => setFilterState((prev) => ({ ...prev, category: value }))}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All categories" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All categories</SelectItem>
+                                    {categories?.map((category) => (
+                                        <SelectItem key={category.id} value={category.id.toString()}>
+                                            {category.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Neighborhood Filter */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Neighborhood</label>
+                            <Select
+                                value={filterState.neighborhood}
+                                onValueChange={(value) => setFilterState((prev) => ({ ...prev, neighborhood: value }))}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="All neighborhoods" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All neighborhoods</SelectItem>
+                                    {neighborhoods?.map((neighborhood) => (
+                                        <SelectItem key={neighborhood.id} value={neighborhood.id.toString()}>
+                                            {neighborhood.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    {/* Active Filters Summary */}
+                    {(filterState.month !== 'all' || filterState.category !== 'all' || filterState.neighborhood !== 'all') && (
+                        <div className="mt-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+                            <div className="mb-2 text-sm font-medium text-blue-900 dark:text-blue-100">Active Filters:</div>
+                            <div className="flex flex-wrap gap-2">
+                                {filterState.month !== 'all' && (
+                                    <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
+                                        Month: {monthOptions.find((m) => m.value === filterState.month)?.label}
+                                    </Badge>
+                                )}
+                                {filterState.category !== 'all' && (
+                                    <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
+                                        Category: {categories?.find((c) => c.id.toString() === filterState.category)?.name}
+                                    </Badge>
+                                )}
+                                {filterState.neighborhood !== 'all' && (
+                                    <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
+                                        Neighborhood: {neighborhoods?.find((n) => n.id.toString() === filterState.neighborhood)?.name}
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Filter Actions */}
+                    <div className="mt-4 flex gap-2">
+                        <Button onClick={applyFilters} className="flex items-center gap-2">
+                            <Filter className="h-4 w-4" />
+                            Apply Filters
+                        </Button>
+                        <Button variant="outline" onClick={clearFilters}>
+                            Clear Filters
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Key Metrics */}
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Readings</CardTitle>
-                        <Activity className="h-4 w-4 text-blue-600" />
+                        <Calendar className="h-4 w-4 text-green-600" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{statistics.total_readings}</div>
                         <p className="text-xs text-slate-600 dark:text-slate-400">All time readings</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">This Month</CardTitle>
-                        <Calendar className="h-4 w-4 text-green-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{statistics.this_month}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Readings this month</p>
                     </CardContent>
                 </Card>
 
@@ -255,21 +475,10 @@ export default function ReadingsStatistics({ statistics, monthlyData, sourceData
                         <p className="text-xs text-slate-600 dark:text-slate-400">Total units consumed</p>
                     </CardContent>
                 </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Avg Consumption</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-purple-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatNumber(statistics.avg_consumption)}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Average per reading</p>
-                    </CardContent>
-                </Card>
             </div>
 
             {/* Additional Statistics */}
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Highest Consumption</CardTitle>
@@ -289,28 +498,6 @@ export default function ReadingsStatistics({ statistics, monthlyData, sourceData
                     <CardContent>
                         <div className="text-2xl font-bold">{formatNumber(statistics.lowest_consumption)}</div>
                         <p className="text-xs text-slate-600 dark:text-slate-400">Single reading minimum</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-                        <Users className="h-4 w-4 text-indigo-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{statistics.active_customers}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Customers with readings</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Bills Generated</CardTitle>
-                        <FileText className="h-4 w-4 text-teal-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{statistics.bills_generated}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Total bills created</p>
                     </CardContent>
                 </Card>
             </div>
@@ -445,60 +632,6 @@ export default function ReadingsStatistics({ statistics, monthlyData, sourceData
                                     </div>
                                 </div>
                             ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Recent Readings */}
-            <div className="mt-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent Readings</CardTitle>
-                        <CardDescription>Latest meter readings across the system</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead>
-                                    <tr className="border-b border-slate-200 dark:border-slate-800">
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Customer</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Meter</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Date</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Consumption</th>
-                                        <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Source</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentReadings.map((reading) => (
-                                        <tr
-                                            key={reading.id}
-                                            className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                                        >
-                                            <td className="px-4 py-3">
-                                                <div className="font-medium">
-                                                    {reading.meter?.customer?.first_name} {reading.meter?.customer?.last_name}
-                                                </div>
-                                                <div className="text-sm text-slate-500">{reading.meter?.customer?.account_number}</div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Badge variant="outline">{reading.meter?.serial}</Badge>
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{formatDate(reading.date)}</td>
-                                            <td className="px-4 py-3">
-                                                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                    {formatNumber(reading.consumption)} units
-                                                </Badge>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Badge variant="secondary" className="capitalize">
-                                                    {reading.source || 'manual'}
-                                                </Badge>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
                         </div>
                     </CardContent>
                 </Card>

@@ -36,7 +36,7 @@ class DashboardController extends Controller
                 ->count() ?? 0,
             'monthlyConsumption' => $this->getMonthlyConsumption($currentMonth, $currentYear),
             'totalAreas' => Neighborhood::count() ?? 0,
-            'recentActivity' => $this->getRecentActivity(),
+            'overdueReadings' => $this->getOverdueReadings(),
             'monthlyRevenue' => $this->getMonthlyRevenue($currentYear),
             'topCustomers' => $this->getTopCustomers(),
             'meterStatus' => $this->getMeterStatus(),
@@ -184,7 +184,7 @@ class DashboardController extends Controller
                 ->count() ?? 0,
             'monthlyConsumption' => $this->getMonthlyConsumption($currentMonth, $currentYear),
             'totalAreas' => Neighborhood::count() ?? 0,
-            'recentActivity' => $this->getRecentActivity(),
+            'overdueReadings' => $this->getOverdueReadings(),
             'monthlyRevenue' => $this->getMonthlyRevenue($currentYear),
             'topCustomers' => $this->getTopCustomers(),
             'meterStatus' => $this->getMeterStatus(),
@@ -321,5 +321,53 @@ class DashboardController extends Controller
                     'count' => $item->count ?? 0
                 ];
             });
+    }
+
+    /**
+     * Get customers with overdue readings (no reading for more than 1 month)
+     */
+    private function getOverdueReadings()
+    {
+        $oneMonthAgo = Carbon::now()->subMonth();
+        
+        // Get customers who have meters but no readings in the last month
+        $customersWithOverdueReadings = Customer::with(['meter', 'neighborhood'])
+            ->whereHas('meter')
+            ->whereDoesntHave('meter.readings', function($query) use ($oneMonthAgo) {
+                $query->where('date', '>=', $oneMonthAgo);
+            })
+            ->orWhereHas('meter.readings', function($query) use ($oneMonthAgo) {
+                $query->where('date', '<', $oneMonthAgo)
+                      ->whereNotExists(function($subQuery) use ($oneMonthAgo) {
+                          $subQuery->select(DB::raw(1))
+                                   ->from('meter_readings as mr2')
+                                   ->whereColumn('mr2.meter_id', 'meter_readings.meter_id')
+                                   ->where('mr2.date', '>=', $oneMonthAgo);
+                      });
+            })
+            ->take(10)
+            ->get()
+            ->map(function ($customer) use ($oneMonthAgo) {
+                $lastReading = $customer->meter?->readings()
+                    ->orderBy('date', 'desc')
+                    ->first();
+                
+                $daysSinceLastReading = $lastReading 
+                    ? $lastReading->date->diffInDays(Carbon::now())
+                    : 'Never';
+                
+                return [
+                    'id' => $customer->id,
+                    'name' => $customer->full_name ?? 'Unknown Customer',
+                    'account_number' => $customer->account_number ?? 'N/A',
+                    'neighborhood' => $customer->neighborhood?->name ?? 'Unknown',
+                    'meter_serial' => $customer->meter?->serial ?? 'N/A',
+                    'last_reading_date' => $lastReading?->date?->format('Y-m-d') ?? 'Never',
+                    'days_since_reading' => $daysSinceLastReading,
+                    'phone' => $customer->phone ?? 'N/A',
+                ];
+            });
+
+        return $customersWithOverdueReadings;
     }
 }

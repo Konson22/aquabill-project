@@ -103,8 +103,8 @@ export default function PaymentFormModal({
         if (!formData.date) {
             nextErrors.date = 'Select a payment date';
         }
-        if (formData.reference_number && formData.reference_number.trim().length === 0) {
-            nextErrors.reference_number = 'Reference number cannot be empty';
+        if (!formData.reference_number || formData.reference_number.trim().length === 0) {
+            nextErrors.reference_number = 'Reference number is required';
         }
         setErrors(nextErrors);
         return Object.keys(nextErrors).length === 0;
@@ -192,7 +192,7 @@ export default function PaymentFormModal({
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="reference_number" className="text-sm font-medium">
-                                Reference Number
+                                Reference Number <span className="text-red-500">*</span>
                             </Label>
                             <Input
                                 id="reference_number"
@@ -200,6 +200,7 @@ export default function PaymentFormModal({
                                 value={formData.reference_number}
                                 onChange={(e) => handleChange('reference_number', e.target.value)}
                                 placeholder="Enter reference number"
+                                required
                             />
                             <InputError message={errors.reference_number} />
                         </div>

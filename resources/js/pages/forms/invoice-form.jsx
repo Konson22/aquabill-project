@@ -1,4 +1,3 @@
-import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -94,59 +93,41 @@ export default function InvoiceForm({
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Customer Display */}
-            <div>
-                <Label className="text-sm font-medium">Customer</Label>
-                {selectedCustomer ? (
-                    <div className="mt-1 rounded-md bg-blue-50 p-2 dark:bg-blue-900/20">
-                        <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-blue-600" />
-                            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                {selectedCustomer.first_name} {selectedCustomer.last_name}
-                            </span>
-                        </div>
+        <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Customer Info - Simple */}
+            {selectedCustomer && (
+                <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+                    <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-blue-600" />
+                        <span className="font-medium text-blue-900 dark:text-blue-100">
+                            {selectedCustomer.first_name} {selectedCustomer.last_name}
+                        </span>
+                        {selectedCustomer.phone && <span className="text-sm text-blue-700 dark:text-blue-300">• {selectedCustomer.phone}</span>}
                     </div>
-                ) : (
-                    <div className="mt-1 rounded-md border border-dashed border-gray-300 p-2 text-center text-sm text-gray-500">
-                        No customer selected
-                    </div>
-                )}
-            </div>
+                </div>
+            )}
 
-            {/* Dates and Amount */}
+            {/* Form Fields - Simple Grid */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                     <Label htmlFor="issue_date" className="text-sm font-medium">
-                        Issue Date *
+                        Issue Date <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                        id="issue_date"
-                        type="date"
-                        value={data.issue_date}
-                        onChange={(e) => handleIssueDateChange(e.target.value)}
-                        className="mt-1 h-9"
-                    />
-                    <InputError message={errors.issue_date} className="mt-1" />
+                    <Input id="issue_date" type="date" value={data.issue_date} onChange={(e) => handleIssueDateChange(e.target.value)} />
+                    {errors.issue_date && <p className="mt-1 text-sm text-red-600">{errors.issue_date}</p>}
                 </div>
 
                 <div>
                     <Label htmlFor="due_date" className="text-sm font-medium">
-                        Due Date *
+                        Due Date <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                        id="due_date"
-                        type="date"
-                        value={data.due_date}
-                        onChange={(e) => setData('due_date', e.target.value)}
-                        className="mt-1 h-9"
-                    />
-                    <InputError message={errors.due_date} className="mt-1" />
+                    <Input id="due_date" type="date" value={data.due_date} onChange={(e) => setData('due_date', e.target.value)} />
+                    {errors.due_date && <p className="mt-1 text-sm text-red-600">{errors.due_date}</p>}
                 </div>
 
                 <div>
                     <Label htmlFor="amount_due" className="text-sm font-medium">
-                        Amount (SSP) *
+                        Amount (SSP) <span className="text-red-500">*</span>
                     </Label>
                     <Input
                         id="amount_due"
@@ -156,13 +137,12 @@ export default function InvoiceForm({
                         value={data.amount_due}
                         onChange={(e) => setData('amount_due', e.target.value)}
                         placeholder="0.00"
-                        className="mt-1 h-9"
                     />
-                    <InputError message={errors.amount_due} className="mt-1" />
+                    {errors.amount_due && <p className="mt-1 text-sm text-red-600">{errors.amount_due}</p>}
                 </div>
             </div>
 
-            {/* Reason */}
+            {/* Reason - Optional */}
             <div>
                 <Label htmlFor="reason" className="text-sm font-medium">
                     Reason (Optional)
@@ -172,18 +152,17 @@ export default function InvoiceForm({
                     value={data.reason}
                     onChange={(e) => setData('reason', e.target.value)}
                     placeholder="Enter reason for this invoice..."
-                    className="mt-1 min-h-[60px]"
                     rows={2}
                 />
-                <InputError message={errors.reason} className="mt-1" />
+                {errors.reason && <p className="mt-1 text-sm text-red-600">{errors.reason}</p>}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={handleReset} disabled={processing} size="sm">
+            {/* Action Buttons - Simple */}
+            <div className="flex items-center justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={handleReset} disabled={processing}>
                     Reset
                 </Button>
-                <Button type="submit" disabled={processing} size="sm" className="min-w-[100px]">
+                <Button type="submit" disabled={processing}>
                     <Save className="mr-2 h-4 w-4" />
                     {processing ? 'Saving...' : isEditing ? 'Update' : 'Create'}
                 </Button>

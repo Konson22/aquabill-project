@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Activity, ArrowLeft, Building2, Calendar, ChevronDown, CreditCard, Download, Edit, FileText, Mail, User, UserCheck, X } from 'lucide-react';
+import { Activity, Building2, Calendar, ChevronDown, CreditCard, Download, Edit, FileText, Mail, User, UserCheck, X } from 'lucide-react';
 import { useState } from 'react';
 
 const breadcrumbs = [
@@ -77,12 +77,6 @@ export default function UserProfile({ user, stats }) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href={route('users.index')}>
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back to Users
-                            </Link>
-                        </Button>
                         <div>
                             <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{user.name}</h1>
                             <p className="text-slate-600 dark:text-slate-400">{user.email}</p>

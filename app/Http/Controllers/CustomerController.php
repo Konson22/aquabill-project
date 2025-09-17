@@ -181,10 +181,14 @@ class CustomerController extends Controller
      */
     public function edit(string $id)
     {
-        $customer = Customer::findOrFail($id);
+        $customer = Customer::with(['neighborhood', 'category', 'meter'])->findOrFail($id);
         $categories = \App\Models\Category::all();
         $neighborhoods = Neighborhood::all();
-        $meters = Meter::whereDoesntHave('customer')->get();
+        
+        // Get available meters (unassigned + current customer's meter)
+        $meters = Meter::whereDoesntHave('customer')
+            ->orWhere('id', $customer->meter_id)
+            ->get();
 
         return Inertia::render('customers/edit', compact('customer', 'categories', 'neighborhoods', 'meters'));
     }
@@ -271,21 +275,40 @@ class CustomerController extends Controller
         $request->validate([
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:20',
+            'phone' => 'required|string|max:20',
             'email' => 'nullable|string|email|max:255',
             'category_id' => 'required|exists:categories,id',
             'neighborhood_id' => 'nullable|exists:neighborhoods,id',
+            'new_neighborhood_name' => 'nullable|string|max:255',
             'date' => 'nullable|date',
             'contract' => 'nullable|string|max:255',
             'credit' => 'nullable|numeric|min:0',
             'meter_id' => 'nullable|exists:meters,id',
             'account_number' => 'nullable|string|max:255|unique:customers,account_number,' . $id,
             'is_active' => 'nullable|boolean',
-            'plot_number' => 'nullable|string|max:20',
-            'address' => 'nullable|string|max:255',
+            'plot_number' => 'required|string|max:20',
+            'address' => 'required|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
         ]);
+
+        // Custom validation: at least one neighborhood option must be provided
+        if (!$request->filled('neighborhood_id') && !$request->filled('new_neighborhood_name')) {
+            return back()->withErrors([
+                'neighborhood_id' => 'Please either select an existing neighborhood or add a new one.',
+                'new_neighborhood_name' => 'Please either select an existing neighborhood or add a new one.'
+            ])->withInput();
+        }
+
+        $neighborhoodId = $request->input('neighborhood_id');
+
+        // Create new neighborhood if provided
+        if ($request->filled('new_neighborhood_name')) {
+            $neighborhood = Neighborhood::create([
+                'name' => $request->input('new_neighborhood_name'),
+            ]);
+            $neighborhoodId = $neighborhood->id;
+        }
 
         $customer->update([
             'first_name' => $request->input('first_name'),
@@ -293,7 +316,7 @@ class CustomerController extends Controller
             'phone' => $request->input('phone'),
             'email' => $request->input('email'),
             'category_id' => $request->input('category_id'),
-            'neighborhood_id' => $request->input('neighborhood_id'),
+            'neighborhood_id' => $neighborhoodId,
             'plot_number' => $request->input('plot_number'),
             'address' => $request->input('address'),
             'latitude' => $request->input('latitude'),
@@ -401,9 +424,9 @@ class CustomerController extends Controller
     /**
      * Export a customer's meter readings as CSV
      */
-    public function exportReadings(Customer $customer)
+public function exportReadings(Customer $customer)
     {
-        $customer->load(['meter', 'readings.meter']);
+        $customer->load(['meter', 'readings.meter', 'category', 'bills.reading']);
 
         $filename = 'customer_' . $customer->id . '_readings_' . now()->format('Ymd_His') . '.csv';
         $headers = [
@@ -412,27 +435,67 @@ class CustomerController extends Controller
         ];
 
         $columns = [
-            'Reading ID', 'Date', 'Meter', 'Prev Reading', 'Current Reading', 'Consumption', 'Billing Officer', 'Illegal Connection'
+            'Reading ID', 'Date', 'Start Date', 'End Date', 'Meter', 'Prev Reading', 'Current Reading', 'Consumption', 
+            'Tariff', 'Fixed Charges', 'Total Amount', 'Billing Officer'
         ];
 
         $callback = function () use ($customer, $columns) {
             $handle = fopen('php://output', 'w');
             fprintf($handle, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            
+            // Add customer information header
+            fputcsv($handle, ['CUSTOMER INFORMATION']);
+            fputcsv($handle, ['Customer Name', $customer->first_name . ' ' . $customer->last_name]);
+            fputcsv($handle, ['Address', $customer->address ?? 'N/A']);
+            fputcsv($handle, ['Plot Number', $customer->plot_number ?? 'N/A']);
+            fputcsv($handle, ['Account Number', $customer->account_number ?? 'N/A']);
+            fputcsv($handle, ['Export Date', now()->format('Y-m-d H:i:s')]);
+            fputcsv($handle, []); // Empty row
+            
+            // Add column headers
             fputcsv($handle, $columns);
-            $customer->readings()->with(['meter', 'recordedBy'])->orderBy('date', 'desc')->chunk(500, function ($rows) use ($handle) {
-                foreach ($rows as $r) {
-                    fputcsv($handle, [
-                        $r->id,
-                        $r->date,
-                        $r->meter?->serial,
-                        $r->previous,
-                        $r->value,
-                        (float) ($r->consumption ?? ($r->value - $r->previous)),
-                        optional($r->recordedBy)->name ?? '',
-                        (float) ($r->illigal_connection ?? 0),
-                    ]);
+            
+            // Get customer's tariff and fixed charges from category
+            $tariff = $customer->category?->tariff ?? 0;
+            $fixedCharges = $customer->category?->fixed_charge ?? 0;
+            
+            // Get all readings ordered by date to calculate proper start/end dates
+            $allReadings = $customer->readings()->with(['meter', 'recordedBy', 'bills'])->orderBy('date', 'asc')->get();
+            
+            foreach ($allReadings as $index => $r) {
+                $consumption = (float) ($r->consumption ?? ($r->value - $r->previous));
+                
+                // Calculate volumetric charge (consumption * tariff)
+                $volumetricCharge = $consumption * $tariff;
+                
+                // Calculate total amount (volumetric + fixed charges)
+                $totalAmount = $volumetricCharge + $fixedCharges;
+                
+                // Calculate start and end dates for billing period
+                $startDate = $r->date; // Current reading date
+                $endDate = $r->date;   // Current reading date
+                
+                // If this is not the first reading, start date should be the previous reading date
+                if ($index > 0) {
+                    $previousReading = $allReadings[$index - 1];
+                    $startDate = $previousReading->date;
                 }
-            });
+                
+                fputcsv($handle, [
+                    $r->id,
+                    $r->date,
+                    $startDate,
+                    $endDate,
+                    $r->meter?->serial,
+                    $r->previous,
+                    $r->value,
+                    $consumption,
+                    $tariff,
+                    $fixedCharges,
+                    $totalAmount,
+                    optional($r->recordedBy)->name ?? '',
+                ]);
+            }
             fclose($handle);
         };
 

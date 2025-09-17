@@ -30,7 +30,9 @@ export function NavUser() {
                                 </div>
                                 <div className="flex flex-col items-start">
                                     <span className="text-sm font-bold">{auth.user.name}</span>
-                                    <span className="text-xs font-medium text-slate-300 dark:text-slate-400">Administrator</span>
+                                    <span className="text-xs font-medium text-slate-300 dark:text-slate-400">
+                                        {auth.user.department?.name || 'No Department'}
+                                    </span>
                                 </div>
                                 <ChevronsUpDown className="ml-auto h-4 w-4 text-slate-400 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                             </div>

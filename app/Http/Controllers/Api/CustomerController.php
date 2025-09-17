@@ -14,10 +14,12 @@ use Illuminate\Validation\Rule;
 class CustomerController extends Controller
 {
     /**
-     * Display a listing of customers
+     * Display a listing of customers whose last reading was not recorded in current month
      */
     public function index(Request $request): JsonResponse
     {
+        $currentMonth = now()->format('Y-m');
+        
         $customers = Customer::with([
             'category',
             'neighborhood',
@@ -28,7 +30,23 @@ class CustomerController extends Controller
             'bills' => function ($query) {
                 $query->latest()->limit(1);
             },
-        ])->whereNotNull('meter_id')->get()->map(function ($customer) {
+        ])->whereNotNull('meter_id')
+        ->whereDoesntHave('readings', function ($query) use ($currentMonth) {
+            $query->whereRaw('DATE_FORMAT(created_at, "%Y-%m") = ?', [$currentMonth]);
+        })
+        ->orWhereHas('readings', function ($query) {
+            $query->whereNull('created_at');
+        })
+        ->get()
+        ->filter(function ($customer) use ($currentMonth) {
+            $last_reading = $customer->readings->first();
+            if (!$last_reading) {
+                return true; // Include customers with no readings
+            }
+            // Include customers whose last reading is not from current month
+            return $last_reading->created_at->format('Y-m') !== $currentMonth;
+        })
+        ->map(function ($customer) {
             $last_reading = $customer->readings->first();
             $last_bill = $customer->bills->first();
             $customer = [
@@ -57,8 +75,7 @@ class CustomerController extends Controller
             return $customer;
         });
 
-
-        return response()->json($customers, 200);
+        return response()->json($customers->values(), 200);
     }
 
     /**

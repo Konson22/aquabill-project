@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input, Select } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { Activity, BarChart3, Calendar, Download, Droplets, Filter, Printer, Search, TrendingUp, X } from 'lucide-react';
+import { Activity, BarChart3, Download, Droplets, Filter, Printer, Search, TrendingUp, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const breadcrumbs = [
@@ -553,7 +553,7 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
             </div>
 
             {/* Stats Cards */}
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Readings</CardTitle>
@@ -562,17 +562,6 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
                     <CardContent>
                         <div className="text-2xl font-bold">{filteredStats.total_readings}</div>
                         <p className="text-xs text-slate-600 dark:text-slate-400">All time readings</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">This Month</CardTitle>
-                        <Calendar className="h-4 w-4 text-green-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.this_month}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Readings this month</p>
                     </CardContent>
                 </Card>
 

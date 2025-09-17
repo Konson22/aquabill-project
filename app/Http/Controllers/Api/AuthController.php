@@ -40,6 +40,15 @@ class AuthController extends BaseController
 
         $user = User::where('email', $request->email)->first();
         
+        // Check if user is active
+        if ($user->status !== 'active') {
+            Auth::logout(); // Logout the user if they're not active
+            return response()->json([
+                'success' => false,
+                'message' => 'Account is inactive. Please contact administrator.'
+            ], 403);
+        }
+        
         // Revoke existing tokens
         $user->tokens()->delete();
         

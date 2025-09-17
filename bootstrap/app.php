@@ -22,6 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        // Register custom middleware
+        $middleware->alias([
+            'department.access' => \App\Http\Middleware\DepartmentAccess::class,
+            'department.restriction' => \App\Http\Middleware\DepartmentRestriction::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

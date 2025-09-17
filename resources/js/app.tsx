@@ -9,7 +9,7 @@ const appName = import.meta.env.VITE_APP_NAME || 'etixss | admin';
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
-    resolve: (name) => resolvePageComponent(`./pages/${name}.jsx`, import.meta.glob('./pages/**/*.jsx')),
+    resolve: (name) => resolvePageComponent(`./pages/${name}.jsx`, import.meta.glob('./pages/**/*.{jsx,tsx}')),
     setup({ el, App, props }) {
         const root = createRoot(el);
 

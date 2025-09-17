@@ -29,7 +29,7 @@ export function AppSidebarHeader({ breadcrumbs = [] }) {
                             </Avatar>
                             <div className="hidden flex-col items-start md:flex">
                                 <span className="text-sm font-semibold text-gray-900">{auth.user.name}</span>
-                                <span className="text-xs text-gray-600">Administrator</span>
+                                <span className="text-xs text-gray-600">{auth.user.department?.name || 'No Department'}</span>
                             </div>
                             <ChevronsUpDown className="h-4 w-4 text-gray-500" />
                         </Button>

@@ -1,20 +1,70 @@
+import RevenueTrendChart from '@/components/charts/RevenueTrendChart';
+import DateRangeFilter from '@/components/finance/DateRangeFilter';
+import MetricCard from '@/components/finance/MetricCard';
+import ReceivablesAging from '@/components/finance/ReceivablesAging';
+import TopDebtors from '@/components/finance/TopDebtors';
+import InvoicePaymentFormModal from '@/components/payments/InvoicePaymentFormModal';
+import PaymentFormModal from '@/components/payments/PaymentFormModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowRight, CreditCard, Download, FileText, Printer, Receipt, Search, TrendingDown } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    ArrowRight,
+    BarChart3,
+    CreditCard,
+    DollarSign,
+    Download,
+    FileText,
+    Filter,
+    Printer,
+    Receipt,
+    Search,
+    Smartphone,
+    TrendingUp,
+    Wallet,
+} from 'lucide-react';
 import { useState } from 'react';
 import { formatSSPCurrency } from '../../utils/formatSSPCurrency';
 
 const breadcrumbs = [{ title: 'Finance', href: '/finance' }];
 
-export default function FinanceIndex({ stats, allPayments, allInvoices, allBills = [] }) {
-    const [activeTab, setActiveTab] = useState('invoices');
+export default function FinanceIndex({
+    stats,
+    allPayments,
+    allInvoices,
+    allBills = [],
+    monthlyRevenue = [],
+    paymentMethodData = [],
+    recentBills = [],
+    latestPayments = [],
+    overdueBills = [],
+    receivablesAging = [],
+    topDebtors = [],
+    dateRange = 'month',
+}) {
+    const [activeTab, setActiveTab] = useState('overview');
     const [searchPayments, setSearchPayments] = useState('');
     const [searchInvoices, setSearchInvoices] = useState('');
     const [searchBills, setSearchBills] = useState('');
+    const [currentDateRange, setCurrentDateRange] = useState(dateRange);
+
+    // Payment modal states
+    const [billPaymentModalOpen, setBillPaymentModalOpen] = useState(false);
+    const [invoicePaymentModalOpen, setInvoicePaymentModalOpen] = useState(false);
+    const [selectedBillForPayment, setSelectedBillForPayment] = useState(null);
+    const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState(null);
+    const [billPaymentDefaults, setBillPaymentDefaults] = useState({});
+    const [invoicePaymentDefaults, setInvoicePaymentDefaults] = useState({});
+
+    // Handle date range change
+    const handleDateRangeChange = (newRange) => {
+        setCurrentDateRange(newRange);
+        router.get('/finance', { date_range: newRange }, { preserveState: true });
+    };
 
     // Export to Excel function
     const exportToExcel = (data, filename, summary = null) => {
@@ -152,144 +202,576 @@ export default function FinanceIndex({ stats, allPayments, allInvoices, allBills
         return filtered;
     };
 
+    // Payment handlers
+    const handleBillPayment = (bill) => {
+        setSelectedBillForPayment(bill);
+        setBillPaymentDefaults({
+            bill_id: bill.id,
+            customer_id: bill.customer?.id || '',
+            customer_name: bill.customer ? `${bill.customer.first_name} ${bill.customer.last_name}` : '',
+            prev_balance: bill.prev_balance || 0,
+            total_amount: bill.total_amount || 0,
+            amount: bill.current_balance || bill.total_amount || '',
+            tariff: bill.customer?.category?.tariff || '',
+            fixed_charge: bill.customer?.category?.fixed_charge || '',
+            illigal_connection: bill.reading?.illigal_connection || 0,
+            date: new Date().toISOString().split('T')[0],
+            method: 'cash',
+        });
+        setBillPaymentModalOpen(true);
+    };
+
+    const handleInvoicePayment = (invoice) => {
+        setSelectedInvoiceForPayment(invoice);
+        setInvoicePaymentDefaults({
+            invoice_id: invoice.id,
+            customer_id: invoice.customer_id,
+            customer_name: invoice.customer ? `${invoice.customer.first_name} ${invoice.customer.last_name}` : 'N/A',
+            amount: invoice.amount_due,
+            due_date: invoice.due_date,
+            date: new Date().toISOString().split('T')[0],
+            method: 'cash',
+        });
+        setInvoicePaymentModalOpen(true);
+    };
+
+    const submitBillPayment = (data) => {
+        const payload = {
+            bill_id: data.bill_id,
+            customer_id: data.customer_id,
+            payment_date: data.date,
+            amount_paid: data.amount,
+            payment_method: data.method,
+            reference_number: data.reference_number || 'N/A',
+        };
+
+        return new Promise((resolve) => {
+            router.post('/payments', payload, {
+                onSuccess: () => {
+                    setBillPaymentModalOpen(false);
+                    setSelectedBillForPayment(null);
+                    router.reload();
+                    resolve();
+                },
+                onError: (errors) => {
+                    console.error('Payment submission error:', errors);
+                    resolve();
+                },
+                onFinish: () => resolve(),
+            });
+        });
+    };
+
+    const submitInvoicePayment = async (data) => {
+        try {
+            await router.post('/payments/invoice', {
+                invoice_id: data.invoice_id,
+                customer_id: data.customer_id,
+                amount_paid: data.amount,
+                payment_method: data.method,
+                payment_date: data.date,
+                reference_number: data.reference_number,
+            });
+            setInvoicePaymentModalOpen(false);
+            setSelectedInvoiceForPayment(null);
+            router.reload();
+        } catch (error) {
+            console.error('Invoice payment submission error:', error);
+        }
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Finance" />
+            <Head title="Finance Dashboard" />
 
             {/* Header Section */}
             <div className="mb-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Finance Dashboard</h1>
-                    <p className="mt-2 text-slate-600 dark:text-slate-400">Comprehensive overview of billing, invoicing, and payment management</p>
+                <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Finance Dashboard</h1>
+                        <p className="mt-2 text-slate-600 dark:text-slate-400">
+                            Comprehensive overview of billing, invoicing, and payment management
+                        </p>
+                    </div>
+                    <div className="mt-4 flex items-center gap-4 sm:mt-0">
+                        <DateRangeFilter value={currentDateRange} onChange={handleDateRangeChange} />
+                        <Button variant="outline" size="sm">
+                            <Filter className="mr-2 h-4 w-4" />
+                            Filters
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                // Export all financial data to Excel
+                                const exportData = {
+                                    stats: stats,
+                                    recentBills: recentBills,
+                                    latestPayments: latestPayments,
+                                    overdueBills: overdueBills,
+                                    topDebtors: topDebtors,
+                                    receivablesAging: receivablesAging,
+                                    monthlyRevenue: monthlyRevenue,
+                                    paymentMethodData: paymentMethodData,
+                                };
+
+                                // Create a comprehensive summary
+                                const summary = {
+                                    'Export Date': new Date().toLocaleDateString(),
+                                    'Date Range': currentDateRange,
+                                    'Total Revenue': formatSSPCurrency(stats?.total_revenue || 0),
+                                    'Outstanding Balance': formatSSPCurrency(stats?.outstanding_balance || 0),
+                                    'Total Bills Issued': stats?.total_bills_issued || 0,
+                                    'Collection Rate': `${stats?.collection_rate || 0}%`,
+                                    'Recent Bills Count': recentBills.length,
+                                    'Latest Payments Count': latestPayments.length,
+                                    'Overdue Bills Count': overdueBills.length,
+                                    'Top Debtors Count': topDebtors.length,
+                                };
+
+                                // Convert to CSV format
+                                const csvContent = [
+                                    // Summary section
+                                    'FINANCE DASHBOARD EXPORT',
+                                    'Generated on: ' + new Date().toLocaleString(),
+                                    '',
+                                    'SUMMARY',
+                                    Object.keys(summary).join(','),
+                                    Object.values(summary)
+                                        .map((value) => `"${value}"`)
+                                        .join(','),
+                                    '',
+                                    // Recent Bills
+                                    'RECENT BILLS',
+                                    'Bill ID,Customer,Amount,Status,Due Date',
+                                    ...recentBills.map((bill) =>
+                                        [
+                                            bill.id,
+                                            bill.customer_name,
+                                            formatSSPCurrency(bill.amount),
+                                            bill.status,
+                                            bill.due_date ? new Date(bill.due_date).toLocaleDateString() : 'N/A',
+                                        ]
+                                            .map((value) => `"${value}"`)
+                                            .join(','),
+                                    ),
+                                    '',
+                                    // Latest Payments
+                                    'LATEST PAYMENTS',
+                                    'Payment ID,Customer,Amount,Method,Date',
+                                    ...latestPayments.map((payment) =>
+                                        [
+                                            payment.id,
+                                            payment.customer_name,
+                                            formatSSPCurrency(payment.amount),
+                                            payment.method,
+                                            payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : 'N/A',
+                                        ]
+                                            .map((value) => `"${value}"`)
+                                            .join(','),
+                                    ),
+                                    '',
+                                    // Overdue Bills
+                                    'OVERDUE BILLS',
+                                    'Bill ID,Customer,Amount,Days Overdue',
+                                    ...overdueBills.map((bill) =>
+                                        [bill.id, bill.customer_name, formatSSPCurrency(bill.amount), bill.days_overdue]
+                                            .map((value) => `"${value}"`)
+                                            .join(','),
+                                    ),
+                                    '',
+                                    // Top Debtors
+                                    'TOP DEBTORS',
+                                    'Customer,Outstanding Amount,Bill Count',
+                                    ...topDebtors.map((debtor) =>
+                                        [debtor.customer_name, formatSSPCurrency(debtor.outstanding_amount), debtor.bill_count]
+                                            .map((value) => `"${value}"`)
+                                            .join(','),
+                                    ),
+                                    '',
+                                    // Receivables Aging
+                                    'RECEIVABLES AGING',
+                                    'Days Overdue,Amount,Count',
+                                    ...receivablesAging
+                                        .reduce((acc, item) => {
+                                            const bucket = item.daysOverdue <= 30 ? '0-30' : item.daysOverdue <= 60 ? '31-60' : '61+';
+                                            const existing = acc.find((b) => b.bucket === bucket);
+                                            if (existing) {
+                                                existing.amount += item.amount;
+                                                existing.count += 1;
+                                            } else {
+                                                acc.push({ bucket, amount: item.amount, count: 1 });
+                                            }
+                                            return acc;
+                                        }, [])
+                                        .map((bucket) =>
+                                            [bucket.bucket, formatSSPCurrency(bucket.amount), bucket.count].map((value) => `"${value}"`).join(','),
+                                        ),
+                                    '',
+                                    // Monthly Revenue
+                                    'MONTHLY REVENUE',
+                                    'Month,Revenue',
+                                    ...monthlyRevenue.map((item) =>
+                                        [item.month, formatSSPCurrency(item.revenue)].map((value) => `"${value}"`).join(','),
+                                    ),
+                                    '',
+                                    // Payment Methods
+                                    'PAYMENT METHODS',
+                                    'Method,Amount,Count',
+                                    ...paymentMethodData.map((item) =>
+                                        [item.method, formatSSPCurrency(item.amount), item.count].map((value) => `"${value}"`).join(','),
+                                    ),
+                                ].join('\n');
+
+                                // Download the file
+                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                const link = document.createElement('a');
+                                const url = URL.createObjectURL(blob);
+                                link.setAttribute('href', url);
+                                link.setAttribute('download', `finance-dashboard-${new Date().toISOString().split('T')[0]}.csv`);
+                                link.style.visibility = 'hidden';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                            }}
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export Excel
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Quick Actions Grid */}
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                    {/* Bills Card */}
-                    <Link href="/billing" className="block">
-                        <Card className="group cursor-pointer border-l-4 border-l-blue-500 transition-all duration-200 hover:shadow-lg">
-                            <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="rounded-lg bg-blue-100 p-2 transition-colors group-hover:bg-blue-200 dark:bg-blue-900/20 dark:group-hover:bg-blue-900/30">
-                                            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Bills Management</h3>
-                                            <p className="text-xs text-slate-600 dark:text-slate-400">Manage customer bills and billing cycles</p>
-                                        </div>
-                                    </div>
-                                    <ArrowRight className="h-4 w-4 text-slate-400 transition-colors group-hover:text-blue-600" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-
-                    {/* Invoices Card */}
-                    <Link href="/invoices" className="block">
-                        <Card className="group cursor-pointer border-l-4 border-l-green-500 transition-all duration-200 hover:shadow-lg">
-                            <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="rounded-lg bg-green-100 p-2 transition-colors group-hover:bg-green-200 dark:bg-green-900/20 dark:group-hover:bg-green-900/30">
-                                            <Receipt className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Invoice System</h3>
-                                            <p className="text-xs text-slate-600 dark:text-slate-400">Create and track service invoices</p>
-                                        </div>
-                                    </div>
-                                    <ArrowRight className="h-4 w-4 text-slate-400 transition-colors group-hover:text-green-600" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-
-                    {/* Payments Card */}
-                    <Link href="/payments" className="block">
-                        <Card className="group cursor-pointer border-l-4 border-l-purple-500 transition-all duration-200 hover:shadow-lg">
-                            <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="rounded-lg bg-purple-100 p-2 transition-colors group-hover:bg-purple-200 dark:bg-purple-900/20 dark:group-hover:bg-purple-900/30">
-                                            <CreditCard className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">Payment Processing</h3>
-                                            <p className="text-xs text-slate-600 dark:text-slate-400">Record and track payments</p>
-                                        </div>
-                                    </div>
-                                    <ArrowRight className="h-4 w-4 text-slate-400 transition-colors group-hover:text-purple-600" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                </div>
-            </div>
-
-            {/* Finance Overview - Essential Counts Only */}
-            <div className="mb-8">
-                <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">Finance Overview</h2>
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-blue-100 dark:border-blue-800 dark:from-blue-900/20 dark:to-blue-800/20">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Total Bills</p>
-                                    <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">{allBills?.total || 0}</p>
-                                    <p className="text-xs text-blue-700 dark:text-blue-300">All generated bills</p>
+                    {/* Bills Button */}
+                    <Button
+                        asChild
+                        className="h-auto bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white shadow-lg transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl"
+                    >
+                        <Link href="/billing" className="flex w-full items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <div className="rounded-lg bg-white/20 p-3">
+                                    <FileText className="h-6 w-6" />
                                 </div>
-                                <FileText className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                                <div className="text-left">
+                                    <h3 className="text-lg font-semibold">Bills Management</h3>
+                                    <p className="text-sm text-blue-100">Manage customer bills and billing cycles</p>
+                                </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                            <ArrowRight className="h-5 w-5 text-white/80" />
+                        </Link>
+                    </Button>
 
-                    <Card className="border-green-200 bg-gradient-to-r from-green-50 to-green-100 dark:border-green-800 dark:from-green-900/20 dark:to-green-800/20">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-green-600 dark:text-green-400">Total Invoices</p>
-                                    <p className="text-3xl font-bold text-green-900 dark:text-green-100">{allInvoices?.total || 0}</p>
-                                    <p className="text-xs text-green-700 dark:text-green-300">All created invoices</p>
+                    {/* Invoices Button */}
+                    <Button
+                        asChild
+                        className="h-auto bg-gradient-to-r from-green-500 to-green-600 p-6 text-white shadow-lg transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-xl"
+                    >
+                        <Link href="/invoices" className="flex w-full items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <div className="rounded-lg bg-white/20 p-3">
+                                    <Receipt className="h-6 w-6" />
                                 </div>
-                                <Receipt className="h-10 w-10 text-green-600 dark:text-green-400" />
+                                <div className="text-left">
+                                    <h3 className="text-lg font-semibold">Invoice System</h3>
+                                    <p className="text-sm text-green-100">Create and track service invoices</p>
+                                </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                            <ArrowRight className="h-5 w-5 text-white/80" />
+                        </Link>
+                    </Button>
 
-                    <Card className="border-orange-200 bg-gradient-to-r from-orange-50 to-orange-100 dark:border-orange-800 dark:from-orange-900/20 dark:to-orange-800/20">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Unpaid Invoices</p>
-                                    <p className="text-3xl font-bold text-orange-900 dark:text-orange-100">{stats?.unpaid_invoices || 0}</p>
-                                    <p className="text-xs text-orange-700 dark:text-orange-300">Awaiting payment</p>
+                    {/* Payments Button */}
+                    <Button
+                        asChild
+                        className="h-auto bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-white shadow-lg transition-all duration-200 hover:from-purple-600 hover:to-purple-700 hover:shadow-xl"
+                    >
+                        <Link href="/payments" className="flex w-full items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <div className="rounded-lg bg-white/20 p-3">
+                                    <CreditCard className="h-6 w-6" />
                                 </div>
-                                <TrendingDown className="h-10 w-10 text-orange-600 dark:text-orange-400" />
+                                <div className="text-left">
+                                    <h3 className="text-lg font-semibold">Payment Processing</h3>
+                                    <p className="text-sm text-purple-100">Record and track payments</p>
+                                </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                            <ArrowRight className="h-5 w-5 text-white/80" />
+                        </Link>
+                    </Button>
                 </div>
             </div>
 
-            {/* Tabbed Interface */}
-            <Card>
+            {/* Key Metrics Cards */}
+            <div className="mb-8">
+                <h2 className="mb-6 text-2xl font-semibold text-slate-900 dark:text-slate-100">Key Metrics</h2>
+                <div className="grid grid-cols-2 gap-6">
+                    <MetricCard
+                        title="Total Revenue"
+                        value={formatSSPCurrency(stats?.total_revenue || 0)}
+                        subtitle={`This ${currentDateRange}`}
+                        icon={DollarSign}
+                        color="green"
+                        trend="up"
+                        trendValue="+12.5%"
+                    />
+                    <MetricCard
+                        title="Outstanding Balance"
+                        value={formatSSPCurrency(stats?.outstanding_balance || 0)}
+                        subtitle="Unpaid bills & invoices"
+                        icon={AlertTriangle}
+                        color="red"
+                        trend="down"
+                        trendValue="-5.2%"
+                    />
+                    <MetricCard
+                        title="Total Bills Issued"
+                        value={stats?.total_bills_issued || 0}
+                        subtitle={`This ${currentDateRange}`}
+                        icon={FileText}
+                        color="blue"
+                        trend="up"
+                        trendValue="+8.1%"
+                    />
+                    <MetricCard
+                        title="Collection Rate"
+                        value={`${stats?.collection_rate || 0}%`}
+                        subtitle="Payment efficiency"
+                        icon={TrendingUp}
+                        color="purple"
+                        trend="up"
+                        trendValue="+2.3%"
+                    />
+                </div>
+            </div>
+
+            {/* Charts Section */}
+            <div className="mb-8">
+                <h2 className="mb-6 text-2xl font-semibold text-slate-900 dark:text-slate-100">Analytics</h2>
+                <div className="grid grid-cols-1 gap-6">
+                    <RevenueTrendChart data={monthlyRevenue} type="area" />
+                </div>
+            </div>
+
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                {/* Left Column - Tables */}
+                <div className="space-y-6 lg:col-span-2">
+                    {/* Recent Bills Table */}
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <FileText className="h-5 w-5" />
+                                        Recent Bills
+                                    </CardTitle>
+                                    <CardDescription>Latest bills issued</CardDescription>
+                                </div>
+                                <Button variant="outline" size="sm">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Export
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-gray-200 dark:border-gray-700">
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Bill #</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Due Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {recentBills.length > 0 ? (
+                                            recentBills.map((bill) => (
+                                                <tr
+                                                    key={bill.id}
+                                                    className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                                                >
+                                                    <td className="px-4 py-3 text-sm">
+                                                        <Link href={`/billing/${bill.id}`} className="text-blue-600 hover:underline">
+                                                            #{bill.id}
+                                                        </Link>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm">{bill.customer_name}</td>
+                                                    <td className="px-4 py-3 text-sm font-medium">{formatSSPCurrency(bill.amount)}</td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                        <span
+                                                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                                                                bill.status === 'paid'
+                                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                                                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                                                            }`}
+                                                        >
+                                                            {bill.status.toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                        {bill.due_date ? new Date(bill.due_date).toLocaleDateString() : '—'}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td className="px-4 py-8 text-center text-gray-500" colSpan={5}>
+                                                    No recent bills found
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Latest Payments Table */}
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <CreditCard className="h-5 w-5" />
+                                        Latest Payments
+                                    </CardTitle>
+                                    <CardDescription>Recent payment transactions</CardDescription>
+                                </div>
+                                <Button variant="outline" size="sm">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Export
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-gray-200 dark:border-gray-700">
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Payment #</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Method</th>
+                                            <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {latestPayments.length > 0 ? (
+                                            latestPayments.map((payment) => (
+                                                <tr
+                                                    key={payment.id}
+                                                    className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
+                                                >
+                                                    <td className="px-4 py-3 text-sm">#{payment.id}</td>
+                                                    <td className="px-4 py-3 text-sm">{payment.customer_name}</td>
+                                                    <td className="px-4 py-3 text-sm font-medium">{formatSSPCurrency(payment.amount)}</td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                        <span
+                                                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                                                                payment.method === 'cash'
+                                                                    ? 'bg-green-100 text-green-800'
+                                                                    : payment.method === 'mobile_money'
+                                                                      ? 'bg-orange-100 text-orange-800'
+                                                                      : 'bg-blue-100 text-blue-800'
+                                                            }`}
+                                                        >
+                                                            {payment.method.replace('_', ' ').toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm">
+                                                        {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : '—'}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td className="px-4 py-8 text-center text-gray-500" colSpan={5}>
+                                                    No recent payments found
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Overdue Bills Widget */}
+                    {overdueBills.length > 0 && (
+                        <Card className="border-red-200 dark:border-red-800">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                                    <AlertTriangle className="h-5 w-5" />
+                                    Overdue Bills
+                                </CardTitle>
+                                <CardDescription>Bills requiring immediate attention</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    {overdueBills.slice(0, 5).map((bill) => (
+                                        <div
+                                            key={bill.id}
+                                            className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950"
+                                        >
+                                            <div>
+                                                <p className="font-medium text-red-900 dark:text-red-100">#{bill.id}</p>
+                                                <p className="text-sm text-red-700 dark:text-red-300">{bill.customer_name}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-red-900 dark:text-red-100">{formatSSPCurrency(bill.amount)}</p>
+                                                <p className="text-xs text-red-700 dark:text-red-300">{bill.days_overdue} days overdue</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+
+                {/* Right Column - Analytics */}
+                <div className="space-y-6">
+                    <ReceivablesAging data={receivablesAging} />
+                    <TopDebtors data={topDebtors} />
+                </div>
+            </div>
+
+            {/* Legacy Tabbed Interface - Hidden by default, can be toggled */}
+            <Card className="mt-8">
                 <CardHeader>
-                    <CardTitle>Financial Records</CardTitle>
-                    <CardDescription>View and manage payments, invoices, and bills</CardDescription>
+                    <CardTitle>Detailed Records</CardTitle>
+                    <CardDescription>Comprehensive view of all financial records</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                         <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="invoices" className="flex items-center gap-2">
-                                <Receipt className="h-4 w-4" />
-                                Invoices
+                            <TabsTrigger value="overview" className="flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4" />
+                                Overview
                             </TabsTrigger>
                             <TabsTrigger value="bills" className="flex items-center gap-2">
                                 <FileText className="h-4 w-4" />
                                 Bills
                             </TabsTrigger>
+                            <TabsTrigger value="invoices" className="flex items-center gap-2">
+                                <Receipt className="h-4 w-4" />
+                                Invoices
+                            </TabsTrigger>
                         </TabsList>
+
+                        {/* Overview Tab */}
+                        <TabsContent value="overview" className="mt-6">
+                            <div className="py-8 text-center">
+                                <BarChart3 className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                                <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">Dashboard Overview</h3>
+                                <p className="text-gray-600 dark:text-gray-400">
+                                    The main dashboard above provides a comprehensive view of your financial data.
+                                </p>
+                            </div>
+                        </TabsContent>
 
                         {/* Bills Tab */}
                         <TabsContent value="bills" className="mt-6">
@@ -384,6 +866,7 @@ export default function FinanceIndex({ stats, allPayments, allInvoices, allBills
                                                 <th className="px-4 py-3 text-left text-sm font-semibold">Period</th>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -418,11 +901,24 @@ export default function FinanceIndex({ stats, allPayments, allInvoices, allBills
                                                                 {bill.current_balance <= 0 ? 'PAID' : 'PENDING'}
                                                             </span>
                                                         </td>
+                                                        <td className="px-4 py-3 text-sm">
+                                                            {bill.current_balance > 0 && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-8 gap-1 text-green-600 hover:bg-green-50 hover:text-green-700"
+                                                                    onClick={() => handleBillPayment(bill)}
+                                                                >
+                                                                    <CreditCard className="h-3 w-3" />
+                                                                    Pay
+                                                                </Button>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td className="px-4 py-8 text-center text-slate-500" colSpan={5}>
+                                                    <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
                                                         No bills found.
                                                     </td>
                                                 </tr>
@@ -551,6 +1047,7 @@ export default function FinanceIndex({ stats, allPayments, allInvoices, allBills
                                                 <th className="px-4 py-3 text-left text-sm font-semibold">Due Date</th>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
                                                 <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                                                <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -600,11 +1097,24 @@ export default function FinanceIndex({ stats, allPayments, allInvoices, allBills
                                                                 {invoice.status?.toUpperCase() || 'UNKNOWN'}
                                                             </span>
                                                         </td>
+                                                        <td className="px-4 py-3 text-sm">
+                                                            {invoice.status !== 'paid' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-8 gap-1 text-green-600 hover:bg-green-50 hover:text-green-700"
+                                                                    onClick={() => handleInvoicePayment(invoice)}
+                                                                >
+                                                                    <CreditCard className="h-3 w-3" />
+                                                                    Pay
+                                                                </Button>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 ))
                                             ) : (
                                                 <tr>
-                                                    <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
+                                                    <td className="px-4 py-8 text-center text-slate-500" colSpan={7}>
                                                         No invoices found.
                                                     </td>
                                                 </tr>
@@ -640,6 +1150,33 @@ export default function FinanceIndex({ stats, allPayments, allInvoices, allBills
                     </Tabs>
                 </CardContent>
             </Card>
+
+            {/* Bill Payment Modal */}
+            <PaymentFormModal
+                open={billPaymentModalOpen}
+                onOpenChange={setBillPaymentModalOpen}
+                defaultValues={billPaymentDefaults}
+                onSubmit={submitBillPayment}
+                methods={[
+                    { value: 'cash', label: 'Cash', icon: Wallet, color: 'bg-green-100 text-green-800' },
+                    { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone, color: 'bg-orange-100 text-orange-800' },
+                    { value: 'bank_transfer', label: 'Bank Transfer', icon: CreditCard, color: 'bg-blue-100 text-blue-800' },
+                ]}
+            />
+
+            {/* Invoice Payment Modal */}
+            <InvoicePaymentFormModal
+                open={invoicePaymentModalOpen}
+                onOpenChange={setInvoicePaymentModalOpen}
+                onSubmit={submitInvoicePayment}
+                defaultValues={invoicePaymentDefaults}
+                customer={selectedInvoiceForPayment?.customer}
+                methods={[
+                    { value: 'cash', label: 'Cash', icon: Wallet, color: 'bg-green-100 text-green-800' },
+                    { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone, color: 'bg-orange-100 text-orange-800' },
+                    { value: 'bank_transfer', label: 'Bank Transfer', icon: CreditCard, color: 'bg-blue-100 text-blue-800' },
+                ]}
+            />
         </AppLayout>
     );
 }

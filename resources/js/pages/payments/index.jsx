@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input, Select } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { BarChart3, Calendar, Clock, CreditCard, DollarSign, Download, Filter, Search, TrendingUp, User, X } from 'lucide-react';
+import { BarChart3, Clock, CreditCard, DollarSign, Download, Filter, User, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatSSPCurrency } from '../../utils/formatSSPCurrency';
 
@@ -24,8 +25,6 @@ export default function PaymentsIndex({ payments }) {
         dateFrom: '',
         dateTo: '',
         customer: '',
-        minAmount: '',
-        maxAmount: '',
     });
 
     const formatDate = (date) => (date ? new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '');
@@ -86,14 +85,6 @@ export default function PaymentsIndex({ payments }) {
             filtered = filtered.filter((p) => new Date(p.payment_date) <= new Date(filters.dateTo));
         }
 
-        // Apply amount range filter
-        if (filters.minAmount) {
-            filtered = filtered.filter((p) => parseFloat(p.amount_paid) >= parseFloat(filters.minAmount));
-        }
-        if (filters.maxAmount) {
-            filtered = filtered.filter((p) => parseFloat(p.amount_paid) <= parseFloat(filters.maxAmount));
-        }
-
         setFilteredPayments(filtered);
     }, [searchQuery, filters, items]);
 
@@ -105,8 +96,6 @@ export default function PaymentsIndex({ payments }) {
             dateFrom: '',
             dateTo: '',
             customer: '',
-            minAmount: '',
-            maxAmount: '',
         });
     };
 
@@ -297,7 +286,7 @@ export default function PaymentsIndex({ payments }) {
             </div>
 
             {/* KPI Cards */}
-            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {/* Total Payments */}
                 <Card>
                     <CardContent className="p-6">
@@ -329,26 +318,10 @@ export default function PaymentsIndex({ payments }) {
                         </div>
                     </CardContent>
                 </Card>
-
-                {/* Average Payment */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center">
-                            <div className="flex-1">
-                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Average Payment</p>
-                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatSSPCurrency(kpis.averagePayment)}</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-500">per transaction</p>
-                            </div>
-                            <div className="rounded-full bg-purple-100 p-3 dark:bg-purple-900/20">
-                                <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
             </div>
 
             {/* Secondary KPI Cards */}
-            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {/* Recent Activity */}
                 <Card>
                     <CardContent className="p-6">
@@ -360,22 +333,6 @@ export default function PaymentsIndex({ payments }) {
                             </div>
                             <div className="rounded-full bg-indigo-100 p-3 dark:bg-indigo-900/20">
                                 <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* This Month */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center">
-                            <div className="flex-1">
-                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">This Month</p>
-                                <p className="text-xl font-bold text-slate-900 dark:text-slate-100">{kpis.thisMonthPayments}</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-500">payments recorded</p>
-                            </div>
-                            <div className="rounded-full bg-teal-100 p-3 dark:bg-teal-900/20">
-                                <Calendar className="h-5 w-5 text-teal-600 dark:text-teal-400" />
                             </div>
                         </div>
                     </CardContent>
@@ -412,14 +369,6 @@ export default function PaymentsIndex({ payments }) {
             <div className="mb-6 space-y-4">
                 {/* Search Bar */}
                 <div className="relative">
-                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                        type="text"
-                        placeholder="Search payments by customer, reference number, method, or amount..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                    />
                     {searchQuery && (
                         <Button
                             variant="ghost"
@@ -453,77 +402,92 @@ export default function PaymentsIndex({ payments }) {
 
                 {/* Filter Panel */}
                 {showFilters && (
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <Card className="border-slate-200 dark:border-slate-700">
+                        <CardHeader className="pb-4">
+                            <CardTitle className="text-lg">Filter Payments</CardTitle>
+                            <CardDescription>Use the filters below to narrow down your search results</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                 {/* Payment Method Filter */}
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">Payment Method</label>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Payment Method</label>
                                     <Select
-                                        value={filters.paymentMethod}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, paymentMethod: e.target.value }))}
-                                        options={paymentMethods.map((method) => ({
-                                            id: method,
-                                            name: method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' '),
-                                        }))}
-                                        placeholder="All Methods"
-                                    />
+                                        value={filters.paymentMethod || 'all'}
+                                        onValueChange={(value) => setFilters((prev) => ({ ...prev, paymentMethod: value === 'all' ? '' : value }))}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="All Methods" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Methods</SelectItem>
+                                            {paymentMethods.map((method) => (
+                                                <SelectItem key={method} value={method}>
+                                                    {method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ')}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 {/* Customer Filter */}
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">Customer</label>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Customer</label>
                                     <Select
-                                        value={filters.customer}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, customer: e.target.value }))}
-                                        options={customers.map((customer) => ({
-                                            id: customer.id,
-                                            name: `${customer.first_name} ${customer.last_name}`,
-                                        }))}
-                                        placeholder="All Customers"
-                                    />
+                                        value={filters.customer || 'all'}
+                                        onValueChange={(value) => setFilters((prev) => ({ ...prev, customer: value === 'all' ? '' : value }))}
+                                    >
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="All Customers" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Customers</SelectItem>
+                                            {customers.map((customer) => (
+                                                <SelectItem key={customer.id} value={customer.id.toString()}>
+                                                    {customer.first_name} {customer.last_name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 {/* Date From */}
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">Date From</label>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Date From</label>
                                     <Input
                                         type="date"
                                         value={filters.dateFrom}
                                         onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
+                                        className="w-full"
                                     />
                                 </div>
 
                                 {/* Date To */}
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">Date To</label>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Date To</label>
                                     <Input
                                         type="date"
                                         value={filters.dateTo}
                                         onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
+                                        className="w-full"
                                     />
                                 </div>
+                            </div>
 
-                                {/* Min Amount */}
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">Min Amount</label>
-                                    <Input
-                                        type="number"
-                                        placeholder="0.00"
-                                        value={filters.minAmount}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, minAmount: e.target.value }))}
-                                    />
+                            {/* Filter Actions */}
+                            <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                    {hasActiveFilters
+                                        ? `${Object.values(filters).filter((v) => v !== '').length + (searchQuery ? 1 : 0)} filter(s) active`
+                                        : 'No filters applied'}
                                 </div>
-
-                                {/* Max Amount */}
-                                <div>
-                                    <label className="mb-2 block text-sm font-medium">Max Amount</label>
-                                    <Input
-                                        type="number"
-                                        placeholder="0.00"
-                                        value={filters.maxAmount}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, maxAmount: e.target.value }))}
-                                    />
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" onClick={clearFilters}>
+                                        Clear All
+                                    </Button>
+                                    <Button size="sm" onClick={() => setShowFilters(false)}>
+                                        Apply Filters
+                                    </Button>
                                 </div>
                             </div>
                         </CardContent>
@@ -534,8 +498,20 @@ export default function PaymentsIndex({ payments }) {
             {/* Payments Table */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Payments</CardTitle>
-                    <CardDescription>List of recorded payments</CardDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle>Payments</CardTitle>
+                            <CardDescription>List of recorded payments</CardDescription>
+                        </div>
+                        <div className="flex-1 pl-16">
+                            <Input
+                                type="text"
+                                placeholder="Search payments by customer, reference number, method, or amount..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">

@@ -65,7 +65,7 @@ export default function ReadingShow({ reading }) {
                         </div>
                         <div>
                             <div className="text-sm text-slate-500">Billing Officer</div>
-                            <div className="text-base font-medium">{reading?.billing_officer || reading?.recorded_by?.name || '—'}</div>
+                            <div className="text-base font-medium">{reading?.recordedBy?.name || reading?.recorded_by?.name || '—'}</div>
                         </div>
                     </CardContent>
                 </Card>
