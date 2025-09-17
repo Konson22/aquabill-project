@@ -31,7 +31,6 @@ export default function BillForm({ customers = [], meters = [], readings = [], t
                 onFinish: () => reset(),
             });
         }
-        }
     };
 
     return (

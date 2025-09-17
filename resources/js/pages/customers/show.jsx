@@ -22,7 +22,7 @@ import {
     MapPin,
     Phone,
     Plus,
-    Print,
+    Printer,
     Receipt,
     Settings,
     Trash2,
@@ -268,7 +268,7 @@ export default function Show({ customer, availableMeters = [] }) {
                             Manage Meters
                         </Button>
                         <Button onClick={handlePrint} variant="outline">
-                            <Print className="mr-2 h-4 w-4" />
+                            <Printer className="mr-2 h-4 w-4" />
                             Print
                         </Button>
                     </div>
