@@ -1,0 +1,70 @@
+import BillPrint from '@/components/BillPrint';
+import { Button } from '@/components/ui/button';
+import { Head } from '@inertiajs/react';
+import { Printer } from 'lucide-react';
+
+export default function BillingPrintOnly({ bill }) {
+    const handlePrint = () => {
+        window.print();
+    };
+
+    return (
+        <>
+            <Head title={`Print Bill #${bill?.id}`} />
+            <style>
+                {`@media print {
+                    body { margin: 0 !important; padding: 0 !important; }
+                    .min-h-screen { min-height: auto !important; }
+                    
+                    /* Aggressive font size reduction for printers */
+                    .bill-print-root { font-size: 10px !important; }
+                    .bill-print-root .text-sm { font-size: 9px !important; }
+                    .bill-print-root .text-xs { font-size: 8px !important; }
+                    .bill-print-root .text-base { font-size: 10px !important; }
+                    .bill-print-root .leading-4 { line-height: 1.1 !important; }
+                    .bill-print-root .leading-5 { line-height: 1.2 !important; }
+                    
+                    /* Reduce spacing for print */
+                    .bill-print-root .mb-4 { margin-bottom: 0.5rem !important; }
+                    .bill-print-root .mb-3 { margin-bottom: 0.375rem !important; }
+                    .bill-print-root .gap-4 { gap: 0.5rem !important; }
+                    .bill-print-root .gap-2 { gap: 0.25rem !important; }
+                    .bill-print-root .p-6 { padding: 0.5rem !important; }
+                    .bill-print-root .px-2 { padding-left: 0.25rem !important; padding-right: 0.25rem !important; }
+                    .bill-print-root .py-0\\.5 { padding-top: 0.125rem !important; padding-bottom: 0.125rem !important; }
+                    
+                    /* Logo size reduction */
+                    .bill-print-root .h-16 { height: 2rem !important; }
+                    .bill-print-root .w-16 { width: 2rem !important; }
+                    
+                    /* Single bill print optimization */
+                    .bill-item { 
+                        break-inside: avoid; 
+                        page-break-inside: avoid; 
+                        margin: 0; 
+                    }
+                    
+                    @page { margin: 0.25in !important; }
+                }`}
+            </style>
+            <div className="min-h-screen bg-white">
+                {/* Print button - hidden when printing */}
+                <div className="border-b bg-gray-100 p-4 print:hidden">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-xl font-semibold">Print Bill #{bill?.id}</h1>
+                        <Button onClick={handlePrint} className="gap-2">
+                            <Printer className="h-4 w-4" /> Print
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Bill content */}
+                <div className="p-4">
+                    <div className="bill-item">
+                        <BillPrint bill={bill} />
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+}

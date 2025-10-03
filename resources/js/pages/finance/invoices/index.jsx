@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import InvoiceForm from '@/pages/forms/invoice-form';
 import { Head, Link, router } from '@inertiajs/react';
-import { Calendar, CreditCard, DollarSign, Download, Edit, Eye, Filter, Plus, Receipt, Search, Trash2, X } from 'lucide-react';
+import { CreditCard, DollarSign, Download, Edit, Eye, Filter, Plus, Receipt, Search, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { formatSSPCurrency } from '../../../utils/formatSSPCurrency';
 
@@ -213,7 +213,6 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                                 <tr className="border-b border-slate-200 dark:border-slate-800">
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Issue Date</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold">Due Date</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Amount Due</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">#Ref No</th>
@@ -253,18 +252,7 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                                                           })
                                                         : '—'}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm">
-                                                    <div className={`flex items-center gap-1 ${overdue ? 'font-medium text-red-600' : ''}`}>
-                                                        <Calendar className="h-3 w-3" />
-                                                        {invoice.due_date
-                                                            ? new Date(invoice.due_date).toLocaleDateString('en-US', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                  day: 'numeric',
-                                                              })
-                                                            : '—'}
-                                                    </div>
-                                                </td>
+
                                                 <td className="px-4 py-3 text-sm font-medium">{formatSSPCurrency(invoice.amount_due)}</td>
                                                 <td className="px-4 py-3 text-sm">{getStatusBadge(displayStatus)}</td>
                                                 <td className="px-4 py-3 text-sm">

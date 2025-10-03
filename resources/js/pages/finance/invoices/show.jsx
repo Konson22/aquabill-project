@@ -1,9 +1,26 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { AlertCircle, ArrowLeft, Calendar, CheckCircle, Clock, DollarSign, MapPin, Phone, Printer, User, XCircle } from 'lucide-react';
+import {
+    AlertCircle,
+    ArrowLeft,
+    Calendar,
+    CheckCircle,
+    Clock,
+    CreditCard,
+    DollarSign,
+    FileText,
+    MapPin,
+    Phone,
+    Printer,
+    TrendingUp,
+    User,
+    XCircle,
+    Zap,
+} from 'lucide-react';
 
 const breadcrumbs = [
     { title: 'Finance', href: '/finance' },
@@ -42,7 +59,7 @@ export default function InvoiceShow({ invoice }) {
         const Icon = config.icon;
 
         return (
-            <Badge className={`${config.className} gap-1`}>
+            <Badge className={`${config.className} gap-1 px-3 py-1`}>
                 <Icon className="h-3 w-3" />
                 {config.label}
             </Badge>
@@ -59,6 +76,12 @@ export default function InvoiceShow({ invoice }) {
     const handlePrint = () => {
         window.open(`/invoices/${invoice.id}/print`, '_blank');
     };
+
+    // Calculate payment progress
+    const totalPaid = invoice.payments ? invoice.payments.reduce((sum, payment) => sum + parseFloat(payment.amount_paid || 0), 0) : 0;
+    const amountDue = parseFloat(invoice.amount_due || 0);
+    const paymentProgress = amountDue > 0 ? (totalPaid / amountDue) * 100 : 0;
+    const isFullyPaid = paymentProgress >= 100;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -81,95 +104,142 @@ export default function InvoiceShow({ invoice }) {
                 `}</style>
             </Head>
 
-            <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button asChild variant="ghost" size="sm" className="no-print">
-                        <Link href="/invoices">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Invoices
-                        </Link>
-                    </Button>
-                    <div className="print-header">
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Invoice #{invoice.invoice_number || invoice.id}</h1>
-                        <p className="mt-1 text-slate-600 dark:text-slate-400">
-                            Created on{' '}
-                            {new Date(invoice.created_at).toLocaleDateString('en-US', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric',
-                            })}
-                        </p>
+            {/* Enhanced Header Section */}
+            <div className="mb-8">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                        <Button asChild variant="ghost" size="sm" className="no-print">
+                            <Link href="/invoices">
+                                <ArrowLeft className="mr-2 h-4 w-4" />
+                                Back to Invoices
+                            </Link>
+                        </Button>
+                        <div className="print-header">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/20">
+                                    <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div>
+                                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                                        Invoice #{invoice.invoice_number || invoice.id}
+                                    </h1>
+                                    <p className="mt-1 text-slate-600 dark:text-slate-400">
+                                        Created on{' '}
+                                        {new Date(invoice.created_at).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric',
+                                        })}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="no-print flex gap-2">
+                        <Button variant="outline" size="sm" className="gap-2" onClick={handlePrint}>
+                            <Printer className="h-4 w-4" />
+                            Print
+                        </Button>
                     </div>
                 </div>
-                <div className="no-print flex gap-2">
-                    <Button variant="outline" size="sm" className="gap-2" onClick={handlePrint}>
-                        <Printer className="h-4 w-4" />
-                        Print
-                    </Button>
+
+                {/* Status and Progress Section */}
+                <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-4">
+                        {getStatusBadge(displayStatus)}
+                        {isFullyPaid && (
+                            <Badge className="gap-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                                <CheckCircle className="h-3 w-3" />
+                                FULLY PAID
+                            </Badge>
+                        )}
+                    </div>
+                    {amountDue > 0 && (
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Payment Progress</span>
+                            <div className="flex items-center gap-2">
+                                <Progress value={paymentProgress} className="w-32" />
+                                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">{Math.round(paymentProgress)}%</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                {/* Invoice Details */}
-                <div className="space-y-6 lg:col-span-2">
-                    {/* Invoice Information */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Invoice Information</CardTitle>
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                {/* Main Content */}
+                <div className="space-y-8 lg:col-span-2">
+                    {/* Invoice Information Card */}
+                    <Card className="border-l-4 border-l-blue-500">
+                        <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-blue-600" />
+                                Invoice Information
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div>
-                                    <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Invoice Number</label>
-                                    <p className="mt-1 text-lg font-semibold">#{invoice.invoice_number || invoice.id}</p>
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Invoice Number</label>
+                                        <p className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">
+                                            #{invoice.invoice_number || invoice.id}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Issue Date</label>
+                                        <p className="mt-1 flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                            <Calendar className="h-4 w-4 text-slate-500" />
+                                            {invoice.issue_date
+                                                ? new Date(invoice.issue_date).toLocaleDateString('en-US', {
+                                                      year: 'numeric',
+                                                      month: 'long',
+                                                      day: 'numeric',
+                                                  })
+                                                : '—'}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Status</label>
-                                    <div className="mt-1">{getStatusBadge(displayStatus)}</div>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Issue Date</label>
-                                    <p className="mt-1 flex items-center gap-2">
-                                        <Calendar className="h-4 w-4" />
-                                        {invoice.issue_date
-                                            ? new Date(invoice.issue_date).toLocaleDateString('en-US', {
-                                                  year: 'numeric',
-                                                  month: 'long',
-                                                  day: 'numeric',
-                                              })
-                                            : '—'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Due Date</label>
-                                    <p
-                                        className={`mt-1 flex items-center gap-2 ${isOverdue(invoice.due_date, invoice.status) ? 'font-medium text-red-600' : ''}`}
-                                    >
-                                        <Calendar className="h-4 w-4" />
-                                        {invoice.due_date
-                                            ? new Date(invoice.due_date).toLocaleDateString('en-US', {
-                                                  year: 'numeric',
-                                                  month: 'long',
-                                                  day: 'numeric',
-                                              })
-                                            : '—'}
-                                    </p>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Due Date</label>
+                                        <p
+                                            className={`mt-1 flex items-center gap-2 ${
+                                                isOverdue(invoice.due_date, invoice.status)
+                                                    ? 'font-bold text-red-600 dark:text-red-400'
+                                                    : 'text-slate-900 dark:text-slate-100'
+                                            }`}
+                                        >
+                                            <Calendar className="h-4 w-4 text-slate-500" />
+                                            {invoice.due_date
+                                                ? new Date(invoice.due_date).toLocaleDateString('en-US', {
+                                                      year: 'numeric',
+                                                      month: 'long',
+                                                      day: 'numeric',
+                                                  })
+                                                : '—'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Status</label>
+                                        <div className="mt-1">{getStatusBadge(displayStatus)}</div>
+                                    </div>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Reason</label>
-                                    <p className="mt-1">{invoice.reason || 'No reason provided'}</p>
+                                    <p className="mt-1 text-slate-900 dark:text-slate-100">{invoice.reason || 'No reason provided'}</p>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Customer Information */}
+                    {/* Customer Information Card */}
                     {invoice.customer && (
-                        <Card>
-                            <CardHeader>
+                        <Card className="border-l-4 border-l-green-500">
+                            <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <User className="h-5 w-5" />
+                                        <User className="h-5 w-5 text-green-600" />
                                         Customer Information
                                     </div>
                                     <Button asChild size="sm" variant="outline">
@@ -178,78 +248,98 @@ export default function InvoiceShow({ invoice }) {
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Name</label>
-                                        <p className="mt-1 text-lg font-semibold">
-                                            {invoice.customer.first_name} {invoice.customer.last_name}
-                                        </p>
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Name</label>
+                                            <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                                {invoice.customer.first_name} {invoice.customer.last_name}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Phone</label>
+                                            <p className="mt-1 flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                                <Phone className="h-4 w-4 text-slate-500" />
+                                                {invoice.customer.phone || 'Not provided'}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Phone</label>
-                                        <p className="mt-1 flex items-center gap-2">
-                                            <Phone className="h-4 w-4" />
-                                            {invoice.customer.phone || 'Not provided'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Address</label>
-                                        <p className="mt-1 flex items-center gap-2">
-                                            <MapPin className="h-4 w-4" />
-                                            {invoice.customer.address || 'Not provided'}
-                                        </p>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Address</label>
+                                            <p className="mt-1 flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                                                <MapPin className="h-4 w-4 text-slate-500" />
+                                                {invoice.customer.address || 'Not provided'}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                     )}
 
-                    {/* Meter Information */}
+                    {/* Meter Information Card */}
                     {invoice.meter && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Meter Information</CardTitle>
+                        <Card className="border-l-4 border-l-purple-500">
+                            <CardHeader className="pb-4">
+                                <CardTitle className="flex items-center gap-2">
+                                    <Zap className="h-5 w-5 text-purple-600" />
+                                    Meter Information
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                     <div>
                                         <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Meter Number</label>
-                                        <p className="mt-1 font-medium">{invoice.meter.meter_number}</p>
+                                        <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{invoice.meter.meter_number}</p>
                                     </div>
                                     <div>
                                         <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Location</label>
-                                        <p className="mt-1">{invoice.meter.location || 'Not specified'}</p>
+                                        <p className="mt-1 text-slate-900 dark:text-slate-100">{invoice.meter.location || 'Not specified'}</p>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                     )}
 
-                    {/* Payment History */}
+                    {/* Payment History Card */}
                     {invoice.payments && invoice.payments.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Payment History</CardTitle>
+                        <Card className="border-l-4 border-l-orange-500">
+                            <CardHeader className="pb-4">
+                                <CardTitle className="flex items-center gap-2">
+                                    <CreditCard className="h-5 w-5 text-orange-600" />
+                                    Payment History
+                                </CardTitle>
                                 <CardDescription>Payments received for this invoice</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-3">
-                                    {invoice.payments.map((payment) => (
-                                        <div key={payment.id} className="flex items-center justify-between border-b pb-3 last:border-b-0 last:pb-0">
-                                            <div>
-                                                <div className="font-medium">{formatCurrency(payment.amount_paid)}</div>
-                                                <div className="text-sm text-slate-500">
-                                                    {payment.payment_date
-                                                        ? new Date(payment.payment_date).toLocaleDateString('en-US', {
-                                                              year: 'numeric',
-                                                              month: 'short',
-                                                              day: 'numeric',
-                                                          })
-                                                        : '—'}
+                                <div className="space-y-4">
+                                    {invoice.payments.map((payment, index) => (
+                                        <div
+                                            key={payment.id}
+                                            className="flex items-center justify-between rounded-lg border bg-slate-50 p-4 dark:bg-slate-800/50"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
+                                                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold text-slate-900 dark:text-slate-100">
+                                                        {formatCurrency(payment.amount_paid)}
+                                                    </div>
+                                                    <div className="text-sm text-slate-500">
+                                                        {payment.payment_date
+                                                            ? new Date(payment.payment_date).toLocaleDateString('en-US', {
+                                                                  year: 'numeric',
+                                                                  month: 'short',
+                                                                  day: 'numeric',
+                                                              })
+                                                            : '—'}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-sm font-medium capitalize">
+                                                <div className="text-sm font-medium text-slate-900 capitalize dark:text-slate-100">
                                                     {String(payment.payment_method || '').replace('_', ' ')}
                                                 </div>
                                                 <div className="text-sm text-slate-500">{payment.reference_number || '—'}</div>
@@ -262,52 +352,87 @@ export default function InvoiceShow({ invoice }) {
                     )}
                 </div>
 
-                {/* Summary Sidebar */}
+                {/* Enhanced Summary Sidebar */}
                 <div className="no-print space-y-6">
-                    {/* Amount Summary */}
-                    <Card>
-                        <CardHeader>
+                    {/* Amount Summary Card */}
+                    <Card className="border-l-4 border-l-emerald-500">
+                        <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2">
-                                <DollarSign className="h-5 w-5" />
+                                <DollarSign className="h-5 w-5 text-emerald-600" />
                                 Amount Summary
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-3">
-                                <div className="flex justify-between">
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
                                     <span className="text-slate-600 dark:text-slate-400">Amount Due</span>
-                                    <span className="font-medium">{formatCurrency(invoice.amount_due)}</span>
+                                    <span className="text-xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(invoice.amount_due)}</span>
                                 </div>
+
                                 {invoice.payments && invoice.payments.length > 0 && (
                                     <>
-                                        <div className="flex justify-between">
+                                        <div className="flex items-center justify-between">
                                             <span className="text-slate-600 dark:text-slate-400">Amount Paid</span>
-                                            <span className="font-medium text-green-600">
-                                                {formatCurrency(
-                                                    invoice.payments.reduce((sum, payment) => sum + parseFloat(payment.amount_paid || 0), 0),
-                                                )}
+                                            <span className="text-lg font-semibold text-green-600 dark:text-green-400">
+                                                {formatCurrency(totalPaid)}
                                             </span>
                                         </div>
-                                        <div className="border-t pt-3">
-                                            <div className="flex justify-between">
-                                                <span className="font-medium">Balance</span>
+
+                                        <div className="border-t pt-4">
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-semibold text-slate-900 dark:text-slate-100">Balance</span>
                                                 <span
-                                                    className={`font-bold ${
-                                                        invoice.payments.reduce((sum, payment) => sum + parseFloat(payment.amount_paid || 0), 0) >=
-                                                        parseFloat(invoice.amount_due || 0)
-                                                            ? 'text-green-600'
-                                                            : 'text-red-600'
+                                                    className={`text-lg font-bold ${
+                                                        totalPaid >= amountDue
+                                                            ? 'text-green-600 dark:text-green-400'
+                                                            : 'text-red-600 dark:text-red-400'
                                                     }`}
                                                 >
-                                                    {formatCurrency(
-                                                        parseFloat(invoice.amount_due || 0) -
-                                                            invoice.payments.reduce((sum, payment) => sum + parseFloat(payment.amount_paid || 0), 0),
-                                                    )}
+                                                    {formatCurrency(amountDue - totalPaid)}
                                                 </span>
                                             </div>
                                         </div>
                                     </>
                                 )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Quick Stats Card */}
+                    <Card>
+                        <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2">
+                                <TrendingUp className="h-5 w-5 text-blue-600" />
+                                Quick Stats
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-slate-600 dark:text-slate-400">Payment Progress</span>
+                                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{Math.round(paymentProgress)}%</span>
+                                </div>
+                                <Progress value={paymentProgress} className="w-full" />
+
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-slate-600 dark:text-slate-400">Total Payments</span>
+                                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{invoice.payments?.length || 0}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-slate-600 dark:text-slate-400">Days Overdue</span>
+                                    <span
+                                        className={`text-sm font-semibold ${
+                                            isOverdue(invoice.due_date, invoice.status)
+                                                ? 'text-red-600 dark:text-red-400'
+                                                : 'text-green-600 dark:text-green-400'
+                                        }`}
+                                    >
+                                        {isOverdue(invoice.due_date, invoice.status)
+                                            ? Math.ceil((new Date() - new Date(invoice.due_date)) / (1000 * 60 * 60 * 24))
+                                            : '0'}
+                                    </span>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

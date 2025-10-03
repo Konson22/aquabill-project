@@ -354,7 +354,7 @@ export default function BillingIndex({ bills, filters = {} }) {
                                                                 <>
                                                                     <DropdownMenuItem asChild>
                                                                         <Link
-                                                                            href={route('billing.print', bill.id)}
+                                                                            href={route('billing.print-only', bill.id)}
                                                                             target="_blank"
                                                                             rel="noopener noreferrer"
                                                                             className="flex items-center gap-2"

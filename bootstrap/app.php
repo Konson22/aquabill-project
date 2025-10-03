@@ -23,10 +23,16 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // Apply debug middleware to all API routes for troubleshooting
+        $middleware->api(append: [
+            \App\Http\Middleware\DebugApiRequests::class,
+        ]);
+
         // Register custom middleware
         $middleware->alias([
             'department.access' => \App\Http\Middleware\DepartmentAccess::class,
             'department.restriction' => \App\Http\Middleware\DepartmentRestriction::class,
+            'api.activity' => \App\Http\Middleware\ApiActivityLogger::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

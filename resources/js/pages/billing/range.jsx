@@ -203,7 +203,7 @@ export default function BillingRange({ bills, filters = {}, stats = {} }) {
                                     disabled={selectedIds.length === 0}
                                     onClick={() => {
                                         const idsParam = selectedIds.join(',');
-                                        router.get(route('billing.print-multiple'), { ids: idsParam }, { preserveScroll: true });
+                                        router.get(route('billing.print-multiple-only'), { ids: idsParam }, { preserveScroll: true });
                                     }}
                                     className="gap-2"
                                 >
@@ -289,7 +289,7 @@ export default function BillingRange({ bills, filters = {}, stats = {} }) {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <Button asChild variant="outline" size="sm" className="gap-2">
-                                                    <Link href={route('billing.print', bill.id)} target="_blank" rel="noopener noreferrer">
+                                                    <Link href={route('billing.print-only', bill.id)} target="_blank" rel="noopener noreferrer">
                                                         <Printer className="h-4 w-4" /> Print
                                                     </Link>
                                                 </Button>

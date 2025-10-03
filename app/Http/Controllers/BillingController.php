@@ -252,22 +252,24 @@ class BillingController extends Controller
         ]);
     }
 
+
     /**
-     * Print preview page for a bill
+     * Print-only page without app layout for clean printing
      */
-    public function print(Bill $bill)
+    public function printOnly(Bill $bill)
     {
         $bill->load(['customer', 'customer.category', 'meter', 'reading', 'generatedBy']);
 
-        return Inertia::render('billing/print', [
+        return Inertia::render('billing/print-only', [
             'bill' => $bill,
         ]);
     }
 
+
     /**
-     * Print preview page for multiple bills
+     * Print-only page for multiple bills without app layout
      */
-    public function printMultiple(Request $request)
+    public function printMultipleOnly(Request $request)
     {
         $request->validate([
             'ids' => 'required|string',
@@ -284,7 +286,7 @@ class BillingController extends Controller
             ->orderBy('billing_period_end', 'desc')
             ->get();
 
-        return Inertia::render('billing/print-multiple', [
+        return Inertia::render('billing/print-multiple-only', [
             'bills' => $bills,
         ]);
     }

@@ -233,7 +233,7 @@ export default function MetersPage({ meters, customers, types, stats }) {
                                                         <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
                                                     </div>
                                                     <div className="min-w-0 flex-1">
-                                                        <span className="block truncate font-medium">#{meter.meter_number}</span>
+                                                        <span className="block truncate font-medium">{meter.meter_number}</span>
                                                         <p className="text-xs text-slate-500">{meter.serial && `S/N: ${meter.serial}`}</p>
                                                         {meter.readings && meter.readings.length > 0 && (
                                                             <p className="text-xs text-slate-500">Last: {formatDate(meter.readings[0].date)}</p>

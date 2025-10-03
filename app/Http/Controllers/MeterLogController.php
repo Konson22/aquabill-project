@@ -72,6 +72,8 @@ class MeterLogController extends Controller
                     Customer::where('id', $validated['customer_id'])->update([
                         'meter_id' => $validated['new_meter_id']
                     ]);
+                    // Set meter status to active when assigned to customer
+                    Meter::where('id', $validated['new_meter_id'])->update(['status' => 'active']);
                 }
                 break;
 
@@ -81,12 +83,16 @@ class MeterLogController extends Controller
                     Customer::where('meter_id', $validated['old_meter_id'])->update([
                         'meter_id' => null
                     ]);
+                    // Set old meter to inactive when removed from customer
+                    Meter::where('id', $validated['old_meter_id'])->update(['status' => 'inactive']);
                 }
                 if ($validated['new_meter_id']) {
                     // Assign the new meter to the customer
                     Customer::where('id', $validated['customer_id'])->update([
                         'meter_id' => $validated['new_meter_id']
                     ]);
+                    // Set new meter to active when assigned to customer
+                    Meter::where('id', $validated['new_meter_id'])->update(['status' => 'active']);
                 }
                 break;
 
@@ -96,6 +102,8 @@ class MeterLogController extends Controller
                     Customer::where('meter_id', $validated['old_meter_id'])->update([
                         'meter_id' => null
                     ]);
+                    // Set meter to inactive when removed from customer
+                    Meter::where('id', $validated['old_meter_id'])->update(['status' => 'inactive']);
                 }
                 break;
 
@@ -105,6 +113,8 @@ class MeterLogController extends Controller
                     Customer::where('id', $validated['customer_id'])->update([
                         'meter_id' => $validated['new_meter_id']
                     ]);
+                    // Set meter to active when reactivated for customer
+                    Meter::where('id', $validated['new_meter_id'])->update(['status' => 'active']);
                 }
                 break;
         }

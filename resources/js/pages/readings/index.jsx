@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Activity, BarChart3, Download, Droplets, Filter, Printer, Search, TrendingUp, X } from 'lucide-react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Activity, BarChart3, Calendar, Download, Droplets, Filter, Printer, Search, Trash2, TrendingUp, X, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const breadcrumbs = [
@@ -15,24 +15,47 @@ const breadcrumbs = [
     },
 ];
 
-export default function ReadingsPage({ readings, stats, meters, customers }) {
+export default function ReadingsPage({ readings, stats, meters, customers, auth }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [filteredReadings, setFilteredReadings] = useState(readings);
     const [filteredStats, setFilteredStats] = useState(stats);
 
     // Filter states
     const [filters, setFilters] = useState({
-        dateFrom: '',
-        dateTo: '',
-        month: '',
-        year: '',
-        source: '',
-        illegalConnection: '',
-        consumptionMin: '',
-        consumptionMax: '',
+        timePeriod: '', // 'month', 'quarter', 'half', 'year'
+        selectedMonth: '',
+        selectedYear: '',
+        selectedQuarter: '',
+        selectedHalf: '',
         status: '',
     });
     const [showFilters, setShowFilters] = useState(false);
+    const [deleteDialog, setDeleteDialog] = useState({ open: false, readingId: null, readingInfo: null });
+
+    const { delete: deleteReading, processing: deleting } = useForm();
+
+    // Delete reading function
+    const handleDeleteReading = (readingId, readingInfo) => {
+        setDeleteDialog({
+            open: true,
+            readingId,
+            readingInfo,
+        });
+    };
+
+    const confirmDelete = () => {
+        if (deleteDialog.readingId) {
+            deleteReading(route('readings.destroy', deleteDialog.readingId), {
+                onSuccess: () => {
+                    setDeleteDialog({ open: false, readingId: null, readingInfo: null });
+                },
+            });
+        }
+    };
+
+    const cancelDelete = () => {
+        setDeleteDialog({ open: false, readingId: null, readingInfo: null });
+    };
 
     // Filter readings based on search query and filters
     useEffect(() => {
@@ -80,68 +103,40 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
             });
         }
 
-        // Apply date range filter
-        if (filters.dateFrom) {
-            filtered = filtered.filter((reading) => {
-                const readingDate = new Date(reading.date);
-                const fromDate = new Date(filters.dateFrom);
-                return readingDate >= fromDate;
-            });
-        }
+        // Apply time period filters
+        if (filters.timePeriod && filters.selectedYear) {
+            const year = parseInt(filters.selectedYear);
 
-        if (filters.dateTo) {
-            filtered = filtered.filter((reading) => {
-                const readingDate = new Date(reading.date);
-                const toDate = new Date(filters.dateTo);
-                return readingDate <= toDate;
-            });
-        }
-
-        // Apply month filter
-        if (filters.month) {
-            filtered = filtered.filter((reading) => {
-                const readingDate = new Date(reading.date);
-                return readingDate.getMonth() === parseInt(filters.month) - 1; // Month is 0-indexed
-            });
-        }
-
-        // Apply year filter
-        if (filters.year) {
-            filtered = filtered.filter((reading) => {
-                const readingDate = new Date(reading.date);
-                return readingDate.getFullYear() === parseInt(filters.year);
-            });
-        }
-
-        // Apply source filter
-        if (filters.source) {
-            filtered = filtered.filter((reading) => {
-                const source = reading.source || 'manual';
-                return source === filters.source;
-            });
-        }
-
-        // Apply illegal connection filter
-        if (filters.illegalConnection !== '') {
-            filtered = filtered.filter((reading) => {
-                const isIllegal = reading.illigal_connection === 1 || reading.illigal_connection === true;
-                return filters.illegalConnection === 'yes' ? isIllegal : !isIllegal;
-            });
-        }
-
-        // Apply consumption range filter
-        if (filters.consumptionMin) {
-            filtered = filtered.filter((reading) => {
-                const consumption = reading.consumption || 0;
-                return consumption >= parseFloat(filters.consumptionMin);
-            });
-        }
-
-        if (filters.consumptionMax) {
-            filtered = filtered.filter((reading) => {
-                const consumption = reading.consumption || 0;
-                return consumption <= parseFloat(filters.consumptionMax);
-            });
+            if (filters.timePeriod === 'month' && filters.selectedMonth) {
+                const month = parseInt(filters.selectedMonth);
+                filtered = filtered.filter((reading) => {
+                    const readingDate = new Date(reading.date);
+                    return readingDate.getFullYear() === year && readingDate.getMonth() + 1 === month;
+                });
+            } else if (filters.timePeriod === 'quarter' && filters.selectedQuarter) {
+                const quarter = parseInt(filters.selectedQuarter);
+                const startMonth = (quarter - 1) * 3;
+                const endMonth = startMonth + 2;
+                filtered = filtered.filter((reading) => {
+                    const readingDate = new Date(reading.date);
+                    const month = readingDate.getMonth();
+                    return readingDate.getFullYear() === year && month >= startMonth && month <= endMonth;
+                });
+            } else if (filters.timePeriod === 'half' && filters.selectedHalf) {
+                const half = parseInt(filters.selectedHalf);
+                const startMonth = half === 1 ? 0 : 6; // First half: Jan-Jun, Second half: Jul-Dec
+                const endMonth = half === 1 ? 5 : 11;
+                filtered = filtered.filter((reading) => {
+                    const readingDate = new Date(reading.date);
+                    const month = readingDate.getMonth();
+                    return readingDate.getFullYear() === year && month >= startMonth && month <= endMonth;
+                });
+            } else if (filters.timePeriod === 'year') {
+                filtered = filtered.filter((reading) => {
+                    const readingDate = new Date(reading.date);
+                    return readingDate.getFullYear() === year;
+                });
+            }
         }
 
         // Apply status filter (billed/unbilled)
@@ -183,13 +178,10 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
         }).format(number);
     };
 
-    // Get unique sources from readings
-    const getUniqueSources = () => {
-        const sources = readings.map((reading) => reading.source || 'manual');
-        return [...new Set(sources)].map((source) => ({
-            id: source,
-            name: source.charAt(0).toUpperCase() + source.slice(1),
-        }));
+    // Get month name from month number
+    const getMonthName = (monthNumber) => {
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        return months[parseInt(monthNumber) - 1] || monthNumber;
     };
 
     // Get available years from readings
@@ -198,15 +190,45 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
         return [...new Set(years)]
             .sort((a, b) => b - a)
             .map((year) => ({
-                id: year.toString(),
-                name: year.toString(),
+                value: year.toString(),
+                label: year.toString(),
             }));
     };
 
-    // Get month name from month number
-    const getMonthName = (monthNumber) => {
-        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        return months[parseInt(monthNumber) - 1] || monthNumber;
+    // Get month options
+    const getMonthOptions = () => {
+        return [
+            { value: '1', label: 'January' },
+            { value: '2', label: 'February' },
+            { value: '3', label: 'March' },
+            { value: '4', label: 'April' },
+            { value: '5', label: 'May' },
+            { value: '6', label: 'June' },
+            { value: '7', label: 'July' },
+            { value: '8', label: 'August' },
+            { value: '9', label: 'September' },
+            { value: '10', label: 'October' },
+            { value: '11', label: 'November' },
+            { value: '12', label: 'December' },
+        ];
+    };
+
+    // Get quarter options
+    const getQuarterOptions = () => {
+        return [
+            { value: '1', label: 'Q1 (Jan - Mar)' },
+            { value: '2', label: 'Q2 (Apr - Jun)' },
+            { value: '3', label: 'Q3 (Jul - Sep)' },
+            { value: '4', label: 'Q4 (Oct - Dec)' },
+        ];
+    };
+
+    // Get half-year options
+    const getHalfYearOptions = () => {
+        return [
+            { value: '1', label: 'First Half (Jan - Jun)' },
+            { value: '2', label: 'Second Half (Jul - Dec)' },
+        ];
     };
 
     // Handle filter changes
@@ -220,14 +242,11 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
     // Clear all filters
     const clearFilters = () => {
         setFilters({
-            dateFrom: '',
-            dateTo: '',
-            month: '',
-            year: '',
-            source: '',
-            illegalConnection: '',
-            consumptionMin: '',
-            consumptionMax: '',
+            timePeriod: '',
+            selectedMonth: '',
+            selectedYear: '',
+            selectedQuarter: '',
+            selectedHalf: '',
             status: '',
         });
     };
@@ -535,69 +554,102 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Meter Readings" />
 
-            {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Meter Readings</h1>
-                    <p className="mt-1 text-slate-600 dark:text-slate-400">Manage and view all meter readings across the system</p>
-                </div>
-                <div className="flex items-center">
-                    <Button variant="outline" asChild>
-                        <Link href="/readings/statistics">
-                            <BarChart3 className="h-4 w-4" />
-                            Statistics
-                        </Link>
-                    </Button>
-                    <AddReadingModal meters={meters} />
-                </div>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Readings</CardTitle>
-                        <Activity className="h-4 w-4 text-blue-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.total_readings}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">All time readings</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Consumption</CardTitle>
-                        <Droplets className="h-4 w-4 text-blue-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatNumber(filteredStats.total_consumption)}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Total units consumed</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Avg Consumption</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-purple-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatNumber(filteredStats.avg_consumption)}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Average per reading</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Readings Table */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Recent Readings</CardTitle>
-                            <CardDescription>Latest meter readings from all customers</CardDescription>
+            {/* Modern Header */}
+            <div className="relative mb-8 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 p-8 text-white">
+                <div className="absolute inset-0 bg-black/10"></div>
+                <div className="relative">
+                    <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="space-y-2">
+                            <h1 className="text-3xl font-bold">Meter Readings</h1>
+                            <p className="text-blue-100">Track and manage water consumption data across the system</p>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="relative w-80">
+                        <div className="flex flex-wrap gap-3">
+                            <AddReadingModal meters={meters} />
+                            <Button variant="secondary" asChild className="border-white/30 bg-white/20 text-white hover:bg-white/30">
+                                <Link href="/readings/statistics">
+                                    <BarChart3 className="mr-2 h-4 w-4" />
+                                    Analytics
+                                </Link>
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => window.print()}
+                                className="border-white/30 bg-white/20 text-white hover:bg-white/30"
+                            >
+                                <Printer className="mr-2 h-4 w-4" />
+                                Print
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Modern Stats Cards */}
+            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="border-0 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg dark:from-blue-900/20 dark:to-blue-800/20">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Readings</CardTitle>
+                        <div className="rounded-lg bg-blue-500 p-2">
+                            <Activity className="h-4 w-4 text-white" />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">{filteredStats.total_readings}</div>
+                        <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">All time readings</p>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-0 bg-gradient-to-br from-green-50 to-green-100 shadow-lg dark:from-green-900/20 dark:to-green-800/20">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-green-700 dark:text-green-300">This Month</CardTitle>
+                        <div className="rounded-lg bg-green-500 p-2">
+                            <Calendar className="h-4 w-4 text-white" />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-green-900 dark:text-green-100">{filteredStats.this_month || 0}</div>
+                        <p className="mt-1 text-xs text-green-600 dark:text-green-400">Readings this month</p>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-0 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg dark:from-purple-900/20 dark:to-purple-800/20">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300">Total Consumption</CardTitle>
+                        <div className="rounded-lg bg-purple-500 p-2">
+                            <Droplets className="h-4 w-4 text-white" />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-purple-900 dark:text-purple-100">{formatNumber(filteredStats.total_consumption)}</div>
+                        <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">Cubic meters</p>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-0 bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg dark:from-orange-900/20 dark:to-orange-800/20">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">Avg Consumption</CardTitle>
+                        <div className="rounded-lg bg-orange-500 p-2">
+                            <TrendingUp className="h-4 w-4 text-white" />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold text-orange-900 dark:text-orange-100">{formatNumber(filteredStats.avg_consumption)}</div>
+                        <p className="mt-1 text-xs text-orange-600 dark:text-orange-400">Per reading</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Modern Search and Filter Section */}
+            <Card className="border-0 shadow-lg">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+                    <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100">Recent Readings</CardTitle>
+                            <CardDescription className="text-slate-600 dark:text-slate-400">Latest meter readings from all customers</CardDescription>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="relative min-w-[300px] flex-1">
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                 <Input
                                     type="text"
                                     placeholder="Search by customer, meter, or date..."
@@ -605,22 +657,30 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
-                            <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowFilters(!showFilters)}
+                                className="flex items-center gap-2 border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
+                            >
                                 <Filter className="h-4 w-4" />
                                 Filters
                                 {hasActiveFilters && (
-                                    <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
+                                    <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full bg-blue-500 p-0 text-xs text-white">
                                         {Object.values(filters).filter((value) => value !== '').length}
                                     </Badge>
                                 )}
                             </Button>
-                            <Button variant="default" onClick={exportToExcel} className="flex items-center gap-2">
+                            <Button variant="default" onClick={exportToExcel} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
                                 <Download className="h-4 w-4" />
-                                Export Excel
+                                Export
                             </Button>
-                            <Button variant="outline" onClick={printReport} className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={printReport}
+                                className="flex items-center gap-2 border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-800"
+                            >
                                 <Printer className="h-4 w-4" />
-                                Print Report
+                                Print
                             </Button>
                         </div>
                     </div>
@@ -687,39 +747,20 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-6">
-                                {/* Date Range */}
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                                {/* Time Period Type */}
                                 <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">From Date</label>
-                                    <Input type="date" value={filters.dateFrom} onChange={(e) => handleFilterChange('dateFrom', e.target.value)} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">To Date</label>
-                                    <Input type="date" value={filters.dateTo} onChange={(e) => handleFilterChange('dateTo', e.target.value)} />
-                                </div>
-
-                                {/* Month Filter */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Month</label>
+                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Time Period</label>
                                     <Select
-                                        value={filters.month}
-                                        onChange={(e) => handleFilterChange('month', e.target.value)}
+                                        value={filters.timePeriod}
+                                        onChange={(e) => handleFilterChange('timePeriod', e.target.value)}
                                         options={[
-                                            { id: '1', name: 'January' },
-                                            { id: '2', name: 'February' },
-                                            { id: '3', name: 'March' },
-                                            { id: '4', name: 'April' },
-                                            { id: '5', name: 'May' },
-                                            { id: '6', name: 'June' },
-                                            { id: '7', name: 'July' },
-                                            { id: '8', name: 'August' },
-                                            { id: '9', name: 'September' },
-                                            { id: '10', name: 'October' },
-                                            { id: '11', name: 'November' },
-                                            { id: '12', name: 'December' },
+                                            { id: 'month', name: 'Month' },
+                                            { id: 'quarter', name: 'Quarter' },
+                                            { id: 'half', name: 'Half Year' },
+                                            { id: 'year', name: 'Full Year' },
                                         ]}
-                                        placeholder="Select month"
+                                        placeholder="Select period"
                                     />
                                 </div>
 
@@ -727,37 +768,51 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
                                 <div className="space-y-2">
                                     <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Year</label>
                                     <Select
-                                        value={filters.year}
-                                        onChange={(e) => handleFilterChange('year', e.target.value)}
+                                        value={filters.selectedYear}
+                                        onChange={(e) => handleFilterChange('selectedYear', e.target.value)}
                                         options={getAvailableYears()}
                                         placeholder="Select year"
                                     />
                                 </div>
 
-                                {/* Source Filter */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Source</label>
-                                    <Select
-                                        value={filters.source}
-                                        onChange={(e) => handleFilterChange('source', e.target.value)}
-                                        options={getUniqueSources()}
-                                        placeholder="Select source"
-                                    />
-                                </div>
+                                {/* Month Filter - Only show when timePeriod is 'month' */}
+                                {filters.timePeriod === 'month' && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Month</label>
+                                        <Select
+                                            value={filters.selectedMonth}
+                                            onChange={(e) => handleFilterChange('selectedMonth', e.target.value)}
+                                            options={getMonthOptions()}
+                                            placeholder="Select month"
+                                        />
+                                    </div>
+                                )}
 
-                                {/* Illegal Connection Filter */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Illegal Connection</label>
-                                    <Select
-                                        value={filters.illegalConnection}
-                                        onChange={(e) => handleFilterChange('illegalConnection', e.target.value)}
-                                        options={[
-                                            { id: 'yes', name: 'Yes' },
-                                            { id: 'no', name: 'No' },
-                                        ]}
-                                        placeholder="All connections"
-                                    />
-                                </div>
+                                {/* Quarter Filter - Only show when timePeriod is 'quarter' */}
+                                {filters.timePeriod === 'quarter' && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Quarter</label>
+                                        <Select
+                                            value={filters.selectedQuarter}
+                                            onChange={(e) => handleFilterChange('selectedQuarter', e.target.value)}
+                                            options={getQuarterOptions()}
+                                            placeholder="Select quarter"
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Half Year Filter - Only show when timePeriod is 'half' */}
+                                {filters.timePeriod === 'half' && (
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Half Year</label>
+                                        <Select
+                                            value={filters.selectedHalf}
+                                            onChange={(e) => handleFilterChange('selectedHalf', e.target.value)}
+                                            options={getHalfYearOptions()}
+                                            placeholder="Select half"
+                                        />
+                                    </div>
+                                )}
 
                                 {/* Status Filter */}
                                 <div className="space-y-2">
@@ -774,199 +829,145 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
                                 </div>
                             </div>
 
-                            {/* Second row of filters */}
-                            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                {/* Consumption Range */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Min Consumption</label>
-                                    <Input
-                                        type="number"
-                                        value={filters.consumptionMin}
-                                        onChange={(e) => handleFilterChange('consumptionMin', e.target.value)}
-                                        placeholder="Min units"
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Max Consumption</label>
-                                    <Input
-                                        type="number"
-                                        value={filters.consumptionMax}
-                                        onChange={(e) => handleFilterChange('consumptionMax', e.target.value)}
-                                        placeholder="Max units"
-                                        min="0"
-                                        step="0.01"
-                                    />
-                                </div>
-
-                                {/* Quick Date Filters */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Quick Filters</label>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                const today = new Date();
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    dateFrom: today.toISOString().split('T')[0],
-                                                    dateTo: today.toISOString().split('T')[0],
-                                                }));
-                                            }}
-                                            className="text-xs"
-                                        >
-                                            Today
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                const today = new Date();
-                                                const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-                                                setFilters((prev) => ({
-                                                    ...prev,
-                                                    dateFrom: firstDay.toISOString().split('T')[0],
-                                                    dateTo: today.toISOString().split('T')[0],
-                                                }));
-                                            }}
-                                            className="text-xs"
-                                        >
-                                            This Month
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Actions</label>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs">
-                                            Clear All
-                                        </Button>
-                                        <Button variant="outline" size="sm" onClick={() => setShowFilters(false)} className="text-xs">
-                                            Close
-                                        </Button>
-                                    </div>
-                                </div>
+                            {/* Actions */}
+                            <div className="mt-4 flex justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs">
+                                    Clear All Filters
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => setShowFilters(false)} className="text-xs">
+                                    Close
+                                </Button>
                             </div>
                         </div>
                     )}
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-slate-200 dark:border-slate-800">
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Customer</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Receipt No</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Date</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Previous</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Current</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Consumption</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Status</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredReadings.length > 0 ? (
-                                    filteredReadings.map((reading) => (
-                                        <tr
-                                            key={reading.id}
-                                            className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                                        >
-                                            <td className="px-4 py-3">
-                                                <Link href={`/customers/${reading.meter?.customer?.id}`}>
-                                                    <div className="font-medium">
-                                                        {reading.meter?.customer?.first_name} {reading.meter?.customer?.last_name}
-                                                    </div>
-                                                    <Badge variant="outline">{reading.meter?.serial}</Badge>
-                                                </Link>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {reading.bills && reading.bills.length > 0 ? (
-                                                    <div className="space-y-1">
-                                                        {reading.bills.map((bill) => (
-                                                            <Link
-                                                                key={bill.id}
-                                                                href={`/billing/${bill.id}`}
-                                                                className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                                                            >
-                                                                #{bill.id}
-                                                            </Link>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-sm text-slate-400 dark:text-slate-500">No bill</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{formatDate(reading.date)}</td>
-                                            <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{formatNumber(reading.previous)}</td>
-                                            <td className="px-4 py-3 font-medium">{formatNumber(reading.value)}</td>
-                                            <td className="px-4 py-3">
-                                                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                                    {formatNumber(reading.consumption)}
-                                                </Badge>
-                                            </td>
-
-                                            <td className="px-4 py-3">
-                                                <div className="flex flex-col gap-1">
-                                                    {/* Illegal Connection Badge */}
-                                                    {(reading.illigal_connection === 1 || reading.illigal_connection === true) && (
-                                                        <Badge variant="destructive" className="text-xs">
-                                                            Illegal Connection
-                                                        </Badge>
-                                                    )}
-
-                                                    {/* Billing Status Badge */}
-                                                    {reading.bills && reading.bills.length > 0 ? (
+                        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                            <table className="w-full">
+                                <thead className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+                                    <tr>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Customer</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Receipt No</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Date</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Previous</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Current</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Consumption</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                    {filteredReadings.length > 0 ? (
+                                        filteredReadings.map((reading) => (
+                                            <tr
+                                                key={reading.id}
+                                                className="transition-colors duration-150 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                                            >
+                                                <td className="px-6 py-4">
+                                                    <Link href={`/customers/${reading.meter?.customer?.id}`} className="group">
+                                                        <div className="font-semibold text-slate-900 transition-colors group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-400">
+                                                            {reading.meter?.customer?.first_name} {reading.meter?.customer?.last_name}
+                                                        </div>
                                                         <Badge
-                                                            variant="default"
-                                                            className="bg-green-100 text-xs text-green-800 dark:bg-green-900 dark:text-green-200"
+                                                            variant="outline"
+                                                            className="mt-1 border-blue-200 bg-blue-50 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300"
                                                         >
-                                                            Billed
+                                                            {reading.meter?.serial}
                                                         </Badge>
+                                                    </Link>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {reading.bills && reading.bills.length > 0 ? (
+                                                        <div className="space-y-1">
+                                                            {reading.bills.map((bill) => (
+                                                                <Link
+                                                                    key={bill.id}
+                                                                    href={`/billing/${bill.id}`}
+                                                                    className="inline-flex items-center text-sm font-medium text-blue-600 transition-colors hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                                                >
+                                                                    #{bill.id}
+                                                                </Link>
+                                                            ))}
+                                                        </div>
                                                     ) : (
-                                                        <Badge variant="outline" className="text-xs">
-                                                            Unbilled
-                                                        </Badge>
+                                                        <span className="text-sm text-slate-400 italic dark:text-slate-500">No bill</span>
                                                     )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex space-x-2">
-                                                    <Link href={`/readings/${reading.id}`}>
-                                                        <Button variant="outline" size="sm">
-                                                            View
-                                                        </Button>
-                                                    </Link>
-                                                    <Link href={`/readings/${reading.id}/edit`}>
-                                                        <Button variant="outline" size="sm">
-                                                            Edit
-                                                        </Button>
-                                                    </Link>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+                                                        <Calendar className="h-4 w-4" />
+                                                        <span className="text-sm">{formatDate(reading.date)}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-mono text-sm text-slate-600 dark:text-slate-400">
+                                                        {formatNumber(reading.previous)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                        {formatNumber(reading.value)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <Zap className="h-4 w-4 text-orange-500" />
+                                                        <Badge className="border-orange-200 bg-gradient-to-r from-orange-100 to-orange-200 text-orange-800 dark:border-orange-800 dark:from-orange-900/20 dark:to-orange-800/20 dark:text-orange-300">
+                                                            {formatNumber(reading.consumption)} m³
+                                                        </Badge>
+                                                    </div>
+                                                </td>
+
+                                                <td className="px-4 py-3">
+                                                    <div className="flex space-x-2">
+                                                        <Link href={`/readings/${reading.id}`}>
+                                                            <Button variant="outline" size="sm">
+                                                                View
+                                                            </Button>
+                                                        </Link>
+                                                        <Link href={`/readings/${reading.id}/edit`}>
+                                                            <Button variant="outline" size="sm">
+                                                                Edit
+                                                            </Button>
+                                                        </Link>
+                                                        {auth?.user?.is_admin && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    handleDeleteReading(reading.id, {
+                                                                        customer: `${reading.meter?.customer?.first_name} ${reading.meter?.customer?.last_name}`,
+                                                                        serial: reading.meter?.serial,
+                                                                        date: reading.date,
+                                                                    })
+                                                                }
+                                                                className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="9" className="px-4 py-8 text-center text-slate-500">
+                                                <div className="flex flex-col items-center">
+                                                    <Search className="mb-2 h-8 w-8 text-slate-300" />
+                                                    <p className="text-sm">No readings found matching your search.</p>
+                                                    {searchQuery && (
+                                                        <p className="mt-1 text-xs text-slate-400">
+                                                            Try adjusting your search terms or clear the search to see all readings.
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan="9" className="px-4 py-8 text-center text-slate-500">
-                                            <div className="flex flex-col items-center">
-                                                <Search className="mb-2 h-8 w-8 text-slate-300" />
-                                                <p className="text-sm">No readings found matching your search.</p>
-                                                {searchQuery && (
-                                                    <p className="mt-1 text-xs text-slate-400">
-                                                        Try adjusting your search terms or clear the search to see all readings.
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     {/* Results Count */}
@@ -978,6 +979,46 @@ export default function ReadingsPage({ readings, stats, meters, customers }) {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Delete Confirmation Dialog */}
+            {deleteDialog.open && (
+                <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+                    <div className="mx-4 w-full max-w-md rounded-lg bg-white p-6 dark:bg-slate-800">
+                        <div className="mb-4 flex items-center">
+                            <div className="flex-shrink-0">
+                                <Trash2 className="h-6 w-6 text-red-600" />
+                            </div>
+                            <div className="ml-3">
+                                <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">Delete Reading</h3>
+                            </div>
+                        </div>
+                        <div className="mb-4">
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Are you sure you want to delete this reading? This action cannot be undone.
+                            </p>
+                            {deleteDialog.readingInfo && (
+                                <div className="mt-2 rounded-md bg-slate-50 p-3 dark:bg-slate-700">
+                                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                                        Customer: {deleteDialog.readingInfo.customer}
+                                    </p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">Meter: {deleteDialog.readingInfo.serial}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                                        Date: {new Date(deleteDialog.readingInfo.date).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex justify-end space-x-3">
+                            <Button variant="outline" onClick={cancelDelete} disabled={deleting}>
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+                                {deleting ? 'Deleting...' : 'Delete'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AppLayout>
     );
 }

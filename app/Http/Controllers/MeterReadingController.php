@@ -100,7 +100,14 @@ class MeterReadingController extends Controller
             'stats',
             'meters',
             'customers'
-        ));
+        ))->with('auth', [
+            'user' => auth()->user() ? [
+                'id' => auth()->user()->id,
+                'name' => auth()->user()->name,
+                'email' => auth()->user()->email,
+                'is_admin' => auth()->user()->isAdmin(),
+            ] : null
+        ]);
     }
 
     /**

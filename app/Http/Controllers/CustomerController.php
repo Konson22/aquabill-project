@@ -110,6 +110,11 @@ class CustomerController extends Controller
             'is_active' => $request->input('is_active', true),
         ]);
 
+        // Set meter status to active when assigned to customer during creation
+        if ($request->input('meter_id')) {
+            Meter::where('id', $request->input('meter_id'))->update(['status' => 'active']);
+        }
+
         // Create invoice if invoice fields are provided
         if ($request->filled('invoice_reason') && $request->filled('invoice_amount_due')) {
             Invoice::create([
@@ -253,6 +258,17 @@ class CustomerController extends Controller
                 'meter_id' => $newMeterId,
             ]);
 
+            // Update meter status based on assignment
+            if ($oldMeterId) {
+                // Set old meter to inactive when removed from customer
+                Meter::where('id', $oldMeterId)->update(['status' => 'inactive']);
+            }
+            
+            if ($newMeterId) {
+                // Set new meter to active when assigned to customer
+                Meter::where('id', $newMeterId)->update(['status' => 'active']);
+            }
+
             // Log the meter change in MeterLog
             \App\Models\MeterLog::create([
                 'customer_id' => $customer->id,
@@ -310,6 +326,9 @@ class CustomerController extends Controller
             $neighborhoodId = $neighborhood->id;
         }
 
+        $oldMeterId = $customer->meter_id;
+        $newMeterId = $request->input('meter_id');
+
         $customer->update([
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
@@ -328,6 +347,19 @@ class CustomerController extends Controller
             'account_number' => $request->input('account_number'),
             'is_active' => $request->input('is_active', true),
         ]);
+
+        // Update meter status based on assignment changes
+        if ($oldMeterId != $newMeterId) {
+            if ($oldMeterId) {
+                // Set old meter to inactive when removed from customer
+                Meter::where('id', $oldMeterId)->update(['status' => 'inactive']);
+            }
+            
+            if ($newMeterId) {
+                // Set new meter to active when assigned to customer
+                Meter::where('id', $newMeterId)->update(['status' => 'active']);
+            }
+        }
 
         return redirect()->route('customers.show', $customer->id)
             ->with('success', 'Customer updated successfully.');

@@ -76,7 +76,7 @@ export default function BillingShow({ bill }) {
                     </div>
                     <div className="flex gap-2">
                         <Button asChild variant="outline" className="gap-2">
-                            <Link href={route('billing.print', bill.id)} target="_blank" rel="noopener noreferrer">
+                            <Link href={route('billing.print-only', bill.id)} target="_blank" rel="noopener noreferrer">
                                 <Printer className="h-4 w-4" /> Print
                             </Link>
                         </Button>

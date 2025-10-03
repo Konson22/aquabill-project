@@ -21,16 +21,12 @@ export default function PaymentsIndex({ payments }) {
     const [filteredPayments, setFilteredPayments] = useState(items);
     const [showFilters, setShowFilters] = useState(false);
     const [filters, setFilters] = useState({
-        paymentMethod: '',
         dateFrom: '',
         dateTo: '',
         customer: '',
     });
 
     const formatDate = (date) => (date ? new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '');
-
-    // Get unique payment methods for filter
-    const paymentMethods = [...new Set(items.map((p) => p.payment_method).filter(Boolean))];
 
     // Get unique customers for filter
     const customers = [...new Set(items.map((p) => p.customer).filter(Boolean))];
@@ -51,10 +47,6 @@ export default function PaymentsIndex({ payments }) {
                 const refNumber = payment.reference_number?.toLowerCase() || '';
                 if (refNumber.includes(searchLower)) return true;
 
-                // Search in payment method
-                const method = payment.payment_method?.toLowerCase() || '';
-                if (method.includes(searchLower)) return true;
-
                 // Search in amount paid
                 const amount = payment.amount_paid?.toString() || '';
                 if (amount.includes(searchLower)) return true;
@@ -65,11 +57,6 @@ export default function PaymentsIndex({ payments }) {
 
                 return false;
             });
-        }
-
-        // Apply payment method filter
-        if (filters.paymentMethod) {
-            filtered = filtered.filter((p) => p.payment_method === filters.paymentMethod);
         }
 
         // Apply customer filter
@@ -92,7 +79,6 @@ export default function PaymentsIndex({ payments }) {
     const clearFilters = () => {
         setSearchQuery('');
         setFilters({
-            paymentMethod: '',
             dateFrom: '',
             dateTo: '',
             customer: '',
@@ -165,13 +151,6 @@ export default function PaymentsIndex({ payments }) {
         const invoiceCount = data.filter((p) => p.invoice_id).length;
         const uniqueCustomers = new Set(data.map((p) => p.customer?.id).filter(Boolean)).size;
 
-        // Payment method distribution
-        const paymentMethods = data.reduce((acc, p) => {
-            const method = p.payment_method || 'unknown';
-            acc[method] = (acc[method] || 0) + 1;
-            return acc;
-        }, {});
-
         // Prepare summary data
         const summaryData = [
             ['PAYMENTS SUMMARY REPORT'],
@@ -195,9 +174,6 @@ export default function PaymentsIndex({ payments }) {
             ['Bills:', billCount],
             ['Invoices:', invoiceCount],
             [''],
-            ['PAYMENT METHODS'],
-            ...Object.entries(paymentMethods).map(([method, count]) => [method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' '), count]),
-            [''],
             ['DETAILED PAYMENTS DATA'],
             [''],
         ];
@@ -209,9 +185,6 @@ export default function PaymentsIndex({ payments }) {
             'Payment Type': payment.bill_id ? 'Billing' : 'Invoice',
             'Reference Number': payment.reference_number || 'N/A',
             'Payment Date': formatDate(payment.payment_date),
-            'Payment Method': payment.payment_method
-                ? payment.payment_method.charAt(0).toUpperCase() + payment.payment_method.slice(1).replace('_', ' ')
-                : 'N/A',
             'Total Bill Amount': payment.bill?.total_amount || 0,
             'Amount Paid': payment.amount_paid || 0,
             Balance: (payment.bill?.total_amount || 0) - (payment.amount_paid || 0),
@@ -409,27 +382,6 @@ export default function PaymentsIndex({ payments }) {
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                {/* Payment Method Filter */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Payment Method</label>
-                                    <Select
-                                        value={filters.paymentMethod || 'all'}
-                                        onValueChange={(value) => setFilters((prev) => ({ ...prev, paymentMethod: value === 'all' ? '' : value }))}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="All Methods" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Methods</SelectItem>
-                                            {paymentMethods.map((method) => (
-                                                <SelectItem key={method} value={method}>
-                                                    {method.charAt(0).toUpperCase() + method.slice(1).replace('_', ' ')}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
                                 {/* Customer Filter */}
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Customer</label>
@@ -506,7 +458,7 @@ export default function PaymentsIndex({ payments }) {
                         <div className="flex-1 pl-16">
                             <Input
                                 type="text"
-                                placeholder="Search payments by customer, reference number, method, or amount..."
+                                placeholder="Search payments by customer, reference number, or amount..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
@@ -522,7 +474,6 @@ export default function PaymentsIndex({ payments }) {
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Pay/Type</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Ref No</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold">Method</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Total Bill</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Amount Paid</th>
                                     <th className="px-4 py-3 text-right text-sm font-semibold">Balance</th>
@@ -560,7 +511,6 @@ export default function PaymentsIndex({ payments }) {
                                             </td>
                                             <td className="px-4 py-3 text-sm text-rose-500">#{p.reference_number || '—'}</td>
                                             <td className="px-4 py-3 text-sm">{formatDate(p.payment_date)}</td>
-                                            <td className="px-4 py-3 text-sm capitalize">{String(p.payment_method || '').replace('_', ' ')}</td>
                                             <td className="px-4 py-3 text-left text-sm font-medium">
                                                 {formatSSPCurrency(p?.bill?.total_amount || 0)}
                                             </td>
@@ -572,7 +522,7 @@ export default function PaymentsIndex({ payments }) {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td className="px-4 py-8 text-center text-slate-500" colSpan={8}>
+                                        <td className="px-4 py-8 text-center text-slate-500" colSpan={7}>
                                             {hasActiveFilters ? 'No payments match your filters.' : 'No payments found.'}
                                         </td>
                                     </tr>

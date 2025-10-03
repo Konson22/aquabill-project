@@ -35,11 +35,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/statistics', [DashboardController::class, 'statistics'])->name('statistics.index');
     Route::get('/documentation', [DocumentationController::class, 'index'])->name('documentation');
     Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
-    Route::get('/billing/print-multiple', [BillingController::class, 'printMultiple'])->name('billing.print-multiple');
+    Route::get('/billing/print-multiple-only', [BillingController::class, 'printMultipleOnly'])->name('billing.print-multiple-only');
     Route::get('/billing/{bill}', [BillingController::class, 'show'])->whereNumber('bill')->name('billing.show');
     Route::get('/billing-range', [BillingController::class, 'range'])->name('billing.range');
     Route::get('/billing-range/export', [BillingController::class, 'exportRange'])->name('billing.range.export');
-    Route::get('/billing/{bill}/print', [BillingController::class, 'print'])->whereNumber('bill')->name('billing.print');
+    Route::get('/billing/{bill}/print-only', [BillingController::class, 'printOnly'])->whereNumber('bill')->name('billing.print-only');
     // Test route for department access control
     Route::get('/test-department-access', function () {
         $user = auth()->user();

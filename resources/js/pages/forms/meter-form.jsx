@@ -8,7 +8,7 @@ import { useForm } from '@inertiajs/react';
 export default function MeterForm({ customers = [], meter = null, isEditing = false, closeDialog }) {
     const { data, setData, post, put, processing, errors, reset } = useForm({
         serial: meter?.serial || '',
-        status: meter?.status || 'active',
+        status: meter?.status || 'inactive',
         size: meter?.size || '',
         model: meter?.model || '',
         manufactory: meter?.manufactory || '',
