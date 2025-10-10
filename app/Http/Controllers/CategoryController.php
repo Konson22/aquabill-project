@@ -132,9 +132,10 @@ class CategoryController extends Controller
                 return back()->withErrors(['error' => 'Cannot delete category with active customers.']);
             }
             
-            $category->delete();
+            // Permanently delete the category from database
+            $category->forceDelete();
             return redirect()->route('categories.index')
-                ->with('success', 'Category deleted successfully.');
+                ->with('success', 'Category permanently deleted successfully.');
         } catch (\Throwable $th) {
             return back()->withErrors(['error' => 'Failed to delete category.']);
         }
