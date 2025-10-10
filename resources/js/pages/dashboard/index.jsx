@@ -1,9 +1,28 @@
 import MeterStatusChart from '@/components/charts/MeterStatusChart';
 import RevenueChart from '@/components/charts/RevenueChart';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, Building, CheckCircle, Clock, DollarSign, Droplets, FileText, TrendingUp, Users, Wrench, XCircle } from 'lucide-react';
+import {
+    Activity,
+    AlertTriangle,
+    BarChart3,
+    Bell,
+    Building,
+    CheckCircle,
+    Clock,
+    DollarSign,
+    Droplets,
+    FileText,
+    RefreshCw,
+    Settings,
+    TrendingUp,
+    Users,
+    Wrench,
+    XCircle,
+} from 'lucide-react';
 
 const breadcrumbs = [
     {
@@ -199,48 +218,184 @@ export default function Dashboard({ stats }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-6 p-6">
-                {/* Welcome Section */}
-                <div className="space-y-2">
-                    <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-                    <p className="text-muted-foreground">Welcome to AquaBill - Water Billing Management System</p>
+                {/* Enhanced Header Section */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-8 text-white shadow-2xl">
+                    {/* Background Pattern */}
+                    <div className="absolute inset-0 opacity-20">
+                        <div
+                            className="h-full w-full"
+                            style={{
+                                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+                                backgroundRepeat: 'repeat',
+                            }}
+                        />
+                    </div>
+
+                    {/* Header Content */}
+                    <div className="relative z-10">
+                        <div className="flex items-start justify-between">
+                            <div className="space-y-4">
+                                <div className="flex items-center space-x-3">
+                                    <div className="rounded-xl bg-white/20 p-3 backdrop-blur-sm">
+                                        <Activity className="h-8 w-8" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
+                                        <p className="text-blue-100">Welcome to AquaBill - Water Billing Management System</p>
+                                    </div>
+                                </div>
+
+                                {/* Quick Stats Row */}
+                                <div className="flex flex-wrap items-center gap-6">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="rounded-full bg-green-500 p-1">
+                                            <CheckCircle className="h-4 w-4 text-white" />
+                                        </div>
+                                        <span className="text-sm font-medium">System Operational</span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <div className="rounded-full bg-yellow-500 p-1">
+                                            <Clock className="h-4 w-4 text-white" />
+                                        </div>
+                                        <span className="text-sm font-medium">Last Updated: {new Date().toLocaleTimeString()}</span>
+                                    </div>
+                                    {userDepartment && (
+                                        <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
+                                            {userDepartment} Department
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center space-x-3">
+                                <Button variant="secondary" size="sm" className="bg-white/20 text-white backdrop-blur-sm hover:bg-white/30">
+                                    <RefreshCw className="mr-2 h-4 w-4" />
+                                    Refresh
+                                </Button>
+                                <Button variant="secondary" size="sm" className="bg-white/20 text-white backdrop-blur-sm hover:bg-white/30">
+                                    <Settings className="mr-2 h-4 w-4" />
+                                    Settings
+                                </Button>
+                                <Button variant="secondary" size="sm" className="bg-white/20 text-white backdrop-blur-sm hover:bg-white/30">
+                                    <Bell className="mr-2 h-4 w-4" />
+                                    Notifications
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Key Metrics Preview */}
+                        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div className="rounded-xl bg-white/10 p-4 backdrop-blur-sm">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-blue-100">Total Customers</p>
+                                        <p className="text-2xl font-bold">{data.totalCustomers}</p>
+                                    </div>
+                                    <Users className="h-8 w-8 text-blue-200" />
+                                </div>
+                            </div>
+                            <div className="rounded-xl bg-white/10 p-4 backdrop-blur-sm">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-blue-100">Active Meters</p>
+                                        <p className="text-2xl font-bold">{data.activeMeters}</p>
+                                    </div>
+                                    <Droplets className="h-8 w-8 text-blue-200" />
+                                </div>
+                            </div>
+                            <div className="rounded-xl bg-white/10 p-4 backdrop-blur-sm">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-blue-100">This Month Revenue</p>
+                                        <p className="text-2xl font-bold">${data.thisMonthRevenue?.toLocaleString() || '0'}</p>
+                                    </div>
+                                    <DollarSign className="h-8 w-8 text-blue-200" />
+                                </div>
+                            </div>
+                            <div className="rounded-xl bg-white/10 p-4 backdrop-blur-sm">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-blue-100">Pending Bills</p>
+                                        <p className="text-2xl font-bold">{data.pendingPayments}</p>
+                                    </div>
+                                    <FileText className="h-8 w-8 text-blue-200" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Quick Actions - moved to top - Hidden from Billing and Finance departments */}
+                {/* Enhanced Quick Actions - Hidden from Billing and Finance departments */}
                 {userDepartment !== 'Billing' && userDepartment !== 'Finance' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Quick Actions</CardTitle>
-                            <CardDescription>Common tasks and shortcuts</CardDescription>
+                    <Card className="border-0 shadow-lg">
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="flex items-center space-x-2">
+                                        <BarChart3 className="h-5 w-5 text-blue-600" />
+                                        <span>Quick Actions</span>
+                                    </CardTitle>
+                                    <CardDescription>Common tasks and shortcuts for efficient workflow</CardDescription>
+                                </div>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                                    {userDepartment} Access
+                                </Badge>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                                 <Link
                                     href="/customers/create"
-                                    className="flex items-center space-x-2 rounded-lg border p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                                    className="group relative overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 transition-all duration-300 hover:scale-105 hover:shadow-lg dark:border-blue-800 dark:from-blue-950 dark:to-indigo-950"
                                 >
-                                    <Users className="h-5 w-5" />
-                                    <span>Add Customer</span>
+                                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 opacity-0 transition-opacity group-hover:opacity-100" />
+                                    <div className="relative z-10">
+                                        <div className="mb-3 w-fit rounded-lg bg-blue-500 p-2">
+                                            <Users className="h-5 w-5 text-white" />
+                                        </div>
+                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Add Customer</h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Register new customer</p>
+                                    </div>
                                 </Link>
                                 <Link
                                     href="/billing"
-                                    className="flex items-center space-x-2 rounded-lg border p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                                    className="group relative overflow-hidden rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-6 transition-all duration-300 hover:scale-105 hover:shadow-lg dark:border-green-800 dark:from-green-950 dark:to-emerald-950"
                                 >
-                                    <FileText className="h-5 w-5" />
-                                    <span>Bills</span>
+                                    <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 transition-opacity group-hover:opacity-100" />
+                                    <div className="relative z-10">
+                                        <div className="mb-3 w-fit rounded-lg bg-green-500 p-2">
+                                            <FileText className="h-5 w-5 text-white" />
+                                        </div>
+                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Bills</h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Manage billing</p>
+                                    </div>
                                 </Link>
                                 <Link
                                     href="/payments"
-                                    className="flex items-center space-x-2 rounded-lg border p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                                    className="group relative overflow-hidden rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-6 transition-all duration-300 hover:scale-105 hover:shadow-lg dark:border-purple-800 dark:from-purple-950 dark:to-pink-950"
                                 >
-                                    <DollarSign className="h-5 w-5" />
-                                    <span>Payments</span>
+                                    <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 transition-opacity group-hover:opacity-100" />
+                                    <div className="relative z-10">
+                                        <div className="mb-3 w-fit rounded-lg bg-purple-500 p-2">
+                                            <DollarSign className="h-5 w-5 text-white" />
+                                        </div>
+                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Payments</h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Process payments</p>
+                                    </div>
                                 </Link>
                                 <Link
                                     href="/invoices"
-                                    className="flex items-center space-x-2 rounded-lg border p-4 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
+                                    className="group relative overflow-hidden rounded-xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-6 transition-all duration-300 hover:scale-105 hover:shadow-lg dark:border-orange-800 dark:from-orange-950 dark:to-amber-950"
                                 >
-                                    <DollarSign className="h-5 w-5" />
-                                    <span>Invoices</span>
+                                    <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-amber-500/10 opacity-0 transition-opacity group-hover:opacity-100" />
+                                    <div className="relative z-10">
+                                        <div className="mb-3 w-fit rounded-lg bg-orange-500 p-2">
+                                            <FileText className="h-5 w-5 text-white" />
+                                        </div>
+                                        <h3 className="font-semibold text-slate-900 dark:text-slate-100">Invoices</h3>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">View invoices</p>
+                                    </div>
                                 </Link>
                             </div>
                         </CardContent>

@@ -5,23 +5,23 @@ export default function AuthSplitLayout({ children, title, description }) {
     const { name, quote } = usePage().props;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
+        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-100 to-indigo-100">
             {/* Background Image with Overlay */}
             <div
-                className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
+                className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-80"
                 style={{
-                    backgroundImage: 'url(/images/water-background.jpg)',
+                    backgroundImage: 'url(/images/bg-image.jpg)',
                 }}
             />
 
             {/* Dark Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-blue-900/80 to-indigo-900/80" />
+            <div className="absolute inset-0" />
 
             {/* Centered Form Container */}
             <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-12">
                 <div className="w-full max-w-md">
                     {/* Form Container */}
-                    <div className="rounded-lg border border-slate-200 bg-white p-8 shadow-2xl">
+                    <div className="rounded-lg border border-slate-200 bg-white/90 p-8 shadow-2xl">
                         {/* Logo */}
                         <div className="mb-8 text-center">
                             <div className="mx-auto flex h-16 w-20 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm">
