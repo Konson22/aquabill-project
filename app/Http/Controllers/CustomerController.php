@@ -93,36 +93,25 @@ class CustomerController extends Controller
             // Generate account number inside transaction to avoid race conditions
             $accountNumber = $request->input('account_number');
             if (!$accountNumber) {
-                // Get all existing account numbers within the transaction
-                $existingNumbers = Customer::where('account_number', 'like', 'ACC%')
-                    ->pluck('account_number')
-                    ->map(function($accNum) {
-                        return (int) substr($accNum, 3);
-                    })
-                    ->filter()
-                    ->toArray();
+                // Use a more reliable approach: get the next available number
+                $lastCustomer = Customer::orderBy('id', 'desc')->first();
+                $nextId = $lastCustomer ? $lastCustomer->id + 1 : 1;
                 
-                if (!empty($existingNumbers)) {
-                    $nextNumber = max($existingNumbers) + 1;
-                } else {
-                    $nextNumber = 1;
-                }
-                
-                $accountNumber = 'ACC' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
-                
-                // Ensure the generated account number is unique
-                $counter = $nextNumber;
-                while (Customer::where('account_number', $accountNumber)->exists()) {
-                    $counter++;
+                // Start from the next ID and find the first available account number
+                $counter = $nextId;
+                do {
                     $accountNumber = 'ACC' . str_pad($counter, 5, '0', STR_PAD_LEFT);
-                }
+                    $counter++;
+                } while (Customer::where('account_number', $accountNumber)->exists());
                 
                 // Log for debugging
                 \Log::info('Generated account number in transaction', [
                     'account_number' => $accountNumber,
-                    'existing_numbers' => $existingNumbers,
-                    'next_number' => $counter,
-                    'all_existing_accounts' => Customer::pluck('account_number')->toArray()
+                    'last_customer_id' => $lastCustomer ? $lastCustomer->id : 'none',
+                    'next_id' => $nextId,
+                    'counter' => $counter - 1,
+                    'all_existing_accounts' => Customer::pluck('account_number')->toArray(),
+                    'customer_count' => Customer::count()
                 ]);
             }
 

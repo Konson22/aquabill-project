@@ -15,8 +15,19 @@ export default function BillingPrintOnly({ bill }) {
                 {`@media print {
                     .bill-item .bill-print-root,
                     .bill-item .bill-print-root * {
+                        font-size: 14px !important;
+                        line-height: 1.4 !important;
+                    }
+                    .bill-item .bill-print-root .text-xs {
                         font-size: 12px !important;
-                        line-height: 1.25 !important;
+                    }
+                    .bill-item .bill-print-root .text-sm {
+                        font-size: 13px !important;
+                    }
+                    .bill-item .bill-print-root h1, 
+                    .bill-item .bill-print-root h2, 
+                    .bill-item .bill-print-root h3 {
+                        font-size: 16px !important;
                     }
                 }`}
             </style>

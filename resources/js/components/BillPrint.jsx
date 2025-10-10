@@ -14,16 +14,19 @@ export default function BillPrint({ bill }) {
                 {`
                     @media print {
                         .bill-print-root {
-                            font-size: 10px !important;
+                            font-size: 14px !important;
                         }
                         .bill-print-root .text-xs {
-                            font-size: 8px !important;
+                            font-size: 12px !important;
                         }
                         .bill-print-root .text-sm {
-                            font-size: 9px !important;
+                            font-size: 13px !important;
                         }
                         .bill-print-root h1, .bill-print-root h2, .bill-print-root h3 {
-                            font-size: 10px !important;
+                            font-size: 16px !important;
+                        }
+                        .bill-print-root .text-base {
+                            font-size: 14px !important;
                         }
                     }
                 `}

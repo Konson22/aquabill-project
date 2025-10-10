@@ -28,17 +28,28 @@ export default function BillingPrintMultipleOnly({ bills = [] }) {
                         break-after: page; 
                     }
 
-                    /* Make the card fill available height and smaller print font */
+                    /* Make the card fill available height and larger print font */
                     .bill-item .bill-print-root,
                     .bill-item .bill-print-root * {
-                        font-size: 10px !important;   /* smaller font size for all elements */
-                        line-height: 1.15 !important;
+                        font-size: 12px !important;   /* increased font size for better readability */
+                        line-height: 1.3 !important;
+                    }
+                    .bill-item .bill-print-root .text-xs {
+                        font-size: 10px !important;
+                    }
+                    .bill-item .bill-print-root .text-sm {
+                        font-size: 11px !important;
+                    }
+                    .bill-item .bill-print-root h1, 
+                    .bill-item .bill-print-root h2, 
+                    .bill-item .bill-print-root h3 {
+                        font-size: 14px !important;
                     }
                     .bill-item .bill-print-root {
                         flex: 1 1 auto;
                         display: flex;
                         flex-direction: column;
-                        padding: 0.4rem !important; /* tighter padding for smaller font */
+                        padding: 0.5rem !important; /* adjusted padding for larger font */
                     }
                 }`}
             </style>
