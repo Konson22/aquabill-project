@@ -6,7 +6,6 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertCircle,
-    ArrowLeft,
     Calendar,
     CheckCircle,
     Clock,
@@ -90,7 +89,10 @@ export default function InvoiceShow({ invoice }) {
                     @media print {
                         .no-print { display: none !important; }
                         .print-break { page-break-before: always; }
-                        body { font-size: 12px; }
+                        body { 
+                            font-size: 14px; 
+                            line-height: 1.4;
+                        }
                         .print-header { 
                             border-bottom: 2px solid #000; 
                             margin-bottom: 20px; 
@@ -100,6 +102,30 @@ export default function InvoiceShow({ invoice }) {
                             margin-bottom: 15px; 
                             page-break-inside: avoid;
                         }
+                        /* Add borders around all cards in print */
+                        .print-card {
+                            border: 1px solid #000 !important;
+                            border-radius: 8px !important;
+                            margin-bottom: 20px !important;
+                            padding: 16px !important;
+                            box-shadow: none !important;
+                        }
+                        /* Ensure proper spacing for print */
+                        .print-card h3, .print-card h4, .print-card h5 {
+                            margin-top: 0 !important;
+                            margin-bottom: 12px !important;
+                            font-weight: bold !important;
+                        }
+                        .print-card p, .print-card div {
+                            margin-bottom: 8px !important;
+                        }
+                        /* Make text more readable in print */
+                        .text-slate-900, .text-slate-100 {
+                            color: #000 !important;
+                        }
+                        .text-slate-600, .text-slate-400 {
+                            color: #333 !important;
+                        }
                     }
                 `}</style>
             </Head>
@@ -108,12 +134,6 @@ export default function InvoiceShow({ invoice }) {
             <div className="mb-8">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
-                        <Button asChild variant="ghost" size="sm" className="no-print">
-                            <Link href="/invoices">
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back to Invoices
-                            </Link>
-                        </Button>
                         <div className="print-header">
                             <div className="flex items-center gap-3">
                                 <div className="rounded-lg bg-blue-100 p-3 dark:bg-blue-900/20">
@@ -170,7 +190,7 @@ export default function InvoiceShow({ invoice }) {
                 {/* Main Content */}
                 <div className="space-y-8 lg:col-span-2">
                     {/* Invoice Information Card */}
-                    <Card className="border-l-4 border-l-blue-500">
+                    <Card className="print-card border-l-4 border-l-blue-500">
                         <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2">
                                 <FileText className="h-5 w-5 text-blue-600" />
@@ -235,7 +255,7 @@ export default function InvoiceShow({ invoice }) {
 
                     {/* Customer Information Card */}
                     {invoice.customer && (
-                        <Card className="border-l-4 border-l-green-500">
+                        <Card className="print-card border-l-4 border-l-green-500">
                             <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
@@ -280,7 +300,7 @@ export default function InvoiceShow({ invoice }) {
 
                     {/* Meter Information Card */}
                     {invoice.meter && (
-                        <Card className="border-l-4 border-l-purple-500">
+                        <Card className="print-card border-l-4 border-l-purple-500">
                             <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center gap-2">
                                     <Zap className="h-5 w-5 text-purple-600" />
@@ -304,7 +324,7 @@ export default function InvoiceShow({ invoice }) {
 
                     {/* Payment History Card */}
                     {invoice.payments && invoice.payments.length > 0 && (
-                        <Card className="border-l-4 border-l-orange-500">
+                        <Card className="print-card border-l-4 border-l-orange-500">
                             <CardHeader className="pb-4">
                                 <CardTitle className="flex items-center gap-2">
                                     <CreditCard className="h-5 w-5 text-orange-600" />
@@ -355,7 +375,7 @@ export default function InvoiceShow({ invoice }) {
                 {/* Enhanced Summary Sidebar */}
                 <div className="no-print space-y-6">
                     {/* Amount Summary Card */}
-                    <Card className="border-l-4 border-l-emerald-500">
+                    <Card className="print-card border-l-4 border-l-emerald-500">
                         <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2">
                                 <DollarSign className="h-5 w-5 text-emerald-600" />
@@ -399,7 +419,7 @@ export default function InvoiceShow({ invoice }) {
                     </Card>
 
                     {/* Quick Stats Card */}
-                    <Card>
+                    <Card className="print-card">
                         <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2">
                                 <TrendingUp className="h-5 w-5 text-blue-600" />

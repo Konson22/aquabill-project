@@ -64,13 +64,6 @@ class AuthController extends BaseController
             if ($user->status !== 'active') {
                 Auth::logout(); // Logout the user if they're not active
                 
-                Log::warning('API Login failed - inactive account', [
-                    'user_id' => $user->id,
-                    'email' => $request->email,
-                    'status' => $user->status,
-                    'ip' => $request->ip()
-                ]);
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Account is inactive. Please contact administrator.'
@@ -83,25 +76,13 @@ class AuthController extends BaseController
             // Create new token
             $token = $user->createToken('auth-token')->plainTextToken;
 
-            Log::info('API Login successful', [
-                'user_id' => $user->id,
-                'email' => $request->email,
-                'ip' => $request->ip()
-            ]);
-
             return response()->json([
-                'success' => true,
-                'message' => 'Login successful',
-                'data' => [
-                    'user' => [
-                        'id' => $user->id,
-                        'name' => $user->name,
-                        'email' => $user->email,
-                        'role' => $user->role,
-                    ],
-                    'token' => $token,
-                    'token_type' => 'Bearer',
-                ]
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+                'token' => $token,
             ], 200);
 
         } catch (Exception $e) {

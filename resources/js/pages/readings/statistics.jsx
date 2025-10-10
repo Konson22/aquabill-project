@@ -14,15 +14,14 @@ import {
     Droplets,
     Filter,
     Printer,
-    RefreshCw,
     Target,
     TrendingUp,
     Users,
     X,
     Zap,
 } from 'lucide-react';
-import { useState } from 'react';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useEffect, useState } from 'react';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const breadcrumbs = [
     {
@@ -79,6 +78,15 @@ export default function ReadingsStatistics({
         { value: '12', label: 'December' },
     ];
 
+    // Auto-apply filters when filter state changes
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            applyFilters();
+        }, 300); // Debounce for 300ms to avoid too many requests
+
+        return () => clearTimeout(timeoutId);
+    }, [filterState.month, filterState.year, filterState.category, filterState.neighborhood]);
+
     // Apply filters
     const applyFilters = () => {
         const params = new URLSearchParams();
@@ -102,14 +110,7 @@ export default function ReadingsStatistics({
             category: 'all',
             neighborhood: 'all',
         });
-        router.get(
-            '/readings/statistics',
-            {},
-            {
-                preserveState: true,
-                replace: true,
-            },
-        );
+        // The useEffect will automatically apply the cleared filters
     };
 
     const formatNumber = (number) => {
@@ -322,67 +323,35 @@ export default function ReadingsStatistics({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Readings Statistics" />
 
-            {/* Modern Header */}
-            <div className="relative mb-8 overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-8 text-white">
-                <div className="absolute inset-0 bg-black/10"></div>
-                <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-white/10"></div>
-                <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-white/5"></div>
-                <div className="relative">
-                    <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-xl bg-white/20 p-3">
-                                    <BarChart3 className="h-8 w-8 text-white" />
-                                </div>
-                                <div>
-                                    <h1 className="text-4xl font-bold">Readings Analytics</h1>
-                                    <p className="text-indigo-100">Comprehensive insights and data visualization for meter readings</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-4">
-                                <div className="flex items-center gap-2 rounded-lg bg-white/20 px-3 py-2">
-                                    <Activity className="h-4 w-4" />
-                                    <span className="text-sm font-medium">{statistics.total_readings} Total Readings</span>
-                                </div>
-                                <div className="flex items-center gap-2 rounded-lg bg-white/20 px-3 py-2">
-                                    <Droplets className="h-4 w-4" />
-                                    <span className="text-sm font-medium">{formatNumber(statistics.total_consumption)} Units</span>
-                                </div>
-                                <div className="flex items-center gap-2 rounded-lg bg-white/20 px-3 py-2">
-                                    <TrendingUp className="h-4 w-4" />
-                                    <span className="text-sm font-medium">{formatNumber(statistics.avg_consumption)} Avg/Reading</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                            <Button
-                                variant="secondary"
-                                onClick={exportStatistics}
-                                className="border-white/30 bg-white/20 text-white hover:bg-white/30"
-                            >
-                                <Download className="mr-2 h-4 w-4" />
-                                Export Data
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={printStatistics}
-                                className="border-white/30 bg-white/20 text-white hover:bg-white/30"
-                            >
-                                <Printer className="mr-2 h-4 w-4" />
-                                Print Report
-                            </Button>
-                            <Button variant="secondary" onClick={applyFilters} className="border-white/30 bg-white/20 text-white hover:bg-white/30">
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Refresh
-                            </Button>
-                        </div>
-                    </div>
+            {/* Header */}
+            <div className="mb-8 flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Readings Analytics</h1>
+                    <p className="mt-1 text-slate-600 dark:text-slate-400">Comprehensive insights and data visualization for meter readings</p>
+                </div>
+                <div className="flex gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={exportStatistics}
+                        className="border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    >
+                        <Download className="mr-2 h-4 w-4" />
+                        Export Data
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={printStatistics}
+                        className="border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
+                    >
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print Report
+                    </Button>
                 </div>
             </div>
 
             {/* Modern Filters */}
             <Card className="mb-8 border-0 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+                <CardHeader>
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <CardTitle className="flex items-center gap-3 text-xl font-semibold text-slate-900 dark:text-slate-100">
@@ -406,13 +375,6 @@ export default function ReadingsStatistics({
                             </CardDescription>
                         </div>
                         <div className="flex gap-2">
-                            <Button
-                                onClick={applyFilters}
-                                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                            >
-                                <Filter className="h-4 w-4" />
-                                Apply Filters
-                            </Button>
                             <Button
                                 variant="outline"
                                 onClick={clearFilters}
@@ -770,7 +732,7 @@ export default function ReadingsStatistics({
                     <CardContent className="p-6">
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={consumptionTrends}>
+                                <AreaChart data={consumptionTrends}>
                                     <defs>
                                         <linearGradient id="averageGradient" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
@@ -811,36 +773,36 @@ export default function ReadingsStatistics({
                                         name="Total"
                                         dot={{ fill: '#ec4899', strokeWidth: 2, r: 4 }}
                                     />
-                                </LineChart>
+                                </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Enhanced Top Customers */}
+            {/* Top Consumption by Category */}
             <div className="mt-8">
                 <Card className="border-0 shadow-lg">
                     <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20">
                         <div className="flex items-center gap-3">
                             <div className="rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 p-2">
-                                <Users className="h-5 w-5 text-white" />
+                                <BarChart3 className="h-5 w-5 text-white" />
                             </div>
                             <div>
                                 <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-                                    Top Customers by Consumption
+                                    Top Consumption by Category
                                 </CardTitle>
                                 <CardDescription className="text-slate-600 dark:text-slate-400">
-                                    Customers with highest total water consumption
+                                    Water consumption breakdown by customer category
                                 </CardDescription>
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-6">
                         <div className="space-y-4">
-                            {topCustomers.map((customer, index) => (
+                            {categoryConsumption?.map((category, index) => (
                                 <div
-                                    key={customer.id}
+                                    key={category.category_name}
                                     className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-6 transition-all duration-200 hover:border-amber-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:hover:border-amber-600"
                                 >
                                     <div className="flex items-center justify-between">
@@ -867,27 +829,27 @@ export default function ReadingsStatistics({
                                             </div>
                                             <div className="space-y-1">
                                                 <div className="text-lg font-semibold text-slate-900 group-hover:text-amber-600 dark:text-slate-100 dark:group-hover:text-amber-400">
-                                                    {customer.name}
+                                                    {category.category_name}
                                                 </div>
                                                 <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                                                    <span className="font-medium">Account:</span>
+                                                    <span className="font-medium">Percentage:</span>
                                                     <Badge
                                                         variant="outline"
                                                         className="border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300"
                                                     >
-                                                        {customer.account_number}
+                                                        {category.percentage_of_total}%
                                                     </Badge>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="text-right">
                                             <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                                                {formatNumber(customer.total_consumption)}
+                                                {formatNumber(category.total_consumption)}
                                                 <span className="ml-1 text-sm font-normal text-slate-500 dark:text-slate-400">m³</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                                                 <Activity className="h-4 w-4" />
-                                                <span>{customer.readings_count} readings</span>
+                                                <span>{category.readings_count} readings</span>
                                             </div>
                                         </div>
                                     </div>
@@ -896,7 +858,7 @@ export default function ReadingsStatistics({
                                     <div className="mt-4">
                                         <div className="mb-1 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                                             <span>Consumption Level</span>
-                                            <span>{Math.round((customer.total_consumption / (topCustomers[0]?.total_consumption || 1)) * 100)}%</span>
+                                            <span>{category.percentage_of_total}%</span>
                                         </div>
                                         <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-700">
                                             <div
@@ -910,9 +872,23 @@ export default function ReadingsStatistics({
                                                             : 'bg-gradient-to-r from-slate-400 to-slate-500'
                                                 }`}
                                                 style={{
-                                                    width: `${Math.min((customer.total_consumption / (topCustomers[0]?.total_consumption || 1)) * 100, 100)}%`,
+                                                    width: `${Math.min(category.percentage_of_total, 100)}%`,
                                                 }}
                                             ></div>
+                                        </div>
+                                    </div>
+
+                                    {/* Additional category stats */}
+                                    <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                                        <div className="text-center">
+                                            <div className="text-slate-500 dark:text-slate-400">Average per Reading</div>
+                                            <div className="font-semibold text-slate-900 dark:text-slate-100">
+                                                {formatNumber(category.average_consumption)} m³
+                                            </div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-slate-500 dark:text-slate-400">Total Readings</div>
+                                            <div className="font-semibold text-slate-900 dark:text-slate-100">{category.readings_count}</div>
                                         </div>
                                     </div>
                                 </div>

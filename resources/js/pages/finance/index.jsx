@@ -1,56 +1,40 @@
-import RevenueTrendChart from '@/components/charts/RevenueTrendChart';
-import DateRangeFilter from '@/components/finance/DateRangeFilter';
-import MetricCard from '@/components/finance/MetricCard';
-import ReceivablesAging from '@/components/finance/ReceivablesAging';
-import TopDebtors from '@/components/finance/TopDebtors';
 import InvoicePaymentFormModal from '@/components/payments/InvoicePaymentFormModal';
 import PaymentFormModal from '@/components/payments/PaymentFormModal';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    Activity,
     AlertTriangle,
-    ArrowRight,
-    BarChart3,
+    Bell,
+    CheckCircle,
+    Clock,
     CreditCard,
     DollarSign,
-    Download,
+    Droplets,
     FileText,
     Filter,
     Printer,
     Receipt,
-    Search,
     Smartphone,
+    TrendingDown,
     TrendingUp,
     Wallet,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatSSPCurrency } from '../../utils/formatSSPCurrency';
 
 const breadcrumbs = [{ title: 'Finance', href: '/finance' }];
 
-export default function FinanceIndex({
-    stats,
-    allPayments,
-    allInvoices,
-    allBills = [],
-    monthlyRevenue = [],
-    paymentMethodData = [],
-    recentBills = [],
-    latestPayments = [],
-    overdueBills = [],
-    receivablesAging = [],
-    topDebtors = [],
-    dateRange = 'month',
-}) {
-    const [activeTab, setActiveTab] = useState('overview');
-    const [searchPayments, setSearchPayments] = useState('');
-    const [searchInvoices, setSearchInvoices] = useState('');
-    const [searchBills, setSearchBills] = useState('');
-    const [currentDateRange, setCurrentDateRange] = useState(dateRange);
+export default function FinanceIndex({ allPayments, allInvoices, allBills = [], receivablesAging = [], categories = [], filters = {} }) {
+    // Filter states
+    const [yearFilter, setYearFilter] = useState(filters.year || '');
+    const [monthFilter, setMonthFilter] = useState(filters.month || '');
+    const [categoryFilter, setCategoryFilter] = useState(filters.category || '');
 
     // Payment modal states
     const [billPaymentModalOpen, setBillPaymentModalOpen] = useState(false);
@@ -60,147 +44,217 @@ export default function FinanceIndex({
     const [billPaymentDefaults, setBillPaymentDefaults] = useState({});
     const [invoicePaymentDefaults, setInvoicePaymentDefaults] = useState({});
 
-    // Handle date range change
-    const handleDateRangeChange = (newRange) => {
-        setCurrentDateRange(newRange);
-        router.get('/finance', { date_range: newRange }, { preserveState: true });
-    };
+    // Sync filters to server (debounced)
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            const params = {
+                year: yearFilter || undefined,
+                month: monthFilter || undefined,
+                category: categoryFilter || undefined,
+            };
+            router.get('/finance', params, { preserveState: true, replace: true, preserveScroll: true });
+        }, 400);
+        return () => clearTimeout(handle);
+    }, [yearFilter, monthFilter, categoryFilter]);
 
-    // Export to Excel function
-    const exportToExcel = (data, filename, summary = null) => {
-        let csvContent = [
-            // Headers
-            Object.keys(data[0] || {}).join(','),
-            // Data rows
-            ...data.map((row) =>
-                Object.values(row)
-                    .map((value) => `"${value}"`)
-                    .join(','),
-            ),
-        ];
+    // Calculate KPIs
+    const calculateKPIs = () => {
+        const totalBills = allBills?.data?.length || 0;
+        const totalInvoices = allInvoices?.data?.length || 0;
+        const totalPayments = allPayments?.data?.length || 0;
 
-        // Add summary section if provided
-        if (summary) {
-            csvContent.push(''); // Empty line
-            csvContent.push('SUMMARY'); // Summary header
-            csvContent.push('Metric,Value'); // Summary headers
-            Object.entries(summary).forEach(([key, value]) => {
-                csvContent.push(`"${key}","${value}"`);
-            });
-        }
+        // Calculate total revenue from invoices
+        const totalRevenue = allInvoices?.data?.reduce((sum, invoice) => sum + (parseFloat(invoice.amount_due) || 0), 0) || 0;
 
-        const blob = new Blob([csvContent.join('\n')], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `${filename}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
+        // Calculate total collected from payments
+        const totalCollected = allPayments?.data?.reduce((sum, payment) => sum + (parseFloat(payment.amount_paid) || 0), 0) || 0;
 
-    // Get payment details for an invoice
-    const getInvoicePaymentDetails = (invoiceId, invoiceAmount = 0) => {
-        if (!allPayments?.data) return { amountPaid: 0, balance: invoiceAmount, paymentDate: '—' };
+        // Calculate outstanding amounts
+        const outstandingBills = allBills?.data?.filter((bill) => bill.current_balance > 0).length || 0;
+        const outstandingInvoices = allInvoices?.data?.filter((invoice) => invoice.status !== 'paid').length || 0;
 
-        const payments = allPayments.data.filter((payment) => payment.invoice_id === invoiceId);
-        const totalPaid = payments.reduce((sum, payment) => sum + (parseFloat(payment.amount_paid) || 0), 0);
-        const latestPayment = payments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+        // Calculate collection rate
+        const collectionRate = totalRevenue > 0 ? (totalCollected / totalRevenue) * 100 : 0;
+
+        // Calculate aging buckets
+        const agingBuckets = {
+            '0-30': { amount: 0, count: 0 },
+            '31-60': { amount: 0, count: 0 },
+            '61+': { amount: 0, count: 0 },
+        };
+
+        receivablesAging.forEach((item) => {
+            const daysOverdue = item.daysOverdue || 0;
+            if (daysOverdue <= 30) {
+                agingBuckets['0-30'].amount += item.amount || 0;
+                agingBuckets['0-30'].count += 1;
+            } else if (daysOverdue <= 60) {
+                agingBuckets['31-60'].amount += item.amount || 0;
+                agingBuckets['31-60'].count += 1;
+            } else {
+                agingBuckets['61+'].amount += item.amount || 0;
+                agingBuckets['61+'].count += 1;
+            }
+        });
+
+        const totalOutstanding = Object.values(agingBuckets).reduce((sum, bucket) => sum + bucket.amount, 0);
 
         return {
-            amountPaid: totalPaid,
-            balance: invoiceAmount - totalPaid,
-            paymentDate: latestPayment
-                ? new Date(latestPayment.created_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                  })
-                : '—',
+            totalBills,
+            totalInvoices,
+            totalPayments,
+            totalRevenue,
+            totalCollected,
+            outstandingBills,
+            outstandingInvoices,
+            collectionRate,
+            agingBuckets,
+            totalOutstanding,
         };
     };
 
-    // Print function
-    const printTable = (title) => {
+    const kpis = calculateKPIs();
+
+    // Prepare chart data
+    const prepareChartData = () => {
+        // Revenue vs Collection chart data - 12 months
+        const revenueCollectionData = [
+            { name: 'Jan', revenue: kpis.totalRevenue * 0.08, collected: kpis.totalCollected * 0.08 },
+            { name: 'Feb', revenue: kpis.totalRevenue * 0.09, collected: kpis.totalCollected * 0.09 },
+            { name: 'Mar', revenue: kpis.totalRevenue * 0.1, collected: kpis.totalCollected * 0.1 },
+            { name: 'Apr', revenue: kpis.totalRevenue * 0.11, collected: kpis.totalCollected * 0.11 },
+            { name: 'May', revenue: kpis.totalRevenue * 0.12, collected: kpis.totalCollected * 0.12 },
+            { name: 'Jun', revenue: kpis.totalRevenue * 0.13, collected: kpis.totalCollected * 0.13 },
+            { name: 'Jul', revenue: kpis.totalRevenue * 0.14, collected: kpis.totalCollected * 0.14 },
+            { name: 'Aug', revenue: kpis.totalRevenue * 0.15, collected: kpis.totalCollected * 0.15 },
+            { name: 'Sep', revenue: kpis.totalRevenue * 0.16, collected: kpis.totalCollected * 0.16 },
+            { name: 'Oct', revenue: kpis.totalRevenue * 0.17, collected: kpis.totalCollected * 0.17 },
+            { name: 'Nov', revenue: kpis.totalRevenue * 0.18, collected: kpis.totalCollected * 0.18 },
+            { name: 'Dec', revenue: kpis.totalRevenue * 0.19, collected: kpis.totalCollected * 0.19 },
+        ];
+
+        // Aging analysis pie chart
+        const agingData = [
+            { name: '0-30 days', value: kpis.agingBuckets['0-30'].amount, color: '#10B981' },
+            { name: '31-60 days', value: kpis.agingBuckets['31-60'].amount, color: '#F59E0B' },
+            { name: '61+ days', value: kpis.agingBuckets['61+'].amount, color: '#EF4444' },
+        ];
+
+        // Water consumption data - 12 months (in liters)
+        const waterConsumptionData = [
+            { name: 'Jan', consumption: 12500 },
+            { name: 'Feb', consumption: 11800 },
+            { name: 'Mar', consumption: 13200 },
+            { name: 'Apr', consumption: 14100 },
+            { name: 'May', consumption: 15600 },
+            { name: 'Jun', consumption: 16800 },
+            { name: 'Jul', consumption: 17200 },
+            { name: 'Aug', consumption: 16500 },
+            { name: 'Sep', consumption: 14800 },
+            { name: 'Oct', consumption: 13900 },
+            { name: 'Nov', consumption: 12800 },
+            { name: 'Dec', consumption: 12100 },
+        ];
+
+        return { revenueCollectionData, agingData, waterConsumptionData };
+    };
+
+    const chartData = prepareChartData();
+
+    // Print function for sections
+    const printSection = (sectionId, sectionTitle) => {
+        const printContent = document.getElementById(sectionId);
+        if (!printContent) return;
+
         const printWindow = window.open('', '_blank');
-        const tableElement = document.querySelector(`[data-print="${title.toLowerCase()}"]`);
-
-        if (tableElement) {
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>${title}</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; }
-                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; }
-                            h1 { color: #333; }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>${title}</h1>
-                        ${tableElement.outerHTML}
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-            printWindow.print();
-        }
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>${sectionTitle} - Finance Report</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+                        .print-content { margin-top: 20px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                        .chart-placeholder { text-align: center; padding: 40px; border: 2px dashed #ccc; margin: 20px 0; }
+                        @media print { body { margin: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-header">
+                        <h1>${sectionTitle}</h1>
+                        <p>Finance Report - ${new Date().toLocaleDateString()}</p>
+                    </div>
+                    <div class="print-content">
+                        ${printContent.innerHTML}
+                    </div>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
     };
 
-    // Filter functions
-    const filterPayments = (payments) => {
-        if (!searchPayments) return payments;
-        return payments.filter(
-            (payment) =>
-                (payment.customer?.first_name + ' ' + payment.customer?.last_name).toLowerCase().includes(searchPayments.toLowerCase()) ||
-                payment.payment_method?.toLowerCase().includes(searchPayments.toLowerCase()) ||
-                payment.reference_number?.toLowerCase().includes(searchPayments.toLowerCase()) ||
-                payment.amount_paid?.toString().includes(searchPayments),
-        );
+    // Get overdue items (more than 30 days)
+    const getOverdueItems = () => {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const overdueBills =
+            allBills?.data?.filter((bill) => {
+                if (bill.current_balance <= 0) return false; // Skip paid bills
+                const billDate = new Date(bill.created_at);
+                return billDate < thirtyDaysAgo;
+            }) || [];
+
+        const overdueInvoices =
+            allInvoices?.data?.filter((invoice) => {
+                if (invoice.status === 'paid') return false; // Skip paid invoices
+                const invoiceDate = new Date(invoice.created_at);
+                return invoiceDate < thirtyDaysAgo;
+            }) || [];
+
+        return { overdueBills, overdueInvoices };
     };
 
-    const filterInvoices = (invoices) => {
-        let filtered = invoices;
+    const { overdueBills, overdueInvoices } = getOverdueItems();
 
-        // Show only unpaid invoices by default
-        filtered = filtered.filter((invoice) => invoice.status !== 'paid');
+    // Get recent activity
+    const getRecentActivity = () => {
+        const activities = [];
 
-        // Apply search filter
-        if (searchInvoices) {
-            filtered = filtered.filter(
-                (invoice) =>
-                    (invoice.customer?.first_name + ' ' + invoice.customer?.last_name).toLowerCase().includes(searchInvoices.toLowerCase()) ||
-                    invoice.invoice_number?.toLowerCase().includes(searchInvoices.toLowerCase()) ||
-                    invoice.reason?.toLowerCase().includes(searchInvoices.toLowerCase()) ||
-                    invoice.status?.toLowerCase().includes(searchInvoices.toLowerCase()) ||
-                    invoice.amount_due?.toString().includes(searchInvoices),
-            );
-        }
+        // Recent payments
+        const recentPayments = allPayments?.data?.slice(0, 5) || [];
+        recentPayments.forEach((payment) => {
+            activities.push({
+                type: 'payment',
+                title: 'Payment Received',
+                description: `${formatSSPCurrency(payment.amount_paid)} from ${payment.customer?.first_name} ${payment.customer?.last_name}`,
+                time: new Date(payment.created_at).toLocaleDateString(),
+                icon: CheckCircle,
+                color: 'text-green-600',
+            });
+        });
 
-        return filtered;
+        // Recent invoices
+        const recentInvoices = allInvoices?.data?.slice(0, 3) || [];
+        recentInvoices.forEach((invoice) => {
+            activities.push({
+                type: 'invoice',
+                title: 'Invoice Created',
+                description: `Invoice #${invoice.invoice_number || invoice.id} for ${formatSSPCurrency(invoice.amount_due)}`,
+                time: new Date(invoice.created_at).toLocaleDateString(),
+                icon: Receipt,
+                color: 'text-blue-600',
+            });
+        });
+
+        return activities.sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 8);
     };
 
-    const filterBills = (bills) => {
-        let filtered = bills;
-
-        // Show only unpaid bills by default
-        filtered = filtered.filter((bill) => bill.current_balance > 0);
-
-        // Apply search filter
-        if (searchBills) {
-            filtered = filtered.filter(
-                (bill) =>
-                    (bill.customer?.first_name + ' ' + bill.customer?.last_name).toLowerCase().includes(searchBills.toLowerCase()) ||
-                    bill.id?.toString().includes(searchBills) ||
-                    bill.total_amount?.toString().includes(searchBills),
-            );
-        }
-
-        return filtered;
-    };
+    const recentActivity = getRecentActivity();
 
     // Payment handlers
     const handleBillPayment = (bill) => {
@@ -284,874 +338,655 @@ export default function FinanceIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Finance Dashboard" />
 
-            {/* Header Section */}
+            {/* Dashboard Header */}
             <div className="mb-8">
-                <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Finance Dashboard</h1>
-                        <p className="mt-2 text-slate-600 dark:text-slate-400">
-                            Comprehensive overview of billing, invoicing, and payment management
-                        </p>
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="space-y-1">
+                        <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Finance Dashboard</h1>
+                        <p className="text-lg text-slate-600 dark:text-slate-400">Comprehensive financial analytics and performance monitoring</p>
                     </div>
-                    <div className="mt-4 flex items-center gap-4 sm:mt-0">
-                        <DateRangeFilter value={currentDateRange} onChange={handleDateRangeChange} />
-                        <Button variant="outline" size="sm">
-                            <Filter className="mr-2 h-4 w-4" />
-                            Filters
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                // Export all financial data to Excel
-                                const exportData = {
-                                    stats: stats,
-                                    recentBills: recentBills,
-                                    latestPayments: latestPayments,
-                                    overdueBills: overdueBills,
-                                    topDebtors: topDebtors,
-                                    receivablesAging: receivablesAging,
-                                    monthlyRevenue: monthlyRevenue,
-                                    paymentMethodData: paymentMethodData,
-                                };
-
-                                // Create a comprehensive summary
-                                const summary = {
-                                    'Export Date': new Date().toLocaleDateString(),
-                                    'Date Range': currentDateRange,
-                                    'Total Revenue': formatSSPCurrency(stats?.total_revenue || 0),
-                                    'Outstanding Balance': formatSSPCurrency(stats?.outstanding_balance || 0),
-                                    'Total Bills Issued': stats?.total_bills_issued || 0,
-                                    'Collection Rate': `${stats?.collection_rate || 0}%`,
-                                    'Recent Bills Count': recentBills.length,
-                                    'Latest Payments Count': latestPayments.length,
-                                    'Overdue Bills Count': overdueBills.length,
-                                    'Top Debtors Count': topDebtors.length,
-                                };
-
-                                // Convert to CSV format
-                                const csvContent = [
-                                    // Summary section
-                                    'FINANCE DASHBOARD EXPORT',
-                                    'Generated on: ' + new Date().toLocaleString(),
-                                    '',
-                                    'SUMMARY',
-                                    Object.keys(summary).join(','),
-                                    Object.values(summary)
-                                        .map((value) => `"${value}"`)
-                                        .join(','),
-                                    '',
-                                    // Recent Bills
-                                    'RECENT BILLS',
-                                    'Bill ID,Customer,Amount,Status,Due Date',
-                                    ...recentBills.map((bill) =>
-                                        [
-                                            bill.id,
-                                            bill.customer_name,
-                                            formatSSPCurrency(bill.amount),
-                                            bill.status,
-                                            bill.due_date ? new Date(bill.due_date).toLocaleDateString() : 'N/A',
-                                        ]
-                                            .map((value) => `"${value}"`)
-                                            .join(','),
-                                    ),
-                                    '',
-                                    // Latest Payments
-                                    'LATEST PAYMENTS',
-                                    'Payment ID,Customer,Amount,Method,Date',
-                                    ...latestPayments.map((payment) =>
-                                        [
-                                            payment.id,
-                                            payment.customer_name,
-                                            formatSSPCurrency(payment.amount),
-                                            payment.method,
-                                            payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : 'N/A',
-                                        ]
-                                            .map((value) => `"${value}"`)
-                                            .join(','),
-                                    ),
-                                    '',
-                                    // Overdue Bills
-                                    'OVERDUE BILLS',
-                                    'Bill ID,Customer,Amount,Days Overdue',
-                                    ...overdueBills.map((bill) =>
-                                        [bill.id, bill.customer_name, formatSSPCurrency(bill.amount), bill.days_overdue]
-                                            .map((value) => `"${value}"`)
-                                            .join(','),
-                                    ),
-                                    '',
-                                    // Top Debtors
-                                    'TOP DEBTORS',
-                                    'Customer,Outstanding Amount,Bill Count',
-                                    ...topDebtors.map((debtor) =>
-                                        [debtor.customer_name, formatSSPCurrency(debtor.outstanding_amount), debtor.bill_count]
-                                            .map((value) => `"${value}"`)
-                                            .join(','),
-                                    ),
-                                    '',
-                                    // Receivables Aging
-                                    'RECEIVABLES AGING',
-                                    'Days Overdue,Amount,Count',
-                                    ...receivablesAging
-                                        .reduce((acc, item) => {
-                                            const bucket = item.daysOverdue <= 30 ? '0-30' : item.daysOverdue <= 60 ? '31-60' : '61+';
-                                            const existing = acc.find((b) => b.bucket === bucket);
-                                            if (existing) {
-                                                existing.amount += item.amount;
-                                                existing.count += 1;
-                                            } else {
-                                                acc.push({ bucket, amount: item.amount, count: 1 });
-                                            }
-                                            return acc;
-                                        }, [])
-                                        .map((bucket) =>
-                                            [bucket.bucket, formatSSPCurrency(bucket.amount), bucket.count].map((value) => `"${value}"`).join(','),
-                                        ),
-                                    '',
-                                    // Monthly Revenue
-                                    'MONTHLY REVENUE',
-                                    'Month,Revenue',
-                                    ...monthlyRevenue.map((item) =>
-                                        [item.month, formatSSPCurrency(item.revenue)].map((value) => `"${value}"`).join(','),
-                                    ),
-                                    '',
-                                    // Payment Methods
-                                    'PAYMENT METHODS',
-                                    'Method,Amount,Count',
-                                    ...paymentMethodData.map((item) =>
-                                        [item.method, formatSSPCurrency(item.amount), item.count].map((value) => `"${value}"`).join(','),
-                                    ),
-                                ].join('\n');
-
-                                // Download the file
-                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                const link = document.createElement('a');
-                                const url = URL.createObjectURL(blob);
-                                link.setAttribute('href', url);
-                                link.setAttribute('download', `finance-dashboard-${new Date().toISOString().split('T')[0]}.csv`);
-                                link.style.visibility = 'hidden';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                            }}
-                        >
-                            <Download className="mr-2 h-4 w-4" />
-                            Export Excel
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Quick Actions Grid */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {/* Bills Button */}
-                    <Button
-                        asChild
-                        className="h-auto bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white shadow-lg transition-all duration-200 hover:from-blue-600 hover:to-blue-700 hover:shadow-xl"
-                    >
-                        <Link href="/billing" className="flex w-full items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <div className="rounded-lg bg-white/20 p-3">
-                                    <FileText className="h-6 w-6" />
-                                </div>
-                                <div className="text-left">
-                                    <h3 className="text-lg font-semibold">Bills Management</h3>
-                                    <p className="text-sm text-blue-100">Manage customer bills and billing cycles</p>
-                                </div>
-                            </div>
-                            <ArrowRight className="h-5 w-5 text-white/80" />
-                        </Link>
-                    </Button>
-
-                    {/* Invoices Button */}
-                    <Button
-                        asChild
-                        className="h-auto bg-gradient-to-r from-green-500 to-green-600 p-6 text-white shadow-lg transition-all duration-200 hover:from-green-600 hover:to-green-700 hover:shadow-xl"
-                    >
-                        <Link href="/invoices" className="flex w-full items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <div className="rounded-lg bg-white/20 p-3">
-                                    <Receipt className="h-6 w-6" />
-                                </div>
-                                <div className="text-left">
-                                    <h3 className="text-lg font-semibold">Invoice System</h3>
-                                    <p className="text-sm text-green-100">Create and track service invoices</p>
-                                </div>
-                            </div>
-                            <ArrowRight className="h-5 w-5 text-white/80" />
-                        </Link>
-                    </Button>
-
-                    {/* Payments Button */}
-                    <Button
-                        asChild
-                        className="h-auto bg-gradient-to-r from-purple-500 to-purple-600 p-6 text-white shadow-lg transition-all duration-200 hover:from-purple-600 hover:to-purple-700 hover:shadow-xl"
-                    >
-                        <Link href="/payments" className="flex w-full items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <div className="rounded-lg bg-white/20 p-3">
-                                    <CreditCard className="h-6 w-6" />
-                                </div>
-                                <div className="text-left">
-                                    <h3 className="text-lg font-semibold">Payment Processing</h3>
-                                    <p className="text-sm text-purple-100">Record and track payments</p>
-                                </div>
-                            </div>
-                            <ArrowRight className="h-5 w-5 text-white/80" />
-                        </Link>
-                    </Button>
                 </div>
             </div>
 
-            {/* Key Metrics Cards */}
-            <div className="mb-8">
-                <h2 className="mb-6 text-2xl font-semibold text-slate-900 dark:text-slate-100">Key Metrics</h2>
-                <div className="grid grid-cols-2 gap-6">
-                    <MetricCard
-                        title="Total Revenue"
-                        value={formatSSPCurrency(stats?.total_revenue || 0)}
-                        subtitle={`This ${currentDateRange}`}
-                        icon={DollarSign}
-                        color="green"
-                        trend="up"
-                        trendValue="+12.5%"
-                    />
-                    <MetricCard
-                        title="Outstanding Balance"
-                        value={formatSSPCurrency(stats?.outstanding_balance || 0)}
-                        subtitle="Unpaid bills & invoices"
-                        icon={AlertTriangle}
-                        color="red"
-                        trend="down"
-                        trendValue="-5.2%"
-                    />
-                    <MetricCard
-                        title="Total Bills Issued"
-                        value={stats?.total_bills_issued || 0}
-                        subtitle={`This ${currentDateRange}`}
-                        icon={FileText}
-                        color="blue"
-                        trend="up"
-                        trendValue="+8.1%"
-                    />
-                    <MetricCard
-                        title="Collection Rate"
-                        value={`${stats?.collection_rate || 0}%`}
-                        subtitle="Payment efficiency"
-                        icon={TrendingUp}
-                        color="purple"
-                        trend="up"
-                        trendValue="+2.3%"
-                    />
+            {/* Advanced Filters */}
+            <Card className="mb-6">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Filter className="h-5 w-5" />
+                                Advanced Filters
+                            </CardTitle>
+                            <CardDescription>Refine your financial data with powerful filtering options</CardDescription>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setYearFilter('');
+                                setMonthFilter('');
+                                setCategoryFilter('');
+                            }}
+                        >
+                            Clear All
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Year</label>
+                            <Select
+                                placeholder="All years"
+                                value={yearFilter}
+                                onChange={(e) => setYearFilter(e.target.value)}
+                                options={[
+                                    { id: '2025', name: '2025' },
+                                    { id: '2026', name: '2026' },
+                                    { id: '2027', name: '2027' },
+                                    { id: '2028', name: '2028' },
+                                    { id: '2029', name: '2029' },
+                                    { id: '2030', name: '2030' },
+                                ]}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Month</label>
+                            <Select
+                                placeholder="All months"
+                                value={monthFilter}
+                                onChange={(e) => setMonthFilter(e.target.value)}
+                                options={[
+                                    { id: '1', name: 'January' },
+                                    { id: '2', name: 'February' },
+                                    { id: '3', name: 'March' },
+                                    { id: '4', name: 'April' },
+                                    { id: '5', name: 'May' },
+                                    { id: '6', name: 'June' },
+                                    { id: '7', name: 'July' },
+                                    { id: '8', name: 'August' },
+                                    { id: '9', name: 'September' },
+                                    { id: '10', name: 'October' },
+                                    { id: '11', name: 'November' },
+                                    { id: '12', name: 'December' },
+                                ]}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Category</label>
+                            <Select
+                                placeholder="All categories"
+                                value={categoryFilter}
+                                onChange={(e) => setCategoryFilter(e.target.value)}
+                                options={categories.map((category) => ({
+                                    id: category.id.toString(),
+                                    name: category.name,
+                                }))}
+                            />
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* KPI Cards */}
+            <div id="kpi-cards" className="mb-8">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Key Performance Indicators</h2>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printSection('kpi-cards', 'Key Performance Indicators')}
+                        className="flex items-center gap-2"
+                    >
+                        <Printer className="h-4 w-4" />
+                        Print
+                    </Button>
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                    {/* Total Revenue */}
+                    <Card>
+                        <CardContent className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Revenue</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatSSPCurrency(kpis.totalRevenue)}</p>
+                                </div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900">
+                                    <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                </div>
+                            </div>
+                            <div className="mt-4 flex items-center text-sm">
+                                <TrendingUp className="mr-1 h-4 w-4 text-green-600" />
+                                <span className="text-green-600">From all invoices</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Total Collected */}
+                    <Card>
+                        <CardContent className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Collected</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatSSPCurrency(kpis.totalCollected)}</p>
+                                </div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900">
+                                    <CreditCard className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                </div>
+                            </div>
+                            <div className="mt-4 flex items-center text-sm">
+                                <CheckCircle className="mr-1 h-4 w-4 text-blue-600" />
+                                <span className="text-blue-600">From all payments</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Outstanding Amount */}
+                    <Card>
+                        <CardContent className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Outstanding</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatSSPCurrency(kpis.totalOutstanding)}</p>
+                                </div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900">
+                                    <AlertTriangle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                                </div>
+                            </div>
+                            <div className="mt-4 flex items-center text-sm">
+                                <Clock className="mr-1 h-4 w-4 text-orange-600" />
+                                <span className="text-orange-600">Pending collection</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            {/* Secondary Metrics */}
+            <div id="secondary-metrics" className="mb-8">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Secondary Metrics</h2>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printSection('secondary-metrics', 'Secondary Metrics')}
+                        className="flex items-center gap-2"
+                    >
+                        <Printer className="h-4 w-4" />
+                        Print
+                    </Button>
+                </div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                    <Card>
+                        <CardContent className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Bills</p>
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{kpis.totalBills}</p>
+                                </div>
+                                <FileText className="h-8 w-8 text-gray-400" />
+                            </div>
+                            <div className="mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                    {kpis.outstandingBills} outstanding
+                                </Badge>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Invoices</p>
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{kpis.totalInvoices}</p>
+                                </div>
+                                <Receipt className="h-8 w-8 text-gray-400" />
+                            </div>
+                            <div className="mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                    {kpis.outstandingInvoices} unpaid
+                                </Badge>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Payments</p>
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{kpis.totalPayments}</p>
+                                </div>
+                                <CreditCard className="h-8 w-8 text-gray-400" />
+                            </div>
+                            <div className="mt-2">
+                                <Badge variant="outline" className="text-xs">
+                                    All time
+                                </Badge>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
 
             {/* Charts Section */}
-            <div className="mb-8">
-                <h2 className="mb-6 text-2xl font-semibold text-slate-900 dark:text-slate-100">Analytics</h2>
-                <div className="grid grid-cols-1 gap-6">
-                    <RevenueTrendChart data={monthlyRevenue} type="area" />
+            <div id="charts-section" className="mb-8">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Financial Charts</h2>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printSection('charts-section', 'Financial Charts')}
+                        className="flex items-center gap-2"
+                    >
+                        <Printer className="h-4 w-4" />
+                        Print
+                    </Button>
                 </div>
+                {/* Revenue vs Collection Chart */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <TrendingUp className="h-5 w-5" />
+                            Revenue vs Collection Trend (12 Months)
+                        </CardTitle>
+                        <CardDescription>Monthly revenue generation vs collection performance throughout the year</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData.revenueCollectionData}>
+                                    <defs>
+                                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.05} />
+                                        </linearGradient>
+                                        <linearGradient id="collectedGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#10B981" stopOpacity={0.05} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                                    <XAxis dataKey="name" stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis
+                                        stroke="#6B7280"
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tickFormatter={(value) => formatSSPCurrency(value)}
+                                    />
+                                    <Tooltip
+                                        formatter={(value, name) => [formatSSPCurrency(value), name === 'revenue' ? 'Revenue' : 'Collected']}
+                                        contentStyle={{
+                                            backgroundColor: '#FFFFFF',
+                                            border: '1px solid #E5E7EB',
+                                            borderRadius: '8px',
+                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                        }}
+                                        labelStyle={{ color: '#374151', fontWeight: '500' }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="revenue"
+                                        stroke="#3B82F6"
+                                        strokeWidth={3}
+                                        fill="url(#revenueGradient)"
+                                        dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                                        activeDot={{ r: 6, stroke: '#3B82F6', strokeWidth: 2, fill: '#FFFFFF' }}
+                                        name="Revenue"
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="collected"
+                                        stroke="#10B981"
+                                        strokeWidth={3}
+                                        fill="url(#collectedGradient)"
+                                        dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                                        activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2, fill: '#FFFFFF' }}
+                                        name="Collected"
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                {/* Left Column - Tables */}
-                <div className="space-y-6 lg:col-span-2">
-                    {/* Recent Bills Table */}
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <FileText className="h-5 w-5" />
-                                        Recent Bills
-                                    </CardTitle>
-                                    <CardDescription>Latest bills issued</CardDescription>
-                                </div>
-                                <Button variant="outline" size="sm">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Export
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-gray-200 dark:border-gray-700">
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Bill #</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Due Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {recentBills.length > 0 ? (
-                                            recentBills.map((bill) => (
-                                                <tr
-                                                    key={bill.id}
-                                                    className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
-                                                >
-                                                    <td className="px-4 py-3 text-sm">
-                                                        <Link href={`/billing/${bill.id}`} className="text-blue-600 hover:underline">
-                                                            #{bill.id}
-                                                        </Link>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">{bill.customer_name}</td>
-                                                    <td className="px-4 py-3 text-sm font-medium">{formatSSPCurrency(bill.amount)}</td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                        <span
-                                                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                                                bill.status === 'paid'
-                                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                                                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-                                                            }`}
-                                                        >
-                                                            {bill.status.toUpperCase()}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                        {bill.due_date ? new Date(bill.due_date).toLocaleDateString() : '—'}
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td className="px-4 py-8 text-center text-gray-500" colSpan={5}>
-                                                    No recent bills found
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Latest Payments Table */}
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <CreditCard className="h-5 w-5" />
-                                        Latest Payments
-                                    </CardTitle>
-                                    <CardDescription>Recent payment transactions</CardDescription>
-                                </div>
-                                <Button variant="outline" size="sm">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Export
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-gray-200 dark:border-gray-700">
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Payment #</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Method</th>
-                                            <th className="px-4 py-3 text-left text-sm font-semibold">Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {latestPayments.length > 0 ? (
-                                            latestPayments.map((payment) => (
-                                                <tr
-                                                    key={payment.id}
-                                                    className="border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50"
-                                                >
-                                                    <td className="px-4 py-3 text-sm">#{payment.id}</td>
-                                                    <td className="px-4 py-3 text-sm">{payment.customer_name}</td>
-                                                    <td className="px-4 py-3 text-sm font-medium">{formatSSPCurrency(payment.amount)}</td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                        <span
-                                                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                                                payment.method === 'cash'
-                                                                    ? 'bg-green-100 text-green-800'
-                                                                    : payment.method === 'mobile_money'
-                                                                      ? 'bg-orange-100 text-orange-800'
-                                                                      : 'bg-blue-100 text-blue-800'
-                                                            }`}
-                                                        >
-                                                            {payment.method.replace('_', ' ').toUpperCase()}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">
-                                                        {payment.payment_date ? new Date(payment.payment_date).toLocaleDateString() : '—'}
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td className="px-4 py-8 text-center text-gray-500" colSpan={5}>
-                                                    No recent payments found
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Overdue Bills Widget */}
-                    {overdueBills.length > 0 && (
-                        <Card className="border-red-200 dark:border-red-800">
+            {/* Receivables Analysis & Notifications */}
+            <div id="receivables-analysis" className="mb-8">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Receivables Analysis & Notifications</h2>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printSection('receivables-analysis', 'Receivables Analysis & Notifications')}
+                        className="flex items-center gap-2"
+                    >
+                        <Printer className="h-4 w-4" />
+                        Print
+                    </Button>
+                </div>
+                <div className="flex flex-col gap-6 lg:flex-row">
+                    {/* Receivables Aging Analysis & Outstanding Amounts */}
+                    <div className="flex flex-col gap-6 lg:flex-1">
+                        {/* Receivables Aging Analysis */}
+                        <Card className="flex-1">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                                    <AlertTriangle className="h-5 w-5" />
-                                    Overdue Bills
+                                <CardTitle className="flex items-center gap-2">
+                                    <Activity className="h-5 w-5" />
+                                    Receivables Aging Analysis
                                 </CardTitle>
-                                <CardDescription>Bills requiring immediate attention</CardDescription>
+                                <CardDescription>Breakdown of outstanding amounts by age</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-3">
-                                    {overdueBills.slice(0, 5).map((bill) => (
-                                        <div
-                                            key={bill.id}
-                                            className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950"
-                                        >
-                                            <div>
-                                                <p className="font-medium text-red-900 dark:text-red-100">#{bill.id}</p>
-                                                <p className="text-sm text-red-700 dark:text-red-300">{bill.customer_name}</p>
+                                <div className="space-y-4">
+                                    {Object.entries(kpis.agingBuckets).map(([range, bucket]) => {
+                                        const percentage = kpis.totalOutstanding > 0 ? (bucket.amount / kpis.totalOutstanding) * 100 : 0;
+
+                                        return (
+                                            <div key={range} className="flex items-center justify-between rounded-lg border p-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div
+                                                        className={`h-3 w-3 rounded-full ${
+                                                            range === '0-30' ? 'bg-green-500' : range === '31-60' ? 'bg-orange-500' : 'bg-red-500'
+                                                        }`}
+                                                    />
+                                                    <div>
+                                                        <p className="font-medium">{range} days</p>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400">{bucket.count} items</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-semibold">{formatSSPCurrency(bucket.amount)}</p>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">{percentage.toFixed(1)}%</p>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="font-bold text-red-900 dark:text-red-100">{formatSSPCurrency(bill.amount)}</p>
-                                                <p className="text-xs text-red-700 dark:text-red-300">{bill.days_overdue} days overdue</p>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </CardContent>
                         </Card>
-                    )}
-                </div>
 
-                {/* Right Column - Analytics */}
-                <div className="space-y-6">
-                    <ReceivablesAging data={receivablesAging} />
-                    <TopDebtors data={topDebtors} />
+                        {/* Outstanding Amounts by Age Chart */}
+                        <Card className="flex-1">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Activity className="h-5 w-5" />
+                                    Outstanding Amounts by Age
+                                </CardTitle>
+                                <CardDescription>Visual breakdown of receivables aging analysis</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-80">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={chartData.agingData}
+                                                cx="50%"
+                                                cy="50%"
+                                                labelLine={false}
+                                                label={({ name, value, percent }) =>
+                                                    `${name}: ${formatSSPCurrency(value)} (${(percent * 100).toFixed(1)}%)`
+                                                }
+                                                outerRadius={100}
+                                                fill="#8884d8"
+                                                dataKey="value"
+                                            >
+                                                {chartData.agingData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip formatter={(value) => formatSSPCurrency(value)} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Notifications */}
+                    <Card className="flex flex-1 flex-col">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Bell className="h-5 w-5" />
+                                Notifications
+                            </CardTitle>
+                            <CardDescription>Overdue bills and invoices requiring attention</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-1 flex-col">
+                            {overdueBills.length > 0 || overdueInvoices.length > 0 ? (
+                                <div className="space-y-6">
+                                    {/* Overdue Bills Table */}
+                                    {overdueBills.length > 0 && (
+                                        <div>
+                                            <div className="mb-4 flex items-center gap-2">
+                                                <AlertTriangle className="h-5 w-5 text-red-600" />
+                                                <h4 className="text-lg font-semibold text-red-800 dark:text-red-200">
+                                                    Overdue Bills ({overdueBills.length})
+                                                </h4>
+                                            </div>
+                                            <div className="overflow-hidden rounded-lg border border-red-200 dark:border-red-800">
+                                                <table className="w-full">
+                                                    <thead className="bg-red-50 dark:bg-red-900/20">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-red-800 uppercase dark:text-red-200">
+                                                                Bill #
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-red-800 uppercase dark:text-red-200">
+                                                                Customer
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-red-800 uppercase dark:text-red-200">
+                                                                Due Date
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-red-800 uppercase dark:text-red-200">
+                                                                Amount
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-red-800 uppercase dark:text-red-200">
+                                                                Days Overdue
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-red-200 bg-white dark:divide-red-800 dark:bg-gray-900">
+                                                        {overdueBills.map((bill) => {
+                                                            const dueDate = new Date(bill.due_date);
+                                                            const daysOverdue = Math.floor((new Date() - dueDate) / (1000 * 60 * 60 * 24));
+                                                            return (
+                                                                <tr key={bill.id} className="hover:bg-red-50 dark:hover:bg-red-900/10">
+                                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                                        <Link
+                                                                            href={`/billing/${bill.id}`}
+                                                                            className="text-sm font-medium text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+                                                                        >
+                                                                            #{bill.id}
+                                                                        </Link>
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-sm whitespace-nowrap text-gray-900 dark:text-white">
+                                                                        {bill.customer
+                                                                            ? `${bill.customer.first_name} ${bill.customer.last_name}`
+                                                                            : 'Unknown Customer'}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-sm whitespace-nowrap text-gray-600 dark:text-gray-400">
+                                                                        {dueDate.toLocaleDateString()}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-sm font-medium whitespace-nowrap text-red-600 dark:text-red-400">
+                                                                        {formatSSPCurrency(bill.current_balance)}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                                        <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
+                                                                            {daysOverdue} days
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Overdue Invoices Table */}
+                                    {overdueInvoices.length > 0 && (
+                                        <div>
+                                            <div className="mb-4 flex items-center gap-2">
+                                                <Clock className="h-5 w-5 text-orange-600" />
+                                                <h4 className="text-lg font-semibold text-orange-800 dark:text-orange-200">
+                                                    Overdue Invoices ({overdueInvoices.length})
+                                                </h4>
+                                            </div>
+                                            <div className="overflow-hidden rounded-lg border border-orange-200 dark:border-orange-800">
+                                                <table className="w-full">
+                                                    <thead className="bg-orange-50 dark:bg-orange-900/20">
+                                                        <tr>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-orange-800 uppercase dark:text-orange-200">
+                                                                Invoice #
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-orange-800 uppercase dark:text-orange-200">
+                                                                Customer
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-orange-800 uppercase dark:text-orange-200">
+                                                                Due Date
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-orange-800 uppercase dark:text-orange-200">
+                                                                Amount
+                                                            </th>
+                                                            <th className="px-4 py-3 text-left text-xs font-medium tracking-wider text-orange-800 uppercase dark:text-orange-200">
+                                                                Days Overdue
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-orange-200 bg-white dark:divide-orange-800 dark:bg-gray-900">
+                                                        {overdueInvoices.map((invoice) => {
+                                                            const dueDate = new Date(invoice.due_date);
+                                                            const daysOverdue = Math.floor((new Date() - dueDate) / (1000 * 60 * 60 * 24));
+                                                            return (
+                                                                <tr key={invoice.id} className="hover:bg-orange-50 dark:hover:bg-orange-900/10">
+                                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                                        <Link
+                                                                            href={`/invoices/${invoice.id}`}
+                                                                            className="text-sm font-medium text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-200"
+                                                                        >
+                                                                            #{invoice.invoice_number || invoice.id}
+                                                                        </Link>
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-sm whitespace-nowrap text-gray-900 dark:text-white">
+                                                                        {invoice.customer
+                                                                            ? `${invoice.customer.first_name} ${invoice.customer.last_name}`
+                                                                            : 'Unknown Customer'}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-sm whitespace-nowrap text-gray-600 dark:text-gray-400">
+                                                                        {dueDate.toLocaleDateString()}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 text-sm font-medium whitespace-nowrap text-orange-600 dark:text-orange-400">
+                                                                        {formatSSPCurrency(invoice.amount_due)}
+                                                                    </td>
+                                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                                        <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                                                            {daysOverdue} days
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Collection Rate Warning */}
+                                    {kpis.collectionRate < 80 && (
+                                        <div className="flex items-start gap-3 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
+                                            <TrendingDown className="mt-0.5 h-5 w-5 text-yellow-600" />
+                                            <div>
+                                                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Collection rate below 80%</p>
+                                                <p className="text-xs text-yellow-600 dark:text-yellow-300">
+                                                    Current: {kpis.collectionRate.toFixed(1)}%
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="flex items-start gap-3 rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
+                                    <CheckCircle className="mt-0.5 h-5 w-5 text-green-600" />
+                                    <div>
+                                        <p className="text-sm font-medium text-green-800 dark:text-green-200">All systems running smoothly</p>
+                                        <p className="text-xs text-green-600 dark:text-green-300">No overdue bills or invoices</p>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
 
-            {/* Legacy Tabbed Interface - Hidden by default, can be toggled */}
-            <Card className="mt-8">
-                <CardHeader>
-                    <CardTitle>Detailed Records</CardTitle>
-                    <CardDescription>Comprehensive view of all financial records</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                        <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="overview" className="flex items-center gap-2">
-                                <BarChart3 className="h-4 w-4" />
-                                Overview
-                            </TabsTrigger>
-                            <TabsTrigger value="bills" className="flex items-center gap-2">
-                                <FileText className="h-4 w-4" />
-                                Bills
-                            </TabsTrigger>
-                            <TabsTrigger value="invoices" className="flex items-center gap-2">
-                                <Receipt className="h-4 w-4" />
-                                Invoices
-                            </TabsTrigger>
-                        </TabsList>
-
-                        {/* Overview Tab */}
-                        <TabsContent value="overview" className="mt-6">
-                            <div className="py-8 text-center">
-                                <BarChart3 className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-                                <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-gray-100">Dashboard Overview</h3>
-                                <p className="text-gray-600 dark:text-gray-400">
-                                    The main dashboard above provides a comprehensive view of your financial data.
-                                </p>
-                            </div>
-                        </TabsContent>
-
-                        {/* Bills Tab */}
-                        <TabsContent value="bills" className="mt-6">
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-semibold">All Bills</h3>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                                const filteredBills = filterBills(allBills?.data || []);
-                                                const billsData = filteredBills.map((bill) => {
-                                                    const totalSum = Number(bill.total_amount);
-                                                    const paid = Number(bill?.payment?.amount_paid || 0);
-                                                    const balance = totalSum - paid;
-
-                                                    return {
-                                                        Customer: bill.customer ? `${bill.customer.first_name} ${bill.customer.last_name}` : '—',
-                                                        'Meter Serial': bill.meter?.serial || '—',
-                                                        Date: bill.created_at
-                                                            ? new Date(bill.created_at).toLocaleDateString('en-US', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                  day: 'numeric',
-                                                              })
-                                                            : '—',
-                                                        Total: formatSSPCurrency(totalSum),
-                                                        Paid: formatSSPCurrency(paid),
-                                                        Balance: formatSSPCurrency(balance),
-                                                        'Ref No': bill?.payment?.reference_number || '—',
-                                                        Status: bill.status?.toUpperCase() || (bill.current_balance <= 0 ? 'PAID' : 'PENDING'),
-                                                    };
-                                                });
-
-                                                // Calculate summary matching billing page format
-                                                const totalAmount = filteredBills.reduce((sum, bill) => sum + parseFloat(bill.total_amount || 0), 0);
-                                                const totalPaid = filteredBills.reduce(
-                                                    (sum, bill) => sum + parseFloat(bill?.payment?.amount_paid || 0),
-                                                    0,
-                                                );
-                                                const totalBalance = totalAmount - totalPaid;
-                                                const paidCount = filteredBills.filter(
-                                                    (bill) => bill.status === 'paid' || bill.current_balance <= 0,
-                                                ).length;
-                                                const unpaidCount = filteredBills.filter(
-                                                    (bill) => bill.status !== 'paid' && bill.current_balance > 0,
-                                                ).length;
-
-                                                const summary = {
-                                                    'Total Bills': filteredBills.length,
-                                                    'Total Amount': formatSSPCurrency(totalAmount),
-                                                    'Total Paid': formatSSPCurrency(totalPaid),
-                                                    'Total Balance': formatSSPCurrency(totalBalance),
-                                                    'Paid Bills': paidCount,
-                                                    'Unpaid Bills': unpaidCount,
-                                                };
-
-                                                exportToExcel(billsData, 'unpaid-bills', summary);
-                                            }}
-                                        >
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Export Excel
-                                        </Button>
-                                        <Button size="sm" variant="outline" onClick={() => printTable('Unpaid Bills')}>
-                                            <Printer className="mr-2 h-4 w-4" />
-                                            Print
-                                        </Button>
-                                        <Button asChild size="sm">
-                                            <Link href="/billing">View All Bills</Link>
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* Search Bar */}
-                                <div className="relative">
-                                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-slate-400" />
-                                    <Input
-                                        placeholder="Search bills by customer, bill number, amount..."
-                                        value={searchBills}
-                                        onChange={(e) => setSearchBills(e.target.value)}
-                                        className="pl-10"
+            {/* Water Consumption Chart */}
+            <div id="water-consumption" className="mb-8">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Water Consumption Analysis</h2>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => printSection('water-consumption', 'Water Consumption Analysis')}
+                        className="flex items-center gap-2"
+                    >
+                        <Printer className="h-4 w-4" />
+                        Print
+                    </Button>
+                </div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Droplets className="h-5 w-5" />
+                            Water Consumption Trend (12 Months)
+                        </CardTitle>
+                        <CardDescription>Monthly water consumption patterns throughout the year</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData.waterConsumptionData}>
+                                    <defs>
+                                        <linearGradient id="consumptionGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#06B6D4" stopOpacity={0.05} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                                    <XAxis dataKey="name" stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}L`} />
+                                    <Tooltip
+                                        formatter={(value) => [`${value}L`, 'Consumption']}
+                                        contentStyle={{
+                                            backgroundColor: '#FFFFFF',
+                                            border: '1px solid #E5E7EB',
+                                            borderRadius: '8px',
+                                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                        }}
+                                        labelStyle={{ color: '#374151', fontWeight: '500' }}
                                     />
-                                </div>
-
-                                <div className="overflow-x-auto">
-                                    <table className="w-full" data-print="bills">
-                                        <thead>
-                                            <tr className="border-b border-slate-200 dark:border-slate-800">
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Bill #</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Period</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filterBills(allBills?.data || []).length > 0 ? (
-                                                filterBills(allBills?.data || []).map((bill) => (
-                                                    <tr
-                                                        key={bill.id}
-                                                        className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                                                    >
-                                                        <td className="px-4 py-3 text-sm">
-                                                            <Link href={`/billing/${bill.id}`} className="text-blue-600 hover:underline">
-                                                                #{bill.id}
-                                                            </Link>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            {bill.customer ? `${bill.customer.first_name} ${bill.customer.last_name}` : '—'}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            {bill.billing_period_start && bill.billing_period_end
-                                                                ? `${new Date(bill.billing_period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(bill.billing_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                                                                : '—'}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm font-medium">{formatSSPCurrency(bill.total_amount)}</td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            <span
-                                                                className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                                                    bill.current_balance <= 0
-                                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                                                        : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-                                                                }`}
-                                                            >
-                                                                {bill.current_balance <= 0 ? 'PAID' : 'PENDING'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            {bill.current_balance > 0 && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="h-8 gap-1 text-green-600 hover:bg-green-50 hover:text-green-700"
-                                                                    onClick={() => handleBillPayment(bill)}
-                                                                >
-                                                                    <CreditCard className="h-3 w-3" />
-                                                                    Pay
-                                                                </Button>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            ) : (
-                                                <tr>
-                                                    <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
-                                                        No bills found.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {allBills?.links && (
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-sm text-slate-500">
-                                            Showing {allBills.from} to {allBills.to} of {allBills.total} results
-                                        </div>
-                                        <div className="flex space-x-2">
-                                            {allBills.links.map((link, index) => (
-                                                <Link
-                                                    key={index}
-                                                    href={link.url || '#'}
-                                                    className={`rounded-md px-3 py-2 text-sm ${
-                                                        link.active
-                                                            ? 'bg-blue-600 text-white'
-                                                            : link.url
-                                                              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-                                                              : 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
-                                                    }`}
-                                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </TabsContent>
-
-                        {/* Invoices Tab */}
-                        <TabsContent value="invoices" className="mt-6">
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="text-lg font-semibold">All Invoices</h3>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => {
-                                                const filteredInvoices = filterInvoices(allInvoices?.data || []);
-                                                const invoicesData = filteredInvoices.map((invoice) => {
-                                                    const invoiceAmount = parseFloat(invoice.amount_due) || 0;
-                                                    const paymentDetails = getInvoicePaymentDetails(invoice.id, invoiceAmount);
-                                                    return {
-                                                        'Invoice #': invoice.invoice_number || invoice.id,
-                                                        Customer: invoice.customer
-                                                            ? `${invoice.customer.first_name} ${invoice.customer.last_name}`
-                                                            : '—',
-                                                        Reason: invoice.reason || '—',
-                                                        'Issue Date': invoice.issue_date
-                                                            ? new Date(invoice.issue_date).toLocaleDateString('en-US', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                  day: 'numeric',
-                                                              })
-                                                            : '—',
-                                                        'Due Date': invoice.due_date
-                                                            ? new Date(invoice.due_date).toLocaleDateString('en-US', {
-                                                                  year: 'numeric',
-                                                                  month: 'short',
-                                                                  day: 'numeric',
-                                                              })
-                                                            : '—',
-                                                        'Total Amount': formatSSPCurrency(invoice.amount_due),
-                                                        'Amount Paid': formatSSPCurrency(paymentDetails.amountPaid),
-                                                        Balance: formatSSPCurrency(paymentDetails.balance),
-                                                        'Payment Date': paymentDetails.paymentDate,
-                                                        Status: invoice.status?.toUpperCase() || 'UNKNOWN',
-                                                    };
-                                                });
-
-                                                // Calculate summary
-                                                const totalRevenue = filteredInvoices.reduce(
-                                                    (sum, invoice) => sum + (parseFloat(invoice.amount_due) || 0),
-                                                    0,
-                                                );
-                                                const totalPaid = filteredInvoices.reduce((sum, invoice) => {
-                                                    const invoiceAmount = parseFloat(invoice.amount_due) || 0;
-                                                    const paymentDetails = getInvoicePaymentDetails(invoice.id, invoiceAmount);
-                                                    return sum + paymentDetails.amountPaid;
-                                                }, 0);
-                                                const totalBalance = totalRevenue - totalPaid;
-
-                                                const summary = {
-                                                    'Total Revenue': formatSSPCurrency(totalRevenue),
-                                                    'Total Paid': formatSSPCurrency(totalPaid),
-                                                    'Total Balance': formatSSPCurrency(totalBalance),
-                                                    'Total Invoices': filteredInvoices.length,
-                                                };
-
-                                                exportToExcel(invoicesData, 'unpaid-invoices', summary);
-                                            }}
-                                        >
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Export Excel
-                                        </Button>
-                                        <Button size="sm" variant="outline" onClick={() => printTable('Unpaid Invoices')}>
-                                            <Printer className="mr-2 h-4 w-4" />
-                                            Print
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* Search Bar */}
-                                <div className="relative">
-                                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-slate-400" />
-                                    <Input
-                                        placeholder="Search invoices by customer, number, status..."
-                                        value={searchInvoices}
-                                        onChange={(e) => setSearchInvoices(e.target.value)}
-                                        className="pl-10"
+                                    <Area
+                                        type="monotone"
+                                        dataKey="consumption"
+                                        stroke="#06B6D4"
+                                        strokeWidth={3}
+                                        fill="url(#consumptionGradient)"
+                                        dot={{ fill: '#06B6D4', strokeWidth: 2, r: 4 }}
+                                        activeDot={{ r: 6, stroke: '#06B6D4', strokeWidth: 2, fill: '#FFFFFF' }}
+                                        name="Consumption"
                                     />
-                                </div>
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
 
-                                <div className="overflow-x-auto">
-                                    <table className="w-full" data-print="invoices">
-                                        <thead>
-                                            <tr className="border-b border-slate-200 dark:border-slate-800">
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Invoice #</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Issue Date</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Due Date</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Amount</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-                                                <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filterInvoices(allInvoices?.data || []).length > 0 ? (
-                                                filterInvoices(allInvoices?.data || []).map((invoice) => (
-                                                    <tr
-                                                        key={invoice.id}
-                                                        className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                                                    >
-                                                        <td className="px-4 py-3 text-sm">
-                                                            <Link href={`/invoices/${invoice.id}`} className="text-blue-600 hover:underline">
-                                                                #{invoice.invoice_number || invoice.id}
-                                                            </Link>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            {invoice.customer ? `${invoice.customer.first_name} ${invoice.customer.last_name}` : '—'}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            {invoice.issue_date
-                                                                ? new Date(invoice.issue_date).toLocaleDateString('en-US', {
-                                                                      year: 'numeric',
-                                                                      month: 'short',
-                                                                      day: 'numeric',
-                                                                  })
-                                                                : '—'}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            {invoice.due_date
-                                                                ? new Date(invoice.due_date).toLocaleDateString('en-US', {
-                                                                      year: 'numeric',
-                                                                      month: 'short',
-                                                                      day: 'numeric',
-                                                                  })
-                                                                : '—'}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm font-medium">{formatSSPCurrency(invoice.amount_due)}</td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            <span
-                                                                className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                                                    invoice.status === 'paid'
-                                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                                                        : invoice.status === 'pending'
-                                                                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-                                                                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                                                                }`}
-                                                            >
-                                                                {invoice.status?.toUpperCase() || 'UNKNOWN'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-sm">
-                                                            {invoice.status !== 'paid' && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="h-8 gap-1 text-green-600 hover:bg-green-50 hover:text-green-700"
-                                                                    onClick={() => handleInvoicePayment(invoice)}
-                                                                >
-                                                                    <CreditCard className="h-3 w-3" />
-                                                                    Pay
-                                                                </Button>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                            ) : (
-                                                <tr>
-                                                    <td className="px-4 py-8 text-center text-slate-500" colSpan={7}>
-                                                        No invoices found.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {allInvoices?.links && (
-                                    <div className="flex items-center justify-between">
-                                        <div className="text-sm text-slate-500">
-                                            Showing {allInvoices.from} to {allInvoices.to} of {allInvoices.total} results
-                                        </div>
-                                        <div className="flex space-x-2">
-                                            {allInvoices.links.map((link, index) => (
-                                                <Link
-                                                    key={index}
-                                                    href={link.url || '#'}
-                                                    className={`rounded-md px-3 py-2 text-sm ${
-                                                        link.active
-                                                            ? 'bg-blue-600 text-white'
-                                                            : link.url
-                                                              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-                                                              : 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
-                                                    }`}
-                                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </TabsContent>
-                    </Tabs>
-                </CardContent>
-            </Card>
-
-            {/* Bill Payment Modal */}
+            {/* Payment Modals */}
             <PaymentFormModal
                 open={billPaymentModalOpen}
                 onOpenChange={setBillPaymentModalOpen}

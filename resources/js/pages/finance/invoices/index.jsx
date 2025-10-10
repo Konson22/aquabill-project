@@ -2,14 +2,15 @@ import InvoicePaymentFormModal from '@/components/payments/InvoicePaymentFormMod
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import CustomSearchBar from '@/components/ui/custom-search-bar';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select } from '@/components/ui/input';
+import { SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import InvoiceForm from '@/pages/forms/invoice-form';
 import { Head, Link, router } from '@inertiajs/react';
-import { CreditCard, DollarSign, Download, Edit, Eye, Filter, Plus, Receipt, Search, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { Clock, CreditCard, DollarSign, Download, Edit, Eye, Filter, Plus, Printer, Receipt, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatSSPCurrency } from '../../../utils/formatSSPCurrency';
 
 const breadcrumbs = [
@@ -18,41 +19,141 @@ const breadcrumbs = [
 ];
 
 export default function InvoiceIndex({ invoices, filters = {}, customers = [], meters = [] }) {
-    const [searchTerm, setSearchTerm] = useState(filters.search || '');
-    const [statusFilter, setStatusFilter] = useState(filters.status || 'all');
-    const [dateFilter, setDateFilter] = useState(filters.date || 'all');
+    const [searchQuery, setSearchQuery] = useState(filters.search || '');
+    const [statusFilter, setStatusFilter] = useState(filters.status || '');
+    const [yearFilter, setYearFilter] = useState(filters.year || '');
+    const [monthFilter, setMonthFilter] = useState(filters.month || '');
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedCustomerForInvoice, setSelectedCustomerForInvoice] = useState(null);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState(null);
+    const [selectedIds, setSelectedIds] = useState([]);
 
-    const handleSearch = () => {
-        router.get(
-            '/invoices',
-            {
-                search: searchTerm,
-                status: statusFilter === 'all' ? '' : statusFilter,
-                date: dateFilter === 'all' ? '' : dateFilter,
-            },
-            {
-                preserveState: true,
-                replace: true,
-            },
-        );
+    const invoiceItems = useMemo(() => {
+        if (!invoices || !invoices.data) return [];
+        return invoices.data;
+    }, [invoices]);
+
+    const filteredInvoices = useMemo(() => {
+        let list = invoiceItems;
+        if (searchQuery.trim() !== '') {
+            const s = searchQuery.toLowerCase();
+            list = list.filter((invoice) => {
+                const customerName = invoice.customer ? `${invoice.customer.first_name || ''} ${invoice.customer.last_name || ''}`.toLowerCase() : '';
+                const reason = (invoice.reason || '').toLowerCase();
+                const refNo = (invoice.reference_number || '').toString().toLowerCase();
+                return customerName.includes(s) || reason.includes(s) || refNo.includes(s);
+            });
+        }
+        if (statusFilter) {
+            list = list.filter((invoice) => invoice.status === statusFilter);
+        }
+        if (yearFilter) {
+            list = list.filter((invoice) => {
+                const invoiceDate = new Date(invoice.issue_date);
+                return invoiceDate.getFullYear().toString() === yearFilter;
+            });
+        }
+        if (monthFilter) {
+            list = list.filter((invoice) => {
+                const invoiceDate = new Date(invoice.issue_date);
+                return (invoiceDate.getMonth() + 1).toString() === monthFilter;
+            });
+        }
+        return list;
+    }, [invoiceItems, searchQuery, statusFilter, yearFilter, monthFilter]);
+
+    // Sync filters to server (debounced)
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            const params = {
+                search: searchQuery || undefined,
+                status: statusFilter || undefined,
+                year: yearFilter || undefined,
+                month: monthFilter || undefined,
+            };
+            router.get('/invoices', params, { preserveState: true, replace: true, preserveScroll: true });
+        }, 400);
+        return () => clearTimeout(handle);
+    }, [searchQuery, statusFilter, yearFilter, monthFilter]);
+
+    const handleExport = () => {
+        const headers = ['Invoice ID', 'Customer Name', 'Issue Date', 'Amount Due', 'Status', 'Reference Number', 'Reason', 'Due Date'];
+
+        const rows = filteredInvoices.map((invoice) => [
+            invoice.id,
+            invoice.customer ? `${invoice.customer.first_name} ${invoice.customer.last_name}` : '',
+            invoice.issue_date ? new Date(invoice.issue_date).toLocaleDateString('en-US') : '',
+            invoice.amount_due || '',
+            invoice.status || '',
+            invoice.reference_number || '',
+            invoice.reason || '',
+            invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('en-US') : '',
+        ]);
+
+        // Calculate summary totals
+        const summary = {
+            totalInvoices: filteredInvoices.length,
+            totalAmount: filteredInvoices.reduce((sum, invoice) => sum + parseFloat(invoice.amount_due || 0), 0),
+            paidInvoices: filteredInvoices.filter((invoice) => invoice.status === 'paid').length,
+            pendingInvoices: filteredInvoices.filter((invoice) => invoice.status === 'pending').length,
+            overdueInvoices: filteredInvoices.filter((invoice) => {
+                if (invoice.status === 'paid' || invoice.status === 'cancelled') return false;
+                return new Date(invoice.due_date) < new Date();
+            }).length,
+        };
+
+        const summaryRows = [
+            [''],
+            ['SUMMARY'],
+            ['Total Invoices', summary.totalInvoices],
+            ['Total Amount (SSP)', summary.totalAmount],
+            ['Paid Invoices', summary.paidInvoices],
+            ['Pending Invoices', summary.pendingInvoices],
+            ['Overdue Invoices', summary.overdueInvoices],
+            ['Collection Rate (%)', summary.totalAmount > 0 ? ((summary.paidInvoices / summary.totalInvoices) * 100).toFixed(2) : '0.00'],
+        ];
+
+        const csv = [headers, ...rows, ...summaryRows]
+            .map((row) =>
+                row
+                    .map((cell) => {
+                        const value = cell === null || cell === undefined ? '' : String(cell);
+                        const escaped = value.replace(/"/g, '""');
+                        return /[",\n]/.test(escaped) ? `"${escaped}"` : escaped;
+                    })
+                    .join(','),
+            )
+            .join('\n');
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const ts = new Date().toISOString().split('T')[0];
+        link.download = `invoices_export_${ts}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
     };
 
-    const handleClearFilters = () => {
-        setSearchTerm('');
-        setStatusFilter('all');
-        setDateFilter('all');
-        router.get(
-            '/invoices',
-            {},
-            {
-                preserveState: true,
-                replace: true,
-            },
-        );
+    // Selection helpers
+    const isSelected = (id) => selectedIds.includes(id);
+    const toggleSelect = (id) => {
+        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+    };
+    const allSelected = filteredInvoices.length > 0 && filteredInvoices.every((invoice) => selectedIds.includes(invoice.id));
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            setSelectedIds((prev) => prev.filter((id) => !filteredInvoices.some((invoice) => invoice.id === id)));
+        } else {
+            const ids = filteredInvoices.map((invoice) => invoice.id);
+            setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
+        }
+    };
+    const handlePrintSelected = () => {
+        if (selectedIds.length === 0) return;
+        const url = `/invoices/print-multiple?ids=${selectedIds.join(',')}`;
+        window.open(url, '_blank');
     };
 
     const getStatusBadge = (status) => {
@@ -110,81 +211,150 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Invoices" />
 
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Invoices</h1>
-                    <p className="mt-1 text-slate-600 dark:text-slate-400">Manage service invoices and billing</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button asChild variant="outline" size="sm" className="gap-2">
-                        <Link href="/finance">
-                            <DollarSign className="h-4 w-4" /> Finance
-                        </Link>
-                    </Button>
-                    <Button onClick={handleCreateInvoice} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> New Invoice
-                    </Button>
+            <div className="mb-8">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="space-y-1">
+                        <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Invoice Management</h1>
+                        <p className="text-lg text-slate-600 dark:text-slate-400">Comprehensive invoice system with advanced analytics</p>
+                    </div>
                 </div>
             </div>
 
-            {/* Filters */}
+            {/* Key Metrics Dashboard */}
+            <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/20">
+                                    <Receipt className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Invoices</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{filteredInvoices.length}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100 dark:bg-green-900/20">
+                                    <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Amount</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                    {formatSSPCurrency(filteredInvoices.reduce((sum, invoice) => sum + parseFloat(invoice.amount_due || 0), 0))}
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/20">
+                                    <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Pending Invoices</p>
+                                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                                    {filteredInvoices.filter((invoice) => invoice.status === 'pending').length}
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Advanced Filters */}
             <Card className="mb-6">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Filter className="h-5 w-5" />
-                        Filters
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Filter className="h-5 w-5" />
+                                Advanced Filters
+                            </CardTitle>
+                            <CardDescription>Refine your search with powerful filtering options</CardDescription>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setSearchQuery('');
+                                setStatusFilter('');
+                                setYearFilter('');
+                                setMonthFilter('');
+                            }}
+                        >
+                            Clear All
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                        <div>
-                            <label className="text-sm font-medium">Search</label>
-                            <Input
-                                placeholder="Search invoices, customers..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="mt-1"
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Status</label>
+                            <Select
+                                placeholder="All statuses"
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                options={[
+                                    { id: 'pending', name: 'Pending' },
+                                    { id: 'paid', name: 'Paid' },
+                                    { id: 'cancelled', name: 'Cancelled' },
+                                    { id: 'overdue', name: 'Overdue' },
+                                ]}
                             />
                         </div>
-                        <div>
-                            <label className="text-sm font-medium">Status</label>
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                <SelectTrigger className="mt-1">
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All statuses</SelectItem>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="paid">Paid</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                                    <SelectItem value="overdue">Overdue</SelectItem>
-                                </SelectContent>
-                            </Select>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Year</label>
+                            <Select
+                                placeholder="All years"
+                                value={yearFilter}
+                                onChange={(e) => setYearFilter(e.target.value)}
+                                options={[
+                                    { id: '2025', name: '2025' },
+                                    { id: '2026', name: '2026' },
+                                    { id: '2027', name: '2027' },
+                                    { id: '2028', name: '2028' },
+                                    { id: '2029', name: '2029' },
+                                    { id: '2030', name: '2030' },
+                                ]}
+                            />
                         </div>
-                        <div>
-                            <label className="text-sm font-medium">Date Range</label>
-                            <Select value={dateFilter} onValueChange={setDateFilter}>
-                                <SelectTrigger className="mt-1">
-                                    <SelectValue placeholder="All dates" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All dates</SelectItem>
-                                    <SelectItem value="today">Today</SelectItem>
-                                    <SelectItem value="week">This week</SelectItem>
-                                    <SelectItem value="month">This month</SelectItem>
-                                    <SelectItem value="quarter">This quarter</SelectItem>
-                                    <SelectItem value="year">This year</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex items-end gap-2">
-                            <Button onClick={handleSearch} className="gap-2">
-                                <Search className="h-4 w-4" />
-                                Search
-                            </Button>
-                            <Button variant="outline" onClick={handleClearFilters}>
-                                Clear
-                            </Button>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Month</label>
+                            <Select
+                                placeholder="All months"
+                                value={monthFilter}
+                                onChange={(e) => setMonthFilter(e.target.value)}
+                                options={[
+                                    { id: '1', name: 'January' },
+                                    { id: '2', name: 'February' },
+                                    { id: '3', name: 'March' },
+                                    { id: '4', name: 'April' },
+                                    { id: '5', name: 'May' },
+                                    { id: '6', name: 'June' },
+                                    { id: '7', name: 'July' },
+                                    { id: '8', name: 'August' },
+                                    { id: '9', name: 'September' },
+                                    { id: '10', name: 'October' },
+                                    { id: '11', name: 'November' },
+                                    { id: '12', name: 'December' },
+                                ]}
+                            />
                         </div>
                     </div>
                 </CardContent>
@@ -196,10 +366,21 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                     <div className="flex items-center justify-between">
                         <div>
                             <CardTitle>All Invoices</CardTitle>
-                            <CardDescription>{invoices?.total ? `${invoices.total} invoices found` : 'No invoices found'}</CardDescription>
+                            <CardDescription>{filteredInvoices.length} invoices found</CardDescription>
                         </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" size="sm" className="gap-2">
+                        <div className="flex items-center gap-2">
+                            <CustomSearchBar
+                                value={searchQuery}
+                                onChange={setSearchQuery}
+                                placeholder="Search invoices by customer name, reason, or reference number..."
+                                className="w-80"
+                                onClear={() => setSearchQuery('')}
+                            />
+                            <Button variant="outline" size="sm" className="gap-2" onClick={handlePrintSelected} disabled={selectedIds.length === 0}>
+                                <Printer className="h-4 w-4" />
+                                Print Selected
+                            </Button>
+                            <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
                                 <Download className="h-4 w-4" />
                                 Export
                             </Button>
@@ -207,10 +388,35 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                     </div>
                 </CardHeader>
                 <CardContent>
+                    <div className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="checkbox"
+                                checked={allSelected}
+                                onChange={toggleSelectAll}
+                                className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                            />
+                            <span className="text-sm text-slate-600 dark:text-slate-400">Select all</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="gap-2" onClick={handlePrintSelected} disabled={selectedIds.length === 0}>
+                                <Printer className="h-4 w-4" />
+                                Print Selected
+                            </Button>
+                        </div>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-slate-200 dark:border-slate-800">
+                                    <th className="px-4 py-3 text-left text-sm font-semibold">
+                                        <input
+                                            type="checkbox"
+                                            checked={allSelected}
+                                            onChange={toggleSelectAll}
+                                            className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                                        />
+                                    </th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Issue Date</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Amount Due</th>
@@ -221,8 +427,8 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                                 </tr>
                             </thead>
                             <tbody>
-                                {invoices?.data?.length > 0 ? (
-                                    invoices.data.map((invoice) => {
+                                {filteredInvoices.length > 0 ? (
+                                    filteredInvoices.map((invoice) => {
                                         const overdue = isOverdue(invoice.due_date, invoice.status);
                                         const displayStatus = overdue ? 'overdue' : invoice.status;
 
@@ -231,6 +437,14 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                                                 key={invoice.id}
                                                 className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                                             >
+                                                <td className="px-4 py-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected(invoice.id)}
+                                                        onChange={() => toggleSelect(invoice.id)}
+                                                        className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                                                    />
+                                                </td>
                                                 <td className="px-4 py-3 text-sm">
                                                     {invoice.customer ? (
                                                         <div>
@@ -320,7 +534,7 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                                     })
                                 ) : (
                                     <tr>
-                                        <td className="px-4 py-8 text-center text-slate-500" colSpan={9}>
+                                        <td className="px-4 py-8 text-center text-slate-500" colSpan={8}>
                                             <div className="flex flex-col items-center gap-2">
                                                 <Receipt className="h-12 w-12 text-slate-400" />
                                                 <div>No invoices found</div>

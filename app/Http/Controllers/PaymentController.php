@@ -60,14 +60,23 @@ class PaymentController extends Controller
         // Update the related bill if specified
         if ($validated['bill_id']) {
             $bill = Bill::findOrFail($validated['bill_id']);
-            $newBalance = max(0, ($bill->prev_balance + $bill->total_amount) - $validated['amount_paid']);
+
+            // Recompute remaining balance from total paid on this bill
+            $totalDue = (float) ($bill->prev_balance + $bill->total_amount);
+            $totalPaid = (float) $bill->payments()->sum('amount_paid'); // includes this payment
+            $newBalance = max(0, $totalDue - $totalPaid);
+
             $bill->current_balance = $newBalance;
-            // Mark as paid if fully settled, else unpaid/partially_paid
+
+            // Update status based on remaining balance
             if ($newBalance <= 0) {
                 $bill->status = 'paid';
-            } elseif ($validated['amount_paid'] > 0 && $validated['amount_paid'] < ($bill->prev_balance + $bill->total_amount)) {
+            } elseif ($totalPaid > 0 && $totalPaid < $totalDue) {
                 $bill->status = 'partially_paid';
+            } else {
+                $bill->status = 'unpaid';
             }
+
             $bill->save();
         }
 

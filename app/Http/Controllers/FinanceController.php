@@ -8,6 +8,7 @@ use App\Models\Bill;
 use App\Models\Payment;
 use App\Models\Invoice;
 use App\Models\Customer;
+use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -58,11 +59,15 @@ class FinanceController extends Controller
             ->latest('billing_period_end')
             ->paginate(20);
 
+        // Fetch all categories for filtering
+        $categories = Category::select('id', 'name')->orderBy('name')->get();
+
         return Inertia::render('finance/index', [
             'stats' => $stats,
             'allPayments' => $allPayments,
             'allInvoices' => $allInvoices,
             'allBills' => $allBills,
+            'categories' => $categories,
             'monthlyRevenue' => $monthlyRevenue,
             'paymentMethodData' => $paymentMethodData,
             'recentBills' => $recentBills,

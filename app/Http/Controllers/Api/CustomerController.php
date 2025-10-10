@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Meter;
 use App\Models\Neighborhood;
 use App\Models\Category;
 use Illuminate\Http\Request;
@@ -338,6 +339,54 @@ class CustomerController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Customer status updated successfully'
+        ], 200);
+    }
+
+    /**
+     * Assign a meter to a customer
+     */
+    public function assignMeter(Request $request, Customer $customer): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'meter_id' => 'required|exists:meters,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Check if meter is already assigned to another customer
+        $existingCustomer = Customer::where('meter_id', $request->meter_id)
+            ->where('id', '!=', $customer->id)
+            ->first();
+
+        if ($existingCustomer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This meter is already assigned to another customer'
+            ], 409);
+        }
+
+        // Update customer with new meter
+        $customer->update([
+            'meter_id' => $request->meter_id
+        ]);
+
+        // Update meter status to active
+        Meter::where('id', $request->meter_id)
+            ->update(['status' => 'active']);
+
+        // Load the updated customer with relationships
+        $customer->load(['neighborhood', 'category', 'meter']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Meter assigned successfully',
+            'data' => $customer
         ], 200);
     }
 }

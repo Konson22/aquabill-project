@@ -75,17 +75,19 @@ export default function BillingShow({ bill }) {
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Bill #{bill?.id}</h1>
                     </div>
                     <div className="flex gap-2">
-                        <Button asChild variant="outline" className="gap-2">
-                            <Link href={route('billing.print-only', bill.id)} target="_blank" rel="noopener noreferrer">
+                        <Button asChild variant="outline" size="sm" className="gap-2">
+                            <a href={`/billing/${bill.id}/print-only`} target="_blank" rel="noopener noreferrer">
                                 <Printer className="h-4 w-4" /> Print
-                            </Link>
+                            </a>
                         </Button>
                         <Button variant="outline" className="gap-2">
                             <Download className="h-4 w-4" /> PDF
                         </Button>
-                        <Button className="gap-2" onClick={() => setPaymentModalOpen(true)}>
-                            <CreditCard className="h-4 w-4" /> Pay
-                        </Button>
+                        {bill?.status !== 'paid' && (
+                            <Button className="gap-2" onClick={() => setPaymentModalOpen(true)}>
+                                <CreditCard className="h-4 w-4" /> Pay
+                            </Button>
+                        )}
                     </div>
                 </div>
 

@@ -2,11 +2,12 @@ import AddReadingModal from '@/components/readings/add-reading-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input, Select } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Activity, BarChart3, Calendar, Download, Droplets, Filter, Printer, Search, Trash2, TrendingUp, X, Zap } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Activity, BarChart3, Calendar, Download, Droplets, Printer, Search, Trash2, TrendingUp, X, Zap } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 const breadcrumbs = [
     {
@@ -15,21 +16,12 @@ const breadcrumbs = [
     },
 ];
 
-export default function ReadingsPage({ readings, stats, meters, customers, auth }) {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filteredReadings, setFilteredReadings] = useState(readings);
-    const [filteredStats, setFilteredStats] = useState(stats);
-
-    // Filter states
-    const [filters, setFilters] = useState({
-        timePeriod: '', // 'month', 'quarter', 'half', 'year'
-        selectedMonth: '',
-        selectedYear: '',
-        selectedQuarter: '',
-        selectedHalf: '',
-        status: '',
-    });
-    const [showFilters, setShowFilters] = useState(false);
+export default function ReadingsPage({ readings, stats, meters, customers, auth, filters = {}, categories = [], neighborhoods = [] }) {
+    const [searchQuery, setSearchQuery] = useState(filters.search || '');
+    const [categoryFilter, setCategoryFilter] = useState(filters.category || 'all');
+    const [neighborhoodFilter, setNeighborhoodFilter] = useState(filters.neighborhood || 'all');
+    const [yearFilter, setYearFilter] = useState(filters.year || 'all');
+    const [monthFilter, setMonthFilter] = useState(filters.month || 'all');
     const [deleteDialog, setDeleteDialog] = useState({ open: false, readingId: null, readingInfo: null });
 
     const { delete: deleteReading, processing: deleting } = useForm();
@@ -57,111 +49,80 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
         setDeleteDialog({ open: false, readingId: null, readingInfo: null });
     };
 
-    // Filter readings based on search query and filters
-    useEffect(() => {
-        let filtered = readings;
+    const readingItems = useMemo(() => {
+        if (!readings || !readings.data) return [];
+        return readings.data;
+    }, [readings]);
 
-        // Apply search filter
+    const filteredReadings = useMemo(() => {
+        let list = readingItems;
         if (searchQuery.trim() !== '') {
-            const searchLower = searchQuery.toLowerCase();
-            filtered = filtered.filter((reading) => {
-                // Search in customer name
-                const customerName = `${reading.meter?.customer?.first_name || ''} ${reading.meter?.customer?.last_name || ''}`.toLowerCase();
-                if (customerName.includes(searchLower)) return true;
-
-                // Search in meter serial
-                const meterSerial = reading.meter?.serial?.toString().toLowerCase() || '';
-                if (meterSerial.includes(searchLower)) return true;
-
-                // Search in reading date
-                const readingDate = new Date(reading.date).toLocaleDateString().toLowerCase();
-                if (readingDate.includes(searchLower)) return true;
-
-                // Search in reading values
-                const currentReading = reading.value?.toString().toLowerCase() || '';
-                const previousReading = reading.previous?.toString().toLowerCase() || '';
-                const consumption = reading.consumption?.toString().toLowerCase() || '';
-
-                if (currentReading.includes(searchLower) || previousReading.includes(searchLower) || consumption.includes(searchLower)) return true;
-
-                // Search in source
-                const source = (reading.source || 'manual').toLowerCase();
-                if (source.includes(searchLower)) return true;
-
-                // Search in recorded by name or billing officer
-                const recordedBy = reading.recorded_by?.name?.toLowerCase() || '';
-                const billingOfficer = reading.billing_officer?.toLowerCase() || '';
-                if (recordedBy.includes(searchLower) || billingOfficer.includes(searchLower)) return true;
-
-                // Search in bill IDs
-                if (reading.bills && reading.bills.length > 0) {
-                    const billIds = reading.bills.map((bill) => bill.id.toString()).join(' ');
-                    if (billIds.includes(searchLower)) return true;
-                }
-
-                return false;
+            const s = searchQuery.toLowerCase();
+            list = list.filter((r) => {
+                const name = `${r.meter?.customer?.first_name || ''} ${r.meter?.customer?.last_name || ''}`.toLowerCase();
+                const acct = (r.meter?.customer?.account_number || '').toString().toLowerCase();
+                const serial = (r.meter?.serial || '').toLowerCase();
+                return name.includes(s) || acct.includes(s) || serial.includes(s);
             });
         }
-
-        // Apply time period filters
-        if (filters.timePeriod && filters.selectedYear) {
-            const year = parseInt(filters.selectedYear);
-
-            if (filters.timePeriod === 'month' && filters.selectedMonth) {
-                const month = parseInt(filters.selectedMonth);
-                filtered = filtered.filter((reading) => {
-                    const readingDate = new Date(reading.date);
-                    return readingDate.getFullYear() === year && readingDate.getMonth() + 1 === month;
-                });
-            } else if (filters.timePeriod === 'quarter' && filters.selectedQuarter) {
-                const quarter = parseInt(filters.selectedQuarter);
-                const startMonth = (quarter - 1) * 3;
-                const endMonth = startMonth + 2;
-                filtered = filtered.filter((reading) => {
-                    const readingDate = new Date(reading.date);
-                    const month = readingDate.getMonth();
-                    return readingDate.getFullYear() === year && month >= startMonth && month <= endMonth;
-                });
-            } else if (filters.timePeriod === 'half' && filters.selectedHalf) {
-                const half = parseInt(filters.selectedHalf);
-                const startMonth = half === 1 ? 0 : 6; // First half: Jan-Jun, Second half: Jul-Dec
-                const endMonth = half === 1 ? 5 : 11;
-                filtered = filtered.filter((reading) => {
-                    const readingDate = new Date(reading.date);
-                    const month = readingDate.getMonth();
-                    return readingDate.getFullYear() === year && month >= startMonth && month <= endMonth;
-                });
-            } else if (filters.timePeriod === 'year') {
-                filtered = filtered.filter((reading) => {
-                    const readingDate = new Date(reading.date);
-                    return readingDate.getFullYear() === year;
-                });
-            }
-        }
-
-        // Apply status filter (billed/unbilled)
-        if (filters.status) {
-            filtered = filtered.filter((reading) => {
-                const hasBills = reading.bills && reading.bills.length > 0;
-                return filters.status === 'billed' ? hasBills : !hasBills;
+        if (categoryFilter && categoryFilter !== 'all') {
+            list = list.filter((r) => {
+                return r.meter?.customer?.category?.id?.toString() === categoryFilter;
             });
         }
-
-        setFilteredReadings(filtered);
-
-        // Update stats based on filtered results
-        const filteredStats = {
-            total_readings: filtered.length,
-            this_month: filtered.filter((r) => {
+        if (neighborhoodFilter && neighborhoodFilter !== 'all') {
+            list = list.filter((r) => {
+                return r.meter?.customer?.neighborhood?.id?.toString() === neighborhoodFilter;
+            });
+        }
+        if (yearFilter && yearFilter !== 'all') {
+            list = list.filter((r) => {
                 const readingDate = new Date(r.date);
-                const now = new Date();
-                return readingDate.getMonth() === now.getMonth() && readingDate.getFullYear() === now.getFullYear();
-            }).length,
-            total_consumption: filtered.reduce((sum, r) => sum + (r.consumption || 0), 0),
-            avg_consumption: filtered.length > 0 ? filtered.reduce((sum, r) => sum + (r.consumption || 0), 0) / filtered.length : 0,
+                return readingDate.getFullYear().toString() === yearFilter;
+            });
+        }
+        if (monthFilter && monthFilter !== 'all') {
+            list = list.filter((r) => {
+                const readingDate = new Date(r.date);
+                return (readingDate.getMonth() + 1).toString() === monthFilter;
+            });
+        }
+        return list;
+    }, [readingItems, searchQuery, categoryFilter, neighborhoodFilter, yearFilter, monthFilter]);
+
+    const filteredStats = useMemo(() => {
+        const total_readings = filteredReadings.length;
+        const this_month = filteredReadings.filter((r) => {
+            const readingDate = new Date(r.date);
+            const now = new Date();
+            return readingDate.getMonth() === now.getMonth() && readingDate.getFullYear() === now.getFullYear();
+        }).length;
+        const total_consumption = filteredReadings.reduce((sum, r) => sum + (r.consumption || 0), 0);
+        const avg_consumption =
+            filteredReadings.length > 0 ? filteredReadings.reduce((sum, r) => sum + (r.consumption || 0), 0) / filteredReadings.length : 0;
+
+        return {
+            total_readings,
+            this_month,
+            total_consumption,
+            avg_consumption,
         };
-        setFilteredStats(filteredStats);
-    }, [searchQuery, filters, readings, stats]);
+    }, [filteredReadings]);
+
+    // Sync filters to server (debounced)
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            const params = {
+                search: searchQuery || undefined,
+                category: categoryFilter !== 'all' ? categoryFilter : undefined,
+                neighborhood: neighborhoodFilter !== 'all' ? neighborhoodFilter : undefined,
+                year: yearFilter !== 'all' ? yearFilter : undefined,
+                month: monthFilter !== 'all' ? monthFilter : undefined,
+            };
+            router.get('/readings', params, { preserveState: true, replace: true, preserveScroll: true });
+        }, 400);
+        return () => clearTimeout(handle);
+    }, [searchQuery, categoryFilter, neighborhoodFilter, yearFilter, monthFilter]);
 
     const formatDate = (date) => {
         return new Date(date).toLocaleDateString('en-US', {
@@ -178,81 +139,22 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
         }).format(number);
     };
 
-    // Get month name from month number
-    const getMonthName = (monthNumber) => {
-        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        return months[parseInt(monthNumber) - 1] || monthNumber;
-    };
-
-    // Get available years from readings
-    const getAvailableYears = () => {
-        const years = readings.map((reading) => new Date(reading.date).getFullYear());
-        return [...new Set(years)]
-            .sort((a, b) => b - a)
-            .map((year) => ({
-                value: year.toString(),
-                label: year.toString(),
-            }));
-    };
-
-    // Get month options
-    const getMonthOptions = () => {
-        return [
-            { value: '1', label: 'January' },
-            { value: '2', label: 'February' },
-            { value: '3', label: 'March' },
-            { value: '4', label: 'April' },
-            { value: '5', label: 'May' },
-            { value: '6', label: 'June' },
-            { value: '7', label: 'July' },
-            { value: '8', label: 'August' },
-            { value: '9', label: 'September' },
-            { value: '10', label: 'October' },
-            { value: '11', label: 'November' },
-            { value: '12', label: 'December' },
-        ];
-    };
-
-    // Get quarter options
-    const getQuarterOptions = () => {
-        return [
-            { value: '1', label: 'Q1 (Jan - Mar)' },
-            { value: '2', label: 'Q2 (Apr - Jun)' },
-            { value: '3', label: 'Q3 (Jul - Sep)' },
-            { value: '4', label: 'Q4 (Oct - Dec)' },
-        ];
-    };
-
-    // Get half-year options
-    const getHalfYearOptions = () => {
-        return [
-            { value: '1', label: 'First Half (Jan - Jun)' },
-            { value: '2', label: 'Second Half (Jul - Dec)' },
-        ];
-    };
-
-    // Handle filter changes
-    const handleFilterChange = (key, value) => {
-        setFilters((prev) => ({
-            ...prev,
-            [key]: value,
-        }));
-    };
-
     // Clear all filters
     const clearFilters = () => {
-        setFilters({
-            timePeriod: '',
-            selectedMonth: '',
-            selectedYear: '',
-            selectedQuarter: '',
-            selectedHalf: '',
-            status: '',
-        });
+        setSearchQuery('');
+        setCategoryFilter('all');
+        setNeighborhoodFilter('all');
+        setYearFilter('all');
+        setMonthFilter('all');
     };
 
     // Check if any filters are active
-    const hasActiveFilters = Object.values(filters).some((value) => value !== '');
+    const hasActiveFilters =
+        searchQuery ||
+        (categoryFilter && categoryFilter !== 'all') ||
+        (neighborhoodFilter && neighborhoodFilter !== 'all') ||
+        (yearFilter && yearFilter !== 'all') ||
+        (monthFilter && monthFilter !== 'all');
 
     // Export to Excel functionality
     const exportToExcel = () => {
@@ -267,12 +169,20 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
             lines.push(`Total Records: ${filteredReadings.length}`);
             if (hasActiveFilters) {
                 lines.push('Filtered Data: Yes');
-                const activeFilters = Object.entries(filters)
-                    .filter(([key, value]) => value !== '')
-                    .map(([key, value]) => `${key}: ${value}`)
-                    .join(', ');
-                if (activeFilters) {
-                    lines.push(`Active Filters: ${activeFilters}`);
+                const activeFilters = [];
+                if (searchQuery) activeFilters.push(`Search: ${searchQuery}`);
+                if (categoryFilter && categoryFilter !== 'all') {
+                    const category = categories.find((c) => c.id.toString() === categoryFilter);
+                    activeFilters.push(`Category: ${category?.name || categoryFilter}`);
+                }
+                if (neighborhoodFilter && neighborhoodFilter !== 'all') {
+                    const neighborhood = neighborhoods.find((n) => n.id.toString() === neighborhoodFilter);
+                    activeFilters.push(`Neighborhood: ${neighborhood?.name || neighborhoodFilter}`);
+                }
+                if (yearFilter && yearFilter !== 'all') activeFilters.push(`Year: ${yearFilter}`);
+                if (monthFilter && monthFilter !== 'all') activeFilters.push(`Month: ${monthFilter}`);
+                if (activeFilters.length > 0) {
+                    lines.push(`Active Filters: ${activeFilters.join(', ')}`);
                 }
             } else {
                 lines.push('Filtered Data: No (All Records)');
@@ -464,10 +374,21 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
                 hasActiveFilters
                     ? `<div>Filtered Data: Yes</div>
                  <div class="filters">
-                     Active Filters: ${Object.entries(filters)
-                         .filter(([key, value]) => value !== '')
-                         .map(([key, value]) => `${key}: ${value}`)
-                         .join(', ')}
+                     Active Filters: ${(() => {
+                         const activeFilters = [];
+                         if (searchQuery) activeFilters.push(`Search: ${searchQuery}`);
+                         if (categoryFilter) {
+                             const category = categories.find((c) => c.id.toString() === categoryFilter);
+                             activeFilters.push(`Category: ${category?.name || categoryFilter}`);
+                         }
+                         if (neighborhoodFilter) {
+                             const neighborhood = neighborhoods.find((n) => n.id.toString() === neighborhoodFilter);
+                             activeFilters.push(`Neighborhood: ${neighborhood?.name || neighborhoodFilter}`);
+                         }
+                         if (yearFilter) activeFilters.push(`Year: ${yearFilter}`);
+                         if (monthFilter) activeFilters.push(`Month: ${monthFilter}`);
+                         return activeFilters.join(', ');
+                     })()}
                  </div>`
                     : '<div>Filtered Data: No (All Records)</div>'
             }
@@ -555,27 +476,22 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
             <Head title="Meter Readings" />
 
             {/* Modern Header */}
-            <div className="relative mb-8 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 p-8 text-white">
-                <div className="absolute inset-0 bg-black/10"></div>
+            <div className="relative mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-700 dark:bg-slate-800">
                 <div className="relative">
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                         <div className="space-y-2">
-                            <h1 className="text-3xl font-bold">Meter Readings</h1>
-                            <p className="text-blue-100">Track and manage water consumption data across the system</p>
+                            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Meter Readings</h1>
+                            <p className="text-slate-600 dark:text-slate-400">Track and manage water consumption data across the system</p>
                         </div>
                         <div className="flex flex-wrap gap-3">
                             <AddReadingModal meters={meters} />
-                            <Button variant="secondary" asChild className="border-white/30 bg-white/20 text-white hover:bg-white/30">
+                            <Button variant="outline" asChild>
                                 <Link href="/readings/statistics">
                                     <BarChart3 className="mr-2 h-4 w-4" />
                                     Analytics
                                 </Link>
                             </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => window.print()}
-                                className="border-white/30 bg-white/20 text-white hover:bg-white/30"
-                            >
+                            <Button variant="outline" onClick={() => window.print()}>
                                 <Printer className="mr-2 h-4 w-4" />
                                 Print
                             </Button>
@@ -585,63 +501,50 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
             </div>
 
             {/* Modern Stats Cards */}
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card className="border-0 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg dark:from-blue-900/20 dark:to-blue-800/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 pt-4 pb-1">
                         <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Readings</CardTitle>
-                        <div className="rounded-lg bg-blue-500 p-2">
-                            <Activity className="h-4 w-4 text-white" />
+                        <div className="rounded-lg bg-blue-500 p-1.5">
+                            <Activity className="h-3.5 w-3.5 text-white" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">{filteredStats.total_readings}</div>
-                        <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">All time readings</p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-0 bg-gradient-to-br from-green-50 to-green-100 shadow-lg dark:from-green-900/20 dark:to-green-800/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-green-700 dark:text-green-300">This Month</CardTitle>
-                        <div className="rounded-lg bg-green-500 p-2">
-                            <Calendar className="h-4 w-4 text-white" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-green-900 dark:text-green-100">{filteredStats.this_month || 0}</div>
-                        <p className="mt-1 text-xs text-green-600 dark:text-green-400">Readings this month</p>
+                    <CardContent className="px-4 pt-1 pb-4">
+                        <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{filteredStats.total_readings}</div>
+                        <p className="mt-0.5 text-xs text-blue-600 dark:text-blue-400">All time readings</p>
                     </CardContent>
                 </Card>
 
                 <Card className="border-0 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg dark:from-purple-900/20 dark:to-purple-800/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 pt-4 pb-1">
                         <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300">Total Consumption</CardTitle>
-                        <div className="rounded-lg bg-purple-500 p-2">
-                            <Droplets className="h-4 w-4 text-white" />
+                        <div className="rounded-lg bg-purple-500 p-1.5">
+                            <Droplets className="h-3.5 w-3.5 text-white" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-purple-900 dark:text-purple-100">{formatNumber(filteredStats.total_consumption)}</div>
-                        <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">Cubic meters</p>
+                    <CardContent className="px-4 pt-1 pb-4">
+                        <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">{formatNumber(filteredStats.total_consumption)}</div>
+                        <p className="mt-0.5 text-xs text-purple-600 dark:text-purple-400">Cubic meters</p>
                     </CardContent>
                 </Card>
 
                 <Card className="border-0 bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg dark:from-orange-900/20 dark:to-orange-800/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 pt-4 pb-1">
                         <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">Avg Consumption</CardTitle>
-                        <div className="rounded-lg bg-orange-500 p-2">
-                            <TrendingUp className="h-4 w-4 text-white" />
+                        <div className="rounded-lg bg-orange-500 p-1.5">
+                            <TrendingUp className="h-3.5 w-3.5 text-white" />
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold text-orange-900 dark:text-orange-100">{formatNumber(filteredStats.avg_consumption)}</div>
-                        <p className="mt-1 text-xs text-orange-600 dark:text-orange-400">Per reading</p>
+                    <CardContent className="px-4 pt-1 pb-4">
+                        <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">{formatNumber(filteredStats.avg_consumption)}</div>
+                        <p className="mt-0.5 text-xs text-orange-600 dark:text-orange-400">Per reading</p>
                     </CardContent>
                 </Card>
             </div>
 
             {/* Modern Search and Filter Section */}
             <Card className="border-0 shadow-lg">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+                <CardHeader className="bg-white dark:bg-slate-800">
                     <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <CardTitle className="text-xl font-semibold text-slate-900 dark:text-slate-100">Recent Readings</CardTitle>
@@ -657,19 +560,6 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
-                            <Button
-                                variant="outline"
-                                onClick={() => setShowFilters(!showFilters)}
-                                className="flex items-center gap-2 border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700"
-                            >
-                                <Filter className="h-4 w-4" />
-                                Filters
-                                {hasActiveFilters && (
-                                    <Badge variant="secondary" className="ml-1 h-5 w-5 rounded-full bg-blue-500 p-0 text-xs text-white">
-                                        {Object.values(filters).filter((value) => value !== '').length}
-                                    </Badge>
-                                )}
-                            </Button>
                             <Button variant="default" onClick={exportToExcel} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
                                 <Download className="h-4 w-4" />
                                 Export
@@ -686,160 +576,140 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
                     </div>
 
                     {/* Filter Panel */}
-                    {showFilters && (
-                        <div className="mt-4 rounded-lg border bg-slate-50 p-4 dark:bg-slate-800/50">
-                            <div className="mb-4 flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Filter Readings</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                                        Showing {filteredReadings.length} of {readings.length} readings
-                                    </p>
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                                    <X className="mr-1 h-3 w-3" />
-                                    Clear All
-                                </Button>
+                    <div className="mt-4 rounded-lg border bg-slate-50 p-4 dark:bg-slate-800/50">
+                        <div className="mb-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">Filter Readings</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Showing {filteredReadings.length} of {readingItems.length} readings
+                                </p>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={clearFilters}>
+                                <X className="mr-1 h-3 w-3" />
+                                Clear All
+                            </Button>
+                        </div>
+
+                        {/* Active Filters Summary */}
+                        {hasActiveFilters && (
+                            <div className="mb-4 flex flex-wrap gap-2">
+                                {searchQuery && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        Search: {searchQuery}
+                                    </Badge>
+                                )}
+                                {categoryFilter && categoryFilter !== 'all' && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        Category: {categories.find((c) => c.id.toString() === categoryFilter)?.name || categoryFilter}
+                                    </Badge>
+                                )}
+                                {neighborhoodFilter && neighborhoodFilter !== 'all' && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        Neighborhood: {neighborhoods.find((n) => n.id.toString() === neighborhoodFilter)?.name || neighborhoodFilter}
+                                    </Badge>
+                                )}
+                                {yearFilter && yearFilter !== 'all' && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        Year: {yearFilter}
+                                    </Badge>
+                                )}
+                                {monthFilter && monthFilter !== 'all' && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        Month: {monthFilter}
+                                    </Badge>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            {/* Category Filter */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Category</label>
+                                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All categories" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All categories</SelectItem>
+                                        {categories.map((category) => (
+                                            <SelectItem key={category.id} value={category.id.toString()}>
+                                                {category.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
 
-                            {/* Active Filters Summary */}
-                            {hasActiveFilters && (
-                                <div className="mb-4 flex flex-wrap gap-2">
-                                    {filters.dateFrom && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            From: {filters.dateFrom}
-                                        </Badge>
-                                    )}
-                                    {filters.dateTo && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            To: {filters.dateTo}
-                                        </Badge>
-                                    )}
-                                    {filters.month && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            Month: {getMonthName(filters.month)}
-                                        </Badge>
-                                    )}
-                                    {filters.year && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            Year: {filters.year}
-                                        </Badge>
-                                    )}
-                                    {filters.source && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            Source: {filters.source}
-                                        </Badge>
-                                    )}
-                                    {filters.illegalConnection && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            Illegal: {filters.illegalConnection === 'yes' ? 'Yes' : 'No'}
-                                        </Badge>
-                                    )}
-                                    {filters.status && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            Status: {filters.status}
-                                        </Badge>
-                                    )}
-                                    {(filters.consumptionMin || filters.consumptionMax) && (
-                                        <Badge variant="secondary" className="text-xs">
-                                            Consumption: {filters.consumptionMin || '0'} - {filters.consumptionMax || '∞'}
-                                        </Badge>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                                {/* Time Period Type */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Time Period</label>
-                                    <Select
-                                        value={filters.timePeriod}
-                                        onChange={(e) => handleFilterChange('timePeriod', e.target.value)}
-                                        options={[
-                                            { id: 'month', name: 'Month' },
-                                            { id: 'quarter', name: 'Quarter' },
-                                            { id: 'half', name: 'Half Year' },
-                                            { id: 'year', name: 'Full Year' },
-                                        ]}
-                                        placeholder="Select period"
-                                    />
-                                </div>
-
-                                {/* Year Filter */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Year</label>
-                                    <Select
-                                        value={filters.selectedYear}
-                                        onChange={(e) => handleFilterChange('selectedYear', e.target.value)}
-                                        options={getAvailableYears()}
-                                        placeholder="Select year"
-                                    />
-                                </div>
-
-                                {/* Month Filter - Only show when timePeriod is 'month' */}
-                                {filters.timePeriod === 'month' && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Month</label>
-                                        <Select
-                                            value={filters.selectedMonth}
-                                            onChange={(e) => handleFilterChange('selectedMonth', e.target.value)}
-                                            options={getMonthOptions()}
-                                            placeholder="Select month"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Quarter Filter - Only show when timePeriod is 'quarter' */}
-                                {filters.timePeriod === 'quarter' && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Quarter</label>
-                                        <Select
-                                            value={filters.selectedQuarter}
-                                            onChange={(e) => handleFilterChange('selectedQuarter', e.target.value)}
-                                            options={getQuarterOptions()}
-                                            placeholder="Select quarter"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Half Year Filter - Only show when timePeriod is 'half' */}
-                                {filters.timePeriod === 'half' && (
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Half Year</label>
-                                        <Select
-                                            value={filters.selectedHalf}
-                                            onChange={(e) => handleFilterChange('selectedHalf', e.target.value)}
-                                            options={getHalfYearOptions()}
-                                            placeholder="Select half"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* Status Filter */}
-                                <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
-                                    <Select
-                                        value={filters.status}
-                                        onChange={(e) => handleFilterChange('status', e.target.value)}
-                                        options={[
-                                            { id: 'billed', name: 'Billed' },
-                                            { id: 'unbilled', name: 'Unbilled' },
-                                        ]}
-                                        placeholder="All status"
-                                    />
-                                </div>
+                            {/* Neighborhood Filter */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Neighborhood</label>
+                                <Select value={neighborhoodFilter} onValueChange={setNeighborhoodFilter}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All neighborhoods" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All neighborhoods</SelectItem>
+                                        {neighborhoods.map((neighborhood) => (
+                                            <SelectItem key={neighborhood.id} value={neighborhood.id.toString()}>
+                                                {neighborhood.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
 
-                            {/* Actions */}
-                            <div className="mt-4 flex justify-end gap-2">
-                                <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs">
-                                    Clear All Filters
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={() => setShowFilters(false)} className="text-xs">
-                                    Close
-                                </Button>
+                            {/* Year Filter */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Year</label>
+                                <Select value={yearFilter} onValueChange={setYearFilter}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All years" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All years</SelectItem>
+                                        <SelectItem value="2025">2025</SelectItem>
+                                        <SelectItem value="2026">2026</SelectItem>
+                                        <SelectItem value="2027">2027</SelectItem>
+                                        <SelectItem value="2028">2028</SelectItem>
+                                        <SelectItem value="2029">2029</SelectItem>
+                                        <SelectItem value="2030">2030</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Month Filter */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Month</label>
+                                <Select value={monthFilter} onValueChange={setMonthFilter}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="All months" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All months</SelectItem>
+                                        <SelectItem value="1">January</SelectItem>
+                                        <SelectItem value="2">February</SelectItem>
+                                        <SelectItem value="3">March</SelectItem>
+                                        <SelectItem value="4">April</SelectItem>
+                                        <SelectItem value="5">May</SelectItem>
+                                        <SelectItem value="6">June</SelectItem>
+                                        <SelectItem value="7">July</SelectItem>
+                                        <SelectItem value="8">August</SelectItem>
+                                        <SelectItem value="9">September</SelectItem>
+                                        <SelectItem value="10">October</SelectItem>
+                                        <SelectItem value="11">November</SelectItem>
+                                        <SelectItem value="12">December</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
-                    )}
+
+                        {/* Actions */}
+                        <div className="mt-4 flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs">
+                                Clear All Filters
+                            </Button>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
@@ -973,7 +843,7 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth 
                     {/* Results Count */}
                     <div className="mt-6 flex items-center justify-between">
                         <div className="text-sm text-slate-600 dark:text-slate-400">
-                            Showing {filteredReadings.length} of {readings.length} results
+                            Showing {filteredReadings.length} of {readingItems.length} results
                             {searchQuery && <span className="ml-2 text-slate-500">(filtered by "{searchQuery}")</span>}
                         </div>
                     </div>

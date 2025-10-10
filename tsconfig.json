@@ -132,6 +132,7 @@
         "resources/js/components/nav-main.jsx",
         "resources/js/components/app-sidebar-header.jsx",
         "resources/js/components/app-content.jsx",
-        "resources/js/components/nav-user.jsx"
+        "resources/js/components/nav-user.jsx",
+        "resources/js/layouts/auth/auth-split-layout.jsx"
     ]
 }

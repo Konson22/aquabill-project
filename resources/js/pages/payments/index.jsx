@@ -1,11 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import CustomSearchBar from '@/components/ui/custom-search-bar';
+import { Select } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { BarChart3, Clock, CreditCard, DollarSign, Download, Filter, User, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Clock, CreditCard, DollarSign, Download, Filter, User } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatSSPCurrency } from '../../utils/formatSSPCurrency';
 
 const breadcrumbs = [
@@ -13,84 +13,66 @@ const breadcrumbs = [
     { title: 'Payments', href: '/payments' },
 ];
 
-export default function PaymentsIndex({ payments }) {
-    const items = payments?.data || [];
+export default function PaymentsIndex({ payments, filters = {} }) {
+    const [searchQuery, setSearchQuery] = useState(filters.search || '');
+    const [statusFilter, setStatusFilter] = useState(filters.status || '');
+    const [yearFilter, setYearFilter] = useState(filters.year || '');
+    const [monthFilter, setMonthFilter] = useState(filters.month || '');
 
-    // Search and filter states
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filteredPayments, setFilteredPayments] = useState(items);
-    const [showFilters, setShowFilters] = useState(false);
-    const [filters, setFilters] = useState({
-        dateFrom: '',
-        dateTo: '',
-        customer: '',
-    });
+    const paymentItems = useMemo(() => {
+        if (!payments || !payments.data) return [];
+        return payments.data;
+    }, [payments]);
+
+    const filteredPayments = useMemo(() => {
+        let list = paymentItems;
+        if (searchQuery.trim() !== '') {
+            const s = searchQuery.toLowerCase();
+            list = list.filter((payment) => {
+                const customerName = payment.customer ? `${payment.customer.first_name || ''} ${payment.customer.last_name || ''}`.toLowerCase() : '';
+                const refNumber = (payment.reference_number || '').toString().toLowerCase();
+                const amount = (payment.amount_paid || '').toString().toLowerCase();
+                return customerName.includes(s) || refNumber.includes(s) || amount.includes(s);
+            });
+        }
+        if (statusFilter) {
+            // For payments, we can filter by payment method or status
+            list = list.filter((payment) => payment.payment_method === statusFilter);
+        }
+        if (yearFilter) {
+            list = list.filter((payment) => {
+                const paymentDate = new Date(payment.payment_date);
+                return paymentDate.getFullYear().toString() === yearFilter;
+            });
+        }
+        if (monthFilter) {
+            list = list.filter((payment) => {
+                const paymentDate = new Date(payment.payment_date);
+                return (paymentDate.getMonth() + 1).toString() === monthFilter;
+            });
+        }
+        return list;
+    }, [paymentItems, searchQuery, statusFilter, yearFilter, monthFilter]);
+
+    // Sync filters to server (debounced)
+    useEffect(() => {
+        const handle = setTimeout(() => {
+            const params = {
+                search: searchQuery || undefined,
+                status: statusFilter || undefined,
+                year: yearFilter || undefined,
+                month: monthFilter || undefined,
+            };
+            router.get('/payments', params, { preserveState: true, replace: true, preserveScroll: true });
+        }, 400);
+        return () => clearTimeout(handle);
+    }, [searchQuery, statusFilter, yearFilter, monthFilter]);
 
     const formatDate = (date) => (date ? new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '');
 
-    // Get unique customers for filter
-    const customers = [...new Set(items.map((p) => p.customer).filter(Boolean))];
-
-    // Filter payments based on search query and filters
-    useEffect(() => {
-        let filtered = items;
-
-        // Apply search filter
-        if (searchQuery.trim() !== '') {
-            const searchLower = searchQuery.toLowerCase();
-            filtered = filtered.filter((payment) => {
-                // Search in customer name
-                const customerName = payment.customer ? `${payment.customer.first_name || ''} ${payment.customer.last_name || ''}`.toLowerCase() : '';
-                if (customerName.includes(searchLower)) return true;
-
-                // Search in reference number
-                const refNumber = payment.reference_number?.toLowerCase() || '';
-                if (refNumber.includes(searchLower)) return true;
-
-                // Search in amount paid
-                const amount = payment.amount_paid?.toString() || '';
-                if (amount.includes(searchLower)) return true;
-
-                // Search in total bill amount
-                const totalBill = payment.bill?.total_amount?.toString() || '';
-                if (totalBill.includes(searchLower)) return true;
-
-                return false;
-            });
-        }
-
-        // Apply customer filter
-        if (filters.customer) {
-            filtered = filtered.filter((p) => p.customer?.id === parseInt(filters.customer));
-        }
-
-        // Apply date range filter
-        if (filters.dateFrom) {
-            filtered = filtered.filter((p) => new Date(p.payment_date) >= new Date(filters.dateFrom));
-        }
-        if (filters.dateTo) {
-            filtered = filtered.filter((p) => new Date(p.payment_date) <= new Date(filters.dateTo));
-        }
-
-        setFilteredPayments(filtered);
-    }, [searchQuery, filters, items]);
-
-    // Clear all filters
-    const clearFilters = () => {
-        setSearchQuery('');
-        setFilters({
-            dateFrom: '',
-            dateTo: '',
-            customer: '',
-        });
-    };
-
-    // Check if any filters are active
-    const hasActiveFilters = searchQuery.trim() !== '' || Object.values(filters).some((value) => value !== '');
-
     // Calculate KPI metrics
     const calculateKPIs = () => {
-        const data = hasActiveFilters ? filteredPayments : items;
+        const data = filteredPayments;
 
         // Total payments
         const totalPayments = data.length;
@@ -142,7 +124,7 @@ export default function PaymentsIndex({ payments }) {
 
     // Export to Excel functionality
     const exportToExcel = () => {
-        const data = hasActiveFilters ? filteredPayments : items;
+        const data = filteredPayments;
 
         // Calculate summary statistics
         const totalPayments = data.length;
@@ -234,26 +216,12 @@ export default function PaymentsIndex({ payments }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payments" />
 
-            {/* Header Section */}
+            {/* Modern Header Section */}
             <div className="mb-8">
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-1">
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Payments</h1>
-                        <p className="text-slate-600 dark:text-slate-400">
-                            {hasActiveFilters
-                                ? `Showing ${filteredPayments.length} of ${items.length} payments`
-                                : `Manage and track all payment transactions`}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Button variant="outline" size="sm">
-                            <BarChart3 className="mr-2 h-4 w-4" />
-                            Reports
-                        </Button>
-                        <Button onClick={exportToExcel}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Export Excel
-                        </Button>
+                        <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Payment Management</h1>
+                        <p className="text-lg text-slate-600 dark:text-slate-400">Comprehensive payment tracking system with advanced analytics</p>
                     </div>
                 </div>
             </div>
@@ -267,7 +235,9 @@ export default function PaymentsIndex({ payments }) {
                             <div className="flex-1">
                                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Payments</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{kpis.totalPayments.toLocaleString()}</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-500">{hasActiveFilters ? 'filtered results' : 'all time'}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-500">
+                                    {searchQuery || statusFilter || yearFilter || monthFilter ? 'filtered results' : 'all time'}
+                                </p>
                             </div>
                             <div className="rounded-full bg-blue-100 p-3 dark:bg-blue-900/20">
                                 <CreditCard className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -283,7 +253,9 @@ export default function PaymentsIndex({ payments }) {
                             <div className="flex-1">
                                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Total Collected</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatSSPCurrency(kpis.totalAmount)}</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-500">{hasActiveFilters ? 'filtered amount' : 'all time'}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-500">
+                                    {searchQuery || statusFilter || yearFilter || monthFilter ? 'filtered amount' : 'all time'}
+                                </p>
                             </div>
                             <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/20">
                                 <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
@@ -338,130 +310,110 @@ export default function PaymentsIndex({ payments }) {
                 </Card>
             </div>
 
-            {/* Search and Filter Controls */}
-            <div className="mb-6 space-y-4">
-                {/* Search Bar */}
-                <div className="relative">
-                    {searchQuery && (
+            {/* Advanced Filters */}
+            <Card className="mb-6">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Filter className="h-5 w-5" />
+                                Advanced Filters
+                            </CardTitle>
+                            <CardDescription>Refine your search with powerful filtering options</CardDescription>
+                        </div>
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setSearchQuery('')}
-                            className="absolute top-1/2 right-2 h-6 w-6 -translate-y-1/2 p-0"
+                            onClick={() => {
+                                setSearchQuery('');
+                                setStatusFilter('');
+                                setYearFilter('');
+                                setMonthFilter('');
+                            }}
                         >
-                            <X className="h-4 w-4" />
+                            Clear All
                         </Button>
-                    )}
-                </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Payment Method</label>
+                            <Select
+                                placeholder="All methods"
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                options={[
+                                    { id: 'cash', name: 'Cash' },
+                                    { id: 'mobile_money', name: 'Mobile Money' },
+                                    { id: 'bank_transfer', name: 'Bank Transfer' },
+                                ]}
+                            />
+                        </div>
 
-                {/* Filter Toggle and Controls */}
-                <div className="flex items-center justify-between">
-                    <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2">
-                        <Filter className="h-4 w-4" />
-                        Filters
-                        {hasActiveFilters && (
-                            <span className="ml-1 rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white">
-                                {Object.values(filters).filter((v) => v !== '').length + (searchQuery ? 1 : 0)}
-                            </span>
-                        )}
-                    </Button>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Year</label>
+                            <Select
+                                placeholder="All years"
+                                value={yearFilter}
+                                onChange={(e) => setYearFilter(e.target.value)}
+                                options={[
+                                    { id: '2025', name: '2025' },
+                                    { id: '2026', name: '2026' },
+                                    { id: '2027', name: '2027' },
+                                    { id: '2028', name: '2028' },
+                                    { id: '2029', name: '2029' },
+                                    { id: '2030', name: '2030' },
+                                ]}
+                            />
+                        </div>
 
-                    {hasActiveFilters && (
-                        <Button variant="ghost" size="sm" onClick={clearFilters}>
-                            Clear Filters
-                        </Button>
-                    )}
-                </div>
-
-                {/* Filter Panel */}
-                {showFilters && (
-                    <Card className="border-slate-200 dark:border-slate-700">
-                        <CardHeader className="pb-4">
-                            <CardTitle className="text-lg">Filter Payments</CardTitle>
-                            <CardDescription>Use the filters below to narrow down your search results</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                {/* Customer Filter */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Customer</label>
-                                    <Select
-                                        value={filters.customer || 'all'}
-                                        onValueChange={(value) => setFilters((prev) => ({ ...prev, customer: value === 'all' ? '' : value }))}
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="All Customers" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Customers</SelectItem>
-                                            {customers.map((customer) => (
-                                                <SelectItem key={customer.id} value={customer.id.toString()}>
-                                                    {customer.first_name} {customer.last_name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {/* Date From */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Date From</label>
-                                    <Input
-                                        type="date"
-                                        value={filters.dateFrom}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, dateFrom: e.target.value }))}
-                                        className="w-full"
-                                    />
-                                </div>
-
-                                {/* Date To */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Date To</label>
-                                    <Input
-                                        type="date"
-                                        value={filters.dateTo}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, dateTo: e.target.value }))}
-                                        className="w-full"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Filter Actions */}
-                            <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
-                                <div className="text-sm text-slate-500 dark:text-slate-400">
-                                    {hasActiveFilters
-                                        ? `${Object.values(filters).filter((v) => v !== '').length + (searchQuery ? 1 : 0)} filter(s) active`
-                                        : 'No filters applied'}
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" onClick={clearFilters}>
-                                        Clear All
-                                    </Button>
-                                    <Button size="sm" onClick={() => setShowFilters(false)}>
-                                        Apply Filters
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-            </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Month</label>
+                            <Select
+                                placeholder="All months"
+                                value={monthFilter}
+                                onChange={(e) => setMonthFilter(e.target.value)}
+                                options={[
+                                    { id: '1', name: 'January' },
+                                    { id: '2', name: 'February' },
+                                    { id: '3', name: 'March' },
+                                    { id: '4', name: 'April' },
+                                    { id: '5', name: 'May' },
+                                    { id: '6', name: 'June' },
+                                    { id: '7', name: 'July' },
+                                    { id: '8', name: 'August' },
+                                    { id: '9', name: 'September' },
+                                    { id: '10', name: 'October' },
+                                    { id: '11', name: 'November' },
+                                    { id: '12', name: 'December' },
+                                ]}
+                            />
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* Payments Table */}
             <Card>
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
-                            <CardTitle>Payments</CardTitle>
-                            <CardDescription>List of recorded payments</CardDescription>
+                            <CardTitle>Payments Overview</CardTitle>
+                            <CardDescription>Comprehensive payment tracking and management</CardDescription>
                         </div>
-                        <div className="flex-1 pl-16">
-                            <Input
-                                type="text"
-                                placeholder="Search payments by customer, reference number, or amount..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+                        <div className="flex items-center gap-3">
+                            <div className="max-w-md flex-1">
+                                <CustomSearchBar
+                                    value={searchQuery}
+                                    onChange={setSearchQuery}
+                                    placeholder="Search payments by customer, reference, or amount..."
+                                />
+                            </div>
+                            <Button onClick={exportToExcel} variant="outline" size="sm" className="gap-2">
+                                <Download className="h-4 w-4" />
+                                Export
+                            </Button>
                         </div>
                     </div>
                 </CardHeader>
@@ -523,7 +475,9 @@ export default function PaymentsIndex({ payments }) {
                                 ) : (
                                     <tr>
                                         <td className="px-4 py-8 text-center text-slate-500" colSpan={7}>
-                                            {hasActiveFilters ? 'No payments match your filters.' : 'No payments found.'}
+                                            {searchQuery || statusFilter || yearFilter || monthFilter
+                                                ? 'No payments match your filters.'
+                                                : 'No payments found.'}
                                         </td>
                                     </tr>
                                 )}

@@ -159,6 +159,8 @@ class CustomerController extends Controller
                     'id' => $meter->id,
                     'serial' => $meter->serial,
                     'status' => $meter->status,
+                    'model' => $meter->model,
+                    'manufactory' => $meter->manufactory,
                     'type' => $meter->model,
                     'customer_id' => null,
                     'customer_name' => null,
@@ -754,5 +756,98 @@ public function exportReadings(Customer $customer)
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Assign a meter to a customer
+     */
+    public function assignMeter(Request $request, Customer $customer)
+    {
+        $request->validate([
+            'meter_id' => 'required|exists:meters,id',
+        ]);
+
+        // Check if meter is already assigned to another customer
+        $existingCustomer = Customer::where('meter_id', $request->meter_id)
+            ->where('id', '!=', $customer->id)
+            ->first();
+
+        if ($existingCustomer) {
+            return back()->withErrors([
+                'meter_id' => 'This meter is already assigned to another customer'
+            ]);
+        }
+
+        $oldMeter = $customer->meter;
+        $newMeter = Meter::find($request->meter_id);
+        $actionType = $oldMeter ? 'replacement' : 'assignment';
+
+        // If customer already has a meter, set it to inactive
+        if ($oldMeter) {
+            $oldMeter->update(['status' => 'inactive']);
+        }
+
+        // Update customer with new meter
+        $customer->update([
+            'meter_id' => $request->meter_id
+        ]);
+
+        // Update new meter status to active
+        $newMeter->update(['status' => 'active']);
+
+        // Create meter log entry
+        MeterLog::create([
+            'customer_id' => $customer->id,
+            'old_meter_id' => $oldMeter?->id,
+            'new_meter_id' => $newMeter->id,
+            'action_type' => $actionType,
+            'reason' => $request->input('reason', 'Meter ' . $actionType),
+            'effective_date' => now(),
+            'installation_date' => now(),
+            'performed_by' => auth()->id(),
+            'old_meter_data' => $oldMeter ? [
+                'serial' => $oldMeter->serial,
+                'model' => $oldMeter->model,
+                'manufactory' => $oldMeter->manufactory,
+                'status' => 'inactive'
+            ] : null,
+            'new_meter_data' => [
+                'serial' => $newMeter->serial,
+                'model' => $newMeter->model,
+                'manufactory' => $newMeter->manufactory,
+                'status' => 'active'
+            ],
+            'notes' => $request->input('notes', 'Meter ' . $actionType . ' performed')
+        ]);
+
+        $successMessage = $oldMeter 
+            ? 'Meter replaced successfully. Old meter set to inactive.'
+            : 'Meter assigned successfully';
+
+        return back()->with('success', $successMessage);
+    }
+
+    /**
+     * Update meter status
+     */
+    public function updateMeterStatus(Request $request, Customer $customer)
+    {
+        $request->validate([
+            'meter_id' => 'required|exists:meters,id',
+            'status' => 'required|in:active,inactive,maintenance,damaged',
+        ]);
+
+        // Verify the meter belongs to this customer
+        if ($customer->meter_id != $request->meter_id) {
+            return back()->withErrors([
+                'meter_id' => 'This meter does not belong to this customer'
+            ]);
+        }
+
+        // Update meter status
+        Meter::where('id', $request->meter_id)
+            ->update(['status' => $request->status]);
+
+        return back()->with('success', 'Meter status updated successfully');
     }
 }

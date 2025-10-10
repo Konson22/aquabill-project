@@ -13,14 +13,14 @@ const LoginInput = forwardRef(({
     return (
         <div className="relative">
             {Icon && (
-                <div className="absolute top-1/2 left-3 h-6 w-6 -translate-y-1/2 transform">
-                    <Icon className="h-6 w-6 text-blue-400" />
+                <div className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 transform">
+                    <Icon className="h-5 w-5 text-blue-500" />
                 </div>
             )}
             <input
                 type={type}
                 className={cn(
-                    "h-12 w-full rounded-lg border-0 bg-white/20 pl-12 pr-12 text-white placeholder:text-white/70 focus:bg-white/30 focus:ring-2 focus:ring-white/30 focus:outline-none transition-all duration-200",
+                    "h-14 w-full rounded-xl border-2 border-slate-200 bg-white pl-12 pr-12 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 focus:outline-none transition-all duration-300 hover:border-slate-300",
                     Icon && "pl-12",
                     RightIcon && "pr-12",
                     !Icon && !RightIcon && "px-4",
@@ -32,10 +32,10 @@ const LoginInput = forwardRef(({
             {RightIcon && (
                 <button
                     type="button"
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-blue-400 transition-colors hover:text-blue-300"
+                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-500 transition-colors hover:text-blue-600 hover:bg-blue-50 rounded-r-xl"
                     onClick={onRightIconClick}
                 >
-                    <RightIcon className="h-6 w-6" />
+                    <RightIcon className="h-5 w-5" />
                 </button>
             )}
         </div>
