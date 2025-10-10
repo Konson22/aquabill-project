@@ -54,15 +54,7 @@ class FixAccountNumbers extends Command
     
     private function generateUniqueAccountNumber($customerId)
     {
-        $accountNumber = 'ACC' . str_pad($customerId, 5, '0', STR_PAD_LEFT);
-        
-        // If this account number already exists, find the next available one
-        $counter = $customerId;
-        while (Customer::where('account_number', $accountNumber)->exists()) {
-            $counter++;
-            $accountNumber = 'ACC' . str_pad($counter, 5, '0', STR_PAD_LEFT);
-        }
-        
-        return $accountNumber;
+        // Simply use the customer ID as the account number
+        return 'ACC' . str_pad($customerId, 5, '0', STR_PAD_LEFT);
     }
 }

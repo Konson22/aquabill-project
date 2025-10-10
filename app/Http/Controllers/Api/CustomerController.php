@@ -225,11 +225,12 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer): JsonResponse
     {
-        $customer->delete();
+        // Permanently delete the customer from database
+        $customer->forceDelete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Customer deleted successfully'
+            'message' => 'Customer permanently deleted successfully'
         ], 200);
     }
 
