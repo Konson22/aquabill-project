@@ -81,9 +81,24 @@ class CustomerController extends Controller
         // Generate account number if not provided
         $accountNumber = $request->input('account_number');
         if (!$accountNumber) {
+            // Find the highest existing account number and increment it
+            $lastAccountNumber = Customer::where('account_number', 'like', 'ACC%')
+                ->orderBy('account_number', 'desc')
+                ->value('account_number');
+            
+            if ($lastAccountNumber) {
+                // Extract the number part and increment it
+                $lastNumber = (int) substr($lastAccountNumber, 3);
+                $nextNumber = $lastNumber + 1;
+            } else {
+                // If no account numbers exist, start from 1
+                $nextNumber = 1;
+            }
+            
+            // Ensure the generated account number is unique
             do {
-                $nextNumber = Customer::max('id') + 1;
                 $accountNumber = 'ACC' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+                $nextNumber++;
             } while (Customer::where('account_number', $accountNumber)->exists());
         }
 
