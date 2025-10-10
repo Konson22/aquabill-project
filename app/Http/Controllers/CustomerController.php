@@ -78,38 +78,6 @@ class CustomerController extends Controller
             ])->withInput();
         }
 
-        // Generate account number if not provided
-        $accountNumber = $request->input('account_number');
-        if (!$accountNumber) {
-            // Use a more robust approach: find the highest numeric part of existing account numbers
-            $existingNumbers = Customer::where('account_number', 'like', 'ACC%')
-                ->pluck('account_number')
-                ->map(function($accNum) {
-                    return (int) substr($accNum, 3);
-                })
-                ->filter()
-                ->toArray();
-            
-            if (!empty($existingNumbers)) {
-                $nextNumber = max($existingNumbers) + 1;
-            } else {
-                $nextNumber = 1;
-            }
-            
-            // Ensure the generated account number is unique
-            do {
-                $accountNumber = 'ACC' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
-                $nextNumber++;
-            } while (Customer::where('account_number', $accountNumber)->exists());
-            
-            // Log for debugging
-            \Log::info('Generated account number', [
-                'account_number' => $accountNumber,
-                'existing_numbers' => $existingNumbers,
-                'next_number' => $nextNumber - 1
-            ]);
-        }
-
         $neighborhoodId = $request->input('neighborhood_id');
 
         // Create new neighborhood if provided
@@ -121,13 +89,41 @@ class CustomerController extends Controller
         }
 
         // Use database transaction to ensure atomicity
-        $customer = \DB::transaction(function () use ($request, $neighborhoodId, $accountNumber) {
-            // Double-check uniqueness within transaction
-            $finalAccountNumber = $accountNumber;
-            $counter = 1;
-            while (Customer::where('account_number', $finalAccountNumber)->exists()) {
-                $finalAccountNumber = 'ACC' . str_pad($counter, 5, '0', STR_PAD_LEFT);
-                $counter++;
+        $customer = \DB::transaction(function () use ($request, $neighborhoodId) {
+            // Generate account number inside transaction to avoid race conditions
+            $accountNumber = $request->input('account_number');
+            if (!$accountNumber) {
+                // Get all existing account numbers within the transaction
+                $existingNumbers = Customer::where('account_number', 'like', 'ACC%')
+                    ->pluck('account_number')
+                    ->map(function($accNum) {
+                        return (int) substr($accNum, 3);
+                    })
+                    ->filter()
+                    ->toArray();
+                
+                if (!empty($existingNumbers)) {
+                    $nextNumber = max($existingNumbers) + 1;
+                } else {
+                    $nextNumber = 1;
+                }
+                
+                $accountNumber = 'ACC' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+                
+                // Ensure the generated account number is unique
+                $counter = $nextNumber;
+                while (Customer::where('account_number', $accountNumber)->exists()) {
+                    $counter++;
+                    $accountNumber = 'ACC' . str_pad($counter, 5, '0', STR_PAD_LEFT);
+                }
+                
+                // Log for debugging
+                \Log::info('Generated account number in transaction', [
+                    'account_number' => $accountNumber,
+                    'existing_numbers' => $existingNumbers,
+                    'next_number' => $counter,
+                    'all_existing_accounts' => Customer::pluck('account_number')->toArray()
+                ]);
             }
 
             return Customer::create([
@@ -145,7 +141,7 @@ class CustomerController extends Controller
                 'date' => $request->input('date') ?? Carbon::now(),
                 'contract' => $request->input('contract'),
                 'credit' => $request->input('credit') ?? 0,
-                'account_number' => $finalAccountNumber,
+                'account_number' => $accountNumber,
                 'is_active' => $request->input('is_active', true),
             ]);
         });
