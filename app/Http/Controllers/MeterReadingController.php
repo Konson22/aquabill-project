@@ -21,29 +21,79 @@ class MeterReadingController extends Controller
      */
     public function index(Request $request)
     {
-        $readings = MeterReading::with(['meter.customer', 'recordedBy', 'bills'])
-            ->orderBy('date', 'desc')
-            ->get()
-            ->map(function ($reading) {
-                return [
-                    'id' => $reading->id,
-                    'meter_id' => $reading->meter_id,
-                    'value' => $reading->value,
-                    'previous' => $reading->previous,
-                    'consumption' => $reading->consumption,
-                    'date' => $reading->date,
-                    'source' => $reading->source,
-                    'billing_officer' => $reading->billing_officer,
-                    'created_at' => $reading->created_at,
-                    'bills' => $reading->bills->map(function ($bill) {
-                        return [
-                            'id' => $bill->id,
-                            'status' => $bill->status,
-                            'total_amount' => $bill->total_amount,
-                            'current_balance' => $bill->current_balance,
-                        ];
-                    }),
-                    'meter' => [
+        $request->validate([
+            'search' => 'nullable|string',
+            'category' => 'nullable|integer|exists:categories,id',
+            'neighborhood' => 'nullable|integer|exists:neighborhoods,id',
+            'year' => 'nullable|integer',
+            'month' => 'nullable|integer|min:1|max:12',
+        ]);
+
+        $query = MeterReading::with(['meter.customer.category', 'meter.customer.neighborhood', 'recordedBy', 'bills']);
+
+        // Search functionality
+        if ($request->filled('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('meter.customer', function ($cq) use ($search) {
+                    $cq->where('first_name', 'like', "%{$search}%")
+                       ->orWhere('last_name', 'like', "%{$search}%")
+                       ->orWhere('account_number', 'like', "%{$search}%");
+                })->orWhereHas('meter', function ($mq) use ($search) {
+                    $mq->where('serial', 'like', "%{$search}%");
+                });
+            });
+        }
+
+        // Category filter
+        if ($request->filled('category')) {
+            $query->whereHas('meter.customer', function ($q) use ($request) {
+                $q->where('category_id', $request->get('category'));
+            });
+        }
+
+        // Neighborhood filter
+        if ($request->filled('neighborhood')) {
+            $query->whereHas('meter.customer', function ($q) use ($request) {
+                $q->where('neighborhood_id', $request->get('neighborhood'));
+            });
+        }
+
+        // Year filter
+        if ($request->filled('year')) {
+            $query->whereYear('date', $request->get('year'));
+        }
+
+        // Month filter
+        if ($request->filled('month')) {
+            $query->whereMonth('date', $request->get('month'));
+        }
+
+        $readings = $query->orderBy('date', 'desc')
+            ->paginate(15)
+            ->withQueryString();
+
+        // Transform the data
+        $readings->getCollection()->transform(function ($reading) {
+            return [
+                'id' => $reading->id,
+                'meter_id' => $reading->meter_id,
+                'value' => $reading->value,
+                'previous' => $reading->previous,
+                'consumption' => $reading->consumption,
+                'date' => $reading->date,
+                'source' => $reading->source,
+                'billing_officer' => $reading->billing_officer,
+                'created_at' => $reading->created_at,
+                'bills' => $reading->bills->map(function ($bill) {
+                    return [
+                        'id' => $bill->id,
+                        'status' => $bill->status,
+                        'total_amount' => $bill->total_amount,
+                        'current_balance' => $bill->current_balance,
+                    ];
+                }),
+                'meter' => [
                         'id' => $reading->meter->id,
                         'serial' => $reading->meter->serial,
                         'customer' => $reading->meter->customer ? [
@@ -51,6 +101,14 @@ class MeterReadingController extends Controller
                             'first_name' => $reading->meter->customer->first_name,
                             'last_name' => $reading->meter->customer->last_name,
                             'account_number' => $reading->meter->customer->account_number,
+                            'category' => $reading->meter->customer->category ? [
+                                'id' => $reading->meter->customer->category->id,
+                                'name' => $reading->meter->customer->category->name,
+                            ] : null,
+                            'neighborhood' => $reading->meter->customer->neighborhood ? [
+                                'id' => $reading->meter->customer->neighborhood->id,
+                                'name' => $reading->meter->customer->neighborhood->name,
+                            ] : null,
                         ] : null,
                     ],
                     'recorded_by' => $reading->recordedBy ? [
@@ -60,15 +118,15 @@ class MeterReadingController extends Controller
                 ];
             });
 
+        // Calculate stats based on filtered data
+        $filteredReadings = $query->get();
         $stats = [
-            'total_readings' => MeterReading::count(),
-            'this_month' => MeterReading::whereMonth('date', now()->month)->count(),
-            'total_consumption' => MeterReading::get()->sum(function($reading) {
-                return $reading->value - $reading->previous;
-            }),
-            'avg_consumption' => MeterReading::get()->avg(function($reading) {
-                return $reading->value - $reading->previous;
-            }),
+            'total_readings' => $filteredReadings->count(),
+            'this_month' => $filteredReadings->filter(function($reading) {
+                return $reading->date->month === now()->month && $reading->date->year === now()->year;
+            })->count(),
+            'total_consumption' => $filteredReadings->sum('consumption'),
+            'avg_consumption' => $filteredReadings->avg('consumption'),
         ];
 
         // Only include meters that are assigned to customers for AddReadingModal
@@ -94,13 +152,17 @@ class MeterReadingController extends Controller
         });
 
         $customers = Customer::all();
+        $categories = \App\Models\Category::all();
+        $neighborhoods = \App\Models\Neighborhood::all();
 
         return Inertia::render('readings/index', compact(
             'readings',
             'stats',
             'meters',
-            'customers'
-        ))->with('auth', [
+            'customers',
+            'categories',
+            'neighborhoods'
+        ))->with('filters', $request->only(['search', 'category', 'neighborhood', 'year', 'month']))->with('auth', [
             'user' => auth()->user() ? [
                 'id' => auth()->user()->id,
                 'name' => auth()->user()->name,

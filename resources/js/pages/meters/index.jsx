@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Activity, AlertTriangle, CheckCircle, Edit, Eye, Plus, Search, Users, Zap } from 'lucide-react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Activity, AlertTriangle, CheckCircle, Edit, Eye, Plus, Search, Trash2, Users, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import MeterForm from '../forms/meter-form';
 
@@ -21,6 +21,23 @@ export default function MetersPage({ meters, customers, types, stats }) {
     const [filteredMeters, setFilteredMeters] = useState(meters);
     const [filteredStats, setFilteredStats] = useState(stats);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [deleteDialog, setDeleteDialog] = useState({ open: false, meterId: null, meterInfo: null });
+
+    const { delete: deleteMeter, processing: deleting } = useForm();
+
+    // Delete meter function
+    const handleDeleteMeter = () => {
+        if (deleteDialog.meterId) {
+            deleteMeter(route('meters.destroy', deleteDialog.meterId), {
+                onSuccess: () => {
+                    setDeleteDialog({ open: false, meterId: null, meterInfo: null });
+                },
+                onError: (errors) => {
+                    console.error('Error deleting meter:', errors);
+                },
+            });
+        }
+    };
 
     // Filter meters based on search query
     useEffect(() => {
@@ -284,6 +301,26 @@ export default function MetersPage({ meters, customers, types, stats }) {
                                                             Edit
                                                         </Button>
                                                     </Link>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                        onClick={() =>
+                                                            setDeleteDialog({
+                                                                open: true,
+                                                                meterId: meter.id,
+                                                                meterInfo: {
+                                                                    serial: meter.serial || meter.meter_number,
+                                                                    customer: meter.customer
+                                                                        ? `${meter.customer.first_name} ${meter.customer.last_name}`
+                                                                        : 'Unassigned',
+                                                                },
+                                                            })
+                                                        }
+                                                    >
+                                                        <Trash2 className="mr-1 h-3 w-3" />
+                                                        Delete
+                                                    </Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -316,6 +353,47 @@ export default function MetersPage({ meters, customers, types, stats }) {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center">
+                            <Trash2 className="mr-2 h-5 w-5 text-red-600" />
+                            Delete Meter
+                        </DialogTitle>
+                        <DialogDescription>Are you sure you want to delete this meter? This action cannot be undone.</DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-4">
+                        {deleteDialog.meterInfo && (
+                            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
+                                <div className="space-y-2">
+                                    <div>
+                                        <span className="font-medium text-slate-700 dark:text-slate-300">Serial Number:</span>
+                                        <span className="ml-2 text-slate-600 dark:text-slate-400">{deleteDialog.meterInfo.serial || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-medium text-slate-700 dark:text-slate-300">Customer:</span>
+                                        <span className="ml-2 text-slate-600 dark:text-slate-400">{deleteDialog.meterInfo.customer}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div className="mt-6 flex justify-end space-x-2">
+                            <Button
+                                variant="outline"
+                                onClick={() => setDeleteDialog({ open: false, meterId: null, meterInfo: null })}
+                                disabled={deleting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={handleDeleteMeter} disabled={deleting} className="bg-red-600 hover:bg-red-700">
+                                {deleting ? 'Deleting...' : 'Delete Meter'}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

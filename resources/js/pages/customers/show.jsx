@@ -3,11 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import CustomerMeterForm from '@/pages/forms/customer-meter-form';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertCircle,
@@ -40,9 +40,13 @@ export default function Show({ customer, availableMeters = [] }) {
     const { auth } = page.props;
     const userDepartment = auth.user?.department?.name;
     const isBillingDepartment = userDepartment === 'Billing';
+    const isFinanceDepartment = userDepartment === 'Finance';
 
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const [showMeterModal, setShowMeterModal] = useState(false);
+    const [showAssignMeterModal, setShowAssignMeterModal] = useState(false);
+    const [showManageMeterModal, setShowManageMeterModal] = useState(false);
+    const [selectedMeterId, setSelectedMeterId] = useState('');
+    const [selectedMeterStatus, setSelectedMeterStatus] = useState('');
 
     const getStatusColor = (isActive) => {
         return isActive
@@ -196,31 +200,82 @@ export default function Show({ customer, availableMeters = [] }) {
         }
     };
 
+    const handleDeleteCustomer = () => {
+        router.delete(`/customers/${customer.id}`, {
+            onSuccess: () => {
+                setShowDeleteDialog(false);
+                // Redirect to customers index page after successful deletion
+                router.visit('/customers');
+            },
+            onError: (errors) => {
+                console.error('Error deleting customer:', errors);
+                setShowDeleteDialog(false);
+            },
+        });
+    };
+
+    const handleAssignMeter = () => {
+        if (!selectedMeterId) {
+            return;
+        }
+
+        router.post(
+            `/customers/${customer.id}/assign-meter`,
+            {
+                meter_id: selectedMeterId,
+            },
+            {
+                onSuccess: () => {
+                    setShowAssignMeterModal(false);
+                    setSelectedMeterId('');
+                    // Refresh the page to show the updated meter information
+                    router.reload();
+                },
+                onError: (errors) => {
+                    console.error('Error assigning meter:', errors);
+                },
+            },
+        );
+    };
+
+    const handleUpdateMeterStatus = () => {
+        if (!selectedMeterStatus || !customer.meter) {
+            return;
+        }
+
+        router.post(
+            `/customers/${customer.id}/update-meter-status`,
+            {
+                meter_id: customer.meter.id,
+                status: selectedMeterStatus,
+            },
+            {
+                onSuccess: () => {
+                    setShowManageMeterModal(false);
+                    setSelectedMeterStatus('');
+                    // Refresh the page to show the updated meter information
+                    router.reload();
+                },
+                onError: (errors) => {
+                    console.error('Error updating meter status:', errors);
+                },
+            },
+        );
+    };
+
+    const handleReplaceMeter = () => {
+        setShowManageMeterModal(false);
+        setShowAssignMeterModal(true);
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Customer - ${customer.first_name} ${customer.last_name}`} />
 
             <div className="mb-8">
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-2xl font-bold text-white">
-                            {customer.first_name?.[0]}
-                            {customer.last_name?.[0]}
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                                {customer.first_name} {customer.last_name}
-                            </h1>
-                            <div className="mt-2 flex items-center space-x-4">
-                                <Badge className={getStatusColor(customer.is_active)}>{customer.is_active ? 'Active' : 'Inactive'}</Badge>
-                                {customer.account_number && (
-                                    <span className="text-sm text-slate-600 dark:text-slate-400">Account: #{customer.account_number}</span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
                     <div className="no-print flex space-x-2">
-                        {!isBillingDepartment && (
+                        {!isBillingDepartment && !isFinanceDepartment && (
                             <>
                                 <Link href={`/customers/${customer.id}/edit`}>
                                     <Button variant="outline">
@@ -263,9 +318,42 @@ export default function Show({ customer, availableMeters = [] }) {
                                 </Button>
                             </>
                         )}
-                        <Button onClick={() => setShowMeterModal(true)}>
+                        {isFinanceDepartment && (
+                            <>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline">
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Export Excel
+                                            <ChevronDown className="ml-2 h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem asChild>
+                                            <a href={`/customers/${customer.id}/export`} className="flex items-center">
+                                                <User className="mr-2 h-4 w-4" />
+                                                Export All Data
+                                            </a>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem asChild>
+                                            <a href={`/customers/${customer.id}/export-readings`} className="flex items-center">
+                                                <Activity className="mr-2 h-4 w-4" />
+                                                Export Readings
+                                            </a>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem asChild>
+                                            <a href={`/customers/${customer.id}/export-bills`} className="flex items-center">
+                                                <Receipt className="mr-2 h-4 w-4" />
+                                                Export Bills
+                                            </a>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </>
+                        )}
+                        <Button onClick={() => (customer.meter ? setShowManageMeterModal(true) : setShowAssignMeterModal(true))}>
                             <Plus className="mr-2 h-4 w-4" />
-                            Manage Meters
+                            {customer.meter ? 'Manage Meter' : 'Assign Meter'}
                         </Button>
                         <Button onClick={handlePrint} variant="outline">
                             <Printer className="mr-2 h-4 w-4" />
@@ -438,61 +526,54 @@ export default function Show({ customer, availableMeters = [] }) {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Tabs defaultValue="overview" className="w-full">
-                            <TabsList className="grid h-auto w-full grid-cols-2 bg-slate-100 p-1 md:grid-cols-3 lg:grid-cols-5 dark:bg-slate-800">
-                                <TabsTrigger
-                                    value="overview"
-                                    className="flex flex-col items-center space-y-1 p-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
-                                >
-                                    <Settings className="h-5 w-5" />
-                                    <span className="text-xs font-medium">Overview</span>
-                                </TabsTrigger>
+                        <Tabs defaultValue="meters" className="w-full">
+                            <TabsList className="flex h-auto w-full overflow-x-auto bg-slate-100 p-1 dark:bg-slate-800">
                                 <TabsTrigger
                                     value="meters"
-                                    className="flex flex-col items-center space-y-1 p-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
+                                    className="flex items-center space-x-2 px-4 py-2 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
                                 >
-                                    <Droplets className="h-5 w-5" />
-                                    <span className="text-xs font-medium">Meter</span>
+                                    <Droplets className="h-4 w-4" />
+                                    <span className="text-sm font-medium">Meter</span>
                                     {customer.meter && (
-                                        <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
-                                            {customer.meter.status}
+                                        <Badge variant="secondary" className="h-5 px-1.5 py-0 text-xs">
+                                            {customer.meter?.status || 'Unknown'}
                                         </Badge>
                                     )}
                                 </TabsTrigger>
                                 <TabsTrigger
                                     value="readings"
-                                    className="flex flex-col items-center space-y-1 p-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
+                                    className="flex items-center space-x-2 px-4 py-2 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
                                 >
-                                    <Activity className="h-5 w-5" />
-                                    <span className="text-xs font-medium">Readings</span>
+                                    <Activity className="h-4 w-4" />
+                                    <span className="text-sm font-medium">Readings</span>
                                     {customer.readings?.length > 0 && (
-                                        <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
+                                        <Badge variant="secondary" className="h-5 px-1.5 py-0 text-xs">
                                             {customer.readings.length}
                                         </Badge>
                                     )}
                                 </TabsTrigger>
-                                {!isBillingDepartment && (
+                                {!isBillingDepartment && !isFinanceDepartment && (
                                     <>
                                         <TabsTrigger
                                             value="bills"
-                                            className="flex flex-col items-center space-y-1 p-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
+                                            className="flex items-center space-x-2 px-4 py-2 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
                                         >
-                                            <Receipt className="h-5 w-5" />
-                                            <span className="text-xs font-medium">Bills</span>
+                                            <Receipt className="h-4 w-4" />
+                                            <span className="text-sm font-medium">Bills</span>
                                             {customer.bills?.length > 0 && (
-                                                <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
+                                                <Badge variant="secondary" className="h-5 px-1.5 py-0 text-xs">
                                                     {customer.bills.length}
                                                 </Badge>
                                             )}
                                         </TabsTrigger>
                                         <TabsTrigger
                                             value="invoices"
-                                            className="flex flex-col items-center space-y-1 p-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
+                                            className="flex items-center space-x-2 px-4 py-2 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
                                         >
-                                            <FileText className="h-5 w-5" />
-                                            <span className="text-xs font-medium">Invoices</span>
+                                            <FileText className="h-4 w-4" />
+                                            <span className="text-sm font-medium">Invoices</span>
                                             {customer.invoices?.length > 0 && (
-                                                <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
+                                                <Badge variant="secondary" className="h-5 px-1.5 py-0 text-xs">
                                                     {customer.invoices.length}
                                                 </Badge>
                                             )}
@@ -501,132 +582,17 @@ export default function Show({ customer, availableMeters = [] }) {
                                 )}
                                 <TabsTrigger
                                     value="payments"
-                                    className="flex flex-col items-center space-y-1 p-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
+                                    className="flex items-center space-x-2 px-4 py-2 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
                                 >
-                                    <CreditCard className="h-5 w-5" />
-                                    <span className="text-xs font-medium">Payments</span>
+                                    <CreditCard className="h-4 w-4" />
+                                    <span className="text-sm font-medium">Payments</span>
                                     {customer.payments?.length > 0 && (
-                                        <Badge variant="secondary" className="h-4 px-1 py-0 text-xs">
+                                        <Badge variant="secondary" className="h-5 px-1.5 py-0 text-xs">
                                             {customer.payments.length}
                                         </Badge>
                                     )}
                                 </TabsTrigger>
                             </TabsList>
-
-                            <TabsContent value="overview" className="mt-6 space-y-6">
-                                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                                    {/* Customer Summary */}
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center">
-                                                <User className="mr-2 h-5 w-5" />
-                                                Customer Summary
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium">Account Status</span>
-                                                <Badge className={getStatusColor(customer.is_active)}>
-                                                    {customer.is_active ? 'Active' : 'Inactive'}
-                                                </Badge>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium">Account Number</span>
-                                                <span className="font-mono text-sm">{customer.account_number || 'Not assigned'}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium">Member Since</span>
-                                                <span className="text-sm">
-                                                    {customer.date ? new Date(customer.date).toLocaleDateString() : 'Not provided'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium">Credit Balance</span>
-                                                <span className="font-mono text-sm">${customer.credit || 0}</span>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* Recent Activity */}
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center">
-                                                <Activity className="mr-2 h-5 w-5" />
-                                                Recent Activity
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-3">
-                                                {customer.readings?.length > 0 && (
-                                                    <div className="flex items-center justify-between rounded-lg bg-blue-50 p-2 dark:bg-blue-900/20">
-                                                        <div className="flex items-center space-x-2">
-                                                            <Activity className="h-4 w-4 text-blue-500" />
-                                                            <span className="text-sm">Latest Reading</span>
-                                                        </div>
-                                                        <span className="text-sm font-medium">
-                                                            {customer.readings[customer.readings.length - 1].value} units
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                {customer.payments?.length > 0 && (
-                                                    <div className="flex items-center justify-between rounded-lg bg-green-50 p-2 dark:bg-green-900/20">
-                                                        <div className="flex items-center space-x-2">
-                                                            <CreditCard className="h-4 w-4 text-green-500" />
-                                                            <span className="text-sm">Last Payment</span>
-                                                        </div>
-                                                        <span className="text-sm font-medium">
-                                                            ${customer.payments[customer.payments.length - 1].amount}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                {customer.bills?.length > 0 && (
-                                                    <div className="flex items-center justify-between rounded-lg bg-orange-50 p-2 dark:bg-orange-900/20">
-                                                        <div className="flex items-center space-x-2">
-                                                            <Receipt className="h-4 w-4 text-orange-500" />
-                                                            <span className="text-sm">Latest Bill</span>
-                                                        </div>
-                                                        <span className="text-sm font-medium">
-                                                            ${customer.bills[customer.bills.length - 1].total_amount}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-
-                                {/* Quick Actions */}
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center">
-                                            <Settings className="mr-2 h-5 w-5" />
-                                            Quick Actions
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                                            <Button variant="outline" className="flex h-auto flex-col items-center space-y-2 p-4">
-                                                <Plus className="h-5 w-5" />
-                                                <span className="text-xs">Add Reading</span>
-                                            </Button>
-                                            <Button variant="outline" className="flex h-auto flex-col items-center space-y-2 p-4">
-                                                <Receipt className="h-5 w-5" />
-                                                <span className="text-xs">Generate Bill</span>
-                                            </Button>
-                                            <Button variant="outline" className="flex h-auto flex-col items-center space-y-2 p-4">
-                                                <CreditCard className="h-5 w-5" />
-                                                <span className="text-xs">Record Payment</span>
-                                            </Button>
-                                            <a href={`/customers/${customer.id}/export`}>
-                                                <Button variant="outline" className="flex h-auto w-full flex-col items-center space-y-2 p-4">
-                                                    <Download className="h-5 w-5" />
-                                                    <span className="text-xs">Export Data</span>
-                                                </Button>
-                                            </a>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
 
                             <TabsContent value="meters" className="mt-6 space-y-6">
                                 {customer.meter ? (
@@ -640,12 +606,12 @@ export default function Show({ customer, availableMeters = [] }) {
                                                             <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Meter Status</p>
                                                             <Badge
                                                                 className={
-                                                                    customer.meter.status === 'active'
+                                                                    customer.meter?.status === 'active'
                                                                         ? 'bg-green-100 text-green-800'
                                                                         : 'bg-red-100 text-red-800'
                                                                 }
                                                             >
-                                                                {customer.meter.status || 'Unknown'}
+                                                                {customer.meter?.status || 'Unknown'}
                                                             </Badge>
                                                         </div>
                                                         <Droplets className="h-8 w-8 text-blue-500" />
@@ -659,7 +625,7 @@ export default function Show({ customer, availableMeters = [] }) {
                                                         <div>
                                                             <p className="text-sm font-medium text-green-600 dark:text-green-400">Last Reading</p>
                                                             <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                                                                {customer.meter.readings?.length > 0
+                                                                {customer.meter?.readings?.length > 0
                                                                     ? customer.meter.readings[customer.meter.readings.length - 1].value
                                                                     : 'N/A'}
                                                             </p>
@@ -675,7 +641,7 @@ export default function Show({ customer, availableMeters = [] }) {
                                                         <div>
                                                             <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Total Readings</p>
                                                             <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                                                                {customer.meter.readings?.length || 0}
+                                                                {customer.meter?.readings?.length || 0}
                                                             </p>
                                                         </div>
                                                         <Settings className="h-8 w-8 text-purple-500" />
@@ -700,25 +666,25 @@ export default function Show({ customer, availableMeters = [] }) {
                                                             Serial Number
                                                         </label>
                                                         <p className="rounded bg-slate-100 p-2 font-mono text-sm dark:bg-slate-800">
-                                                            {customer.meter.serial || 'N/A'}
+                                                            {customer.meter?.serial || 'N/A'}
                                                         </p>
                                                     </div>
                                                     <div className="space-y-2">
                                                         <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Model</label>
                                                         <p className="rounded bg-slate-100 p-2 text-sm dark:bg-slate-800">
-                                                            {customer.meter.model || 'N/A'}
+                                                            {customer.meter?.model || 'N/A'}
                                                         </p>
                                                     </div>
                                                     <div className="space-y-2">
                                                         <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Manufacturer</label>
                                                         <p className="rounded bg-slate-100 p-2 text-sm dark:bg-slate-800">
-                                                            {customer.meter.manufactory || 'N/A'}
+                                                            {customer.meter?.manufactory || 'N/A'}
                                                         </p>
                                                     </div>
                                                     <div className="space-y-2">
                                                         <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Size</label>
                                                         <p className="rounded bg-slate-100 p-2 text-sm dark:bg-slate-800">
-                                                            {customer.meter.size || 'N/A'}
+                                                            {customer.meter?.size || 'N/A'}
                                                         </p>
                                                     </div>
                                                     <div className="space-y-2">
@@ -726,12 +692,12 @@ export default function Show({ customer, availableMeters = [] }) {
                                                         <div className="p-2">
                                                             <Badge
                                                                 className={
-                                                                    customer.meter.status === 'active'
+                                                                    customer.meter?.status === 'active'
                                                                         ? 'bg-green-100 text-green-800'
                                                                         : 'bg-red-100 text-red-800'
                                                                 }
                                                             >
-                                                                {customer.meter.status || 'Unknown'}
+                                                                {customer.meter?.status || 'Unknown'}
                                                             </Badge>
                                                         </div>
                                                     </div>
@@ -740,7 +706,7 @@ export default function Show({ customer, availableMeters = [] }) {
                                                             Installation Date
                                                         </label>
                                                         <p className="rounded bg-slate-100 p-2 text-sm dark:bg-slate-800">
-                                                            {customer.meter.created_at
+                                                            {customer.meter?.created_at
                                                                 ? new Date(customer.meter.created_at).toLocaleDateString()
                                                                 : 'N/A'}
                                                         </p>
@@ -749,46 +715,178 @@ export default function Show({ customer, availableMeters = [] }) {
                                             </CardContent>
                                         </Card>
 
-                                        {/* Meter Logs */}
-                                        {customer.meterLogs && customer.meterLogs.length > 0 && (
-                                            <Card>
-                                                <CardHeader>
-                                                    <CardTitle className="flex items-center">
-                                                        <Activity className="mr-2 h-5 w-5" />
-                                                        Meter History
-                                                    </CardTitle>
-                                                    <CardDescription>Meter changes and maintenance logs</CardDescription>
-                                                </CardHeader>
-                                                <CardContent>
-                                                    <Table>
-                                                        <TableHeader>
-                                                            <TableRow>
-                                                                <TableHead>Date</TableHead>
-                                                                <TableHead>Action</TableHead>
-                                                                <TableHead>Old Meter</TableHead>
-                                                                <TableHead>New Meter</TableHead>
-                                                                <TableHead>Performed By</TableHead>
-                                                            </TableRow>
-                                                        </TableHeader>
-                                                        <TableBody>
-                                                            {customer.meterLogs.map((log, index) => (
-                                                                <TableRow key={index}>
-                                                                    <TableCell>
-                                                                        {log.created_at ? new Date(log.created_at).toLocaleDateString() : 'N/A'}
-                                                                    </TableCell>
-                                                                    <TableCell>
-                                                                        <Badge variant="outline">{log.action || 'Unknown'}</Badge>
-                                                                    </TableCell>
-                                                                    <TableCell>{log.oldMeter?.serial || 'N/A'}</TableCell>
-                                                                    <TableCell>{log.newMeter?.serial || 'N/A'}</TableCell>
-                                                                    <TableCell>{log.performedBy?.name || 'N/A'}</TableCell>
-                                                                </TableRow>
-                                                            ))}
-                                                        </TableBody>
-                                                    </Table>
-                                                </CardContent>
-                                            </Card>
-                                        )}
+                                        {/* Meter History */}
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle className="flex items-center">
+                                                    <Activity className="mr-2 h-5 w-5" />
+                                                    Meter History
+                                                </CardTitle>
+                                                <CardDescription>
+                                                    Complete history of meter changes, maintenance, and readings for this customer
+                                                </CardDescription>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {customer.meterLogs && customer.meterLogs.length > 0 ? (
+                                                    <div className="space-y-4">
+                                                        {/* Summary Stats */}
+                                                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                                            <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+                                                                <div className="flex items-center">
+                                                                    <Settings className="h-5 w-5 text-blue-600" />
+                                                                    <div className="ml-2">
+                                                                        <p className="text-sm font-medium text-blue-600">Total Changes</p>
+                                                                        <p className="text-2xl font-bold text-blue-900">
+                                                                            {customer.meterLogs.length}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded-lg bg-green-50 p-4 dark:bg-green-900/20">
+                                                                <div className="flex items-center">
+                                                                    <Droplets className="h-5 w-5 text-green-600" />
+                                                                    <div className="ml-2">
+                                                                        <p className="text-sm font-medium text-green-600">Current Meter</p>
+                                                                        <p className="text-lg font-bold text-green-900">
+                                                                            {customer.meter?.serial || 'N/A'}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded-lg bg-purple-50 p-4 dark:bg-purple-900/20">
+                                                                <div className="flex items-center">
+                                                                    <Calendar className="h-5 w-5 text-purple-600" />
+                                                                    <div className="ml-2">
+                                                                        <p className="text-sm font-medium text-purple-600">Last Change</p>
+                                                                        <p className="text-sm font-bold text-purple-900">
+                                                                            {customer.meterLogs.length > 0
+                                                                                ? new Date(customer.meterLogs[0].created_at).toLocaleDateString()
+                                                                                : 'N/A'}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* History Timeline */}
+                                                        <div className="space-y-3">
+                                                            <h4 className="text-lg font-semibold">Timeline</h4>
+                                                            <div className="space-y-2">
+                                                                {customer.meterLogs
+                                                                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                                                                    .map((log, index) => (
+                                                                        <div
+                                                                            key={index}
+                                                                            className="flex items-start space-x-3 rounded-lg border p-4 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                                                        >
+                                                                            <div className="flex-shrink-0">
+                                                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+                                                                                    <Settings className="h-4 w-4 text-blue-600" />
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <div className="flex items-center justify-between">
+                                                                                    <h5 className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                                                                                        {log.action || 'Meter Change'}
+                                                                                    </h5>
+                                                                                    <time className="text-xs text-slate-500 dark:text-slate-400">
+                                                                                        {log.created_at
+                                                                                            ? new Date(log.created_at).toLocaleDateString()
+                                                                                            : 'N/A'}
+                                                                                    </time>
+                                                                                </div>
+                                                                                <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                                                    {log.oldMeter && (
+                                                                                        <div className="text-sm">
+                                                                                            <span className="font-medium text-slate-600 dark:text-slate-400">
+                                                                                                From:
+                                                                                            </span>
+                                                                                            <span className="ml-1 font-mono">
+                                                                                                {log.oldMeter.serial}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                    {log.newMeter && (
+                                                                                        <div className="text-sm">
+                                                                                            <span className="font-medium text-slate-600 dark:text-slate-400">
+                                                                                                To:
+                                                                                            </span>
+                                                                                            <span className="ml-1 font-mono">
+                                                                                                {log.newMeter.serial}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                                {log.performedBy && (
+                                                                                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                                                        Performed by: {log.performedBy.name}
+                                                                                    </div>
+                                                                                )}
+                                                                                {log.note && (
+                                                                                    <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                                                                        <span className="font-medium">Note:</span> {log.note}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Detailed Table View */}
+                                                        <div className="mt-6">
+                                                            <h4 className="mb-4 text-lg font-semibold">Detailed History</h4>
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow>
+                                                                        <TableHead>Date</TableHead>
+                                                                        <TableHead>Action</TableHead>
+                                                                        <TableHead>Old Meter</TableHead>
+                                                                        <TableHead>New Meter</TableHead>
+                                                                        <TableHead>Performed By</TableHead>
+                                                                        <TableHead>Notes</TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {customer.meterLogs
+                                                                        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                                                                        .map((log, index) => (
+                                                                            <TableRow key={index}>
+                                                                                <TableCell>
+                                                                                    {log.created_at
+                                                                                        ? new Date(log.created_at).toLocaleDateString()
+                                                                                        : 'N/A'}
+                                                                                </TableCell>
+                                                                                <TableCell>
+                                                                                    <Badge variant="outline">{log.action || 'Unknown'}</Badge>
+                                                                                </TableCell>
+                                                                                <TableCell className="font-mono">
+                                                                                    {log.oldMeter?.serial || 'N/A'}
+                                                                                </TableCell>
+                                                                                <TableCell className="font-mono">
+                                                                                    {log.newMeter?.serial || 'N/A'}
+                                                                                </TableCell>
+                                                                                <TableCell>{log.performedBy?.name || 'N/A'}</TableCell>
+                                                                                <TableCell className="max-w-xs truncate">{log.note || '-'}</TableCell>
+                                                                            </TableRow>
+                                                                        ))}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="py-8 text-center">
+                                                        <Activity className="mx-auto h-12 w-12 text-slate-400" />
+                                                        <h3 className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+                                                            No meter history
+                                                        </h3>
+                                                        <p className="mt-1 text-sm text-slate-500">
+                                                            No meter changes or maintenance records found for this customer.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
                                     </div>
                                 ) : (
                                     <div className="py-8 text-center">
@@ -867,7 +965,7 @@ export default function Show({ customer, availableMeters = [] }) {
                                 )}
                             </TabsContent>
 
-                            {!isBillingDepartment && (
+                            {!isBillingDepartment && !isFinanceDepartment && (
                                 <>
                                     <TabsContent value="bills" className="mt-6 space-y-4">
                                         {customer.bills && customer.bills.length > 0 ? (
@@ -1103,28 +1201,229 @@ export default function Show({ customer, availableMeters = [] }) {
                 </Card>
             </div>
 
-            {/* Meter Management Modal */}
-            <Dialog open={showMeterModal} onOpenChange={setShowMeterModal} className="no-print">
-                <DialogContent className="max-w-2xl">
+            {/* Assign Meter Modal */}
+            <Dialog open={showAssignMeterModal} onOpenChange={setShowAssignMeterModal} className="no-print">
+                <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center">
-                            <Droplets className="mr-2 h-5 w-5" />
-                            Manage Customer Meter
+                            <Plus className="mr-2 h-5 w-5" />
+                            Assign Meter to Customer
                         </DialogTitle>
                         <DialogDescription>
-                            Assign or change the meter for {customer.first_name} {customer.last_name}
+                            Assign a meter to {customer.first_name} {customer.last_name}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-4">
-                        <CustomerMeterForm
-                            customer={customer}
-                            availableMeters={availableMeters}
-                            onSuccess={() => {
-                                setShowMeterModal(false);
-                                // Refresh the page to show updated meter information
-                                window.location.reload();
-                            }}
-                        />
+                        <div className="space-y-6">
+                            {/* Meter Selection */}
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Select Available Meter</label>
+                                    {availableMeters && availableMeters.length > 0 ? (
+                                        <Select value={selectedMeterId} onValueChange={setSelectedMeterId}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Choose a meter to assign..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {availableMeters.map((meter) => (
+                                                    <SelectItem key={meter.id} value={meter.id.toString()}>
+                                                        <div className="flex w-full items-center justify-between">
+                                                            <div className="flex items-center space-x-2">
+                                                                <Droplets className="h-4 w-4 text-green-600" />
+                                                                <div>
+                                                                    <div className="font-medium">{meter.serial}</div>
+                                                                    <div className="text-xs text-slate-500">
+                                                                        {meter.model} - {meter.manufactory}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center space-x-1">
+                                                                <div
+                                                                    className={`h-2 w-2 rounded-full ${
+                                                                        meter.status === 'active'
+                                                                            ? 'bg-green-500'
+                                                                            : meter.status === 'inactive'
+                                                                              ? 'bg-red-500'
+                                                                              : meter.status === 'maintenance'
+                                                                                ? 'bg-yellow-500'
+                                                                                : meter.status === 'damaged'
+                                                                                  ? 'bg-orange-500'
+                                                                                  : 'bg-gray-500'
+                                                                    }`}
+                                                                ></div>
+                                                                <span className="text-xs text-slate-600 capitalize">{meter.status || 'Unknown'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <div className="py-8 text-center">
+                                            <AlertCircle className="mx-auto h-8 w-8 text-slate-400" />
+                                            <p className="mt-2 text-sm text-slate-500">No available meters found</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex justify-end space-x-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setShowAssignMeterModal(false);
+                                        setSelectedMeterId('');
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button onClick={handleAssignMeter} disabled={!selectedMeterId} className="bg-green-600 hover:bg-green-700">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Assign Meter
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Manage Meter Modal */}
+            <Dialog open={showManageMeterModal} onOpenChange={setShowManageMeterModal} className="no-print">
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center">
+                            <Settings className="mr-2 h-5 w-5" />
+                            Manage Customer Meter
+                        </DialogTitle>
+                        <DialogDescription>
+                            Manage the current meter for {customer.first_name} {customer.last_name}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-4">
+                        <div className="space-y-6">
+                            {/* Current Meter Info */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center text-lg">
+                                        <Droplets className="mr-2 h-5 w-5" />
+                                        Current Meter
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Serial Number</label>
+                                            <p className="rounded bg-slate-100 p-2 font-mono text-sm dark:bg-slate-800">
+                                                {customer.meter?.serial || 'N/A'}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Model</label>
+                                            <p className="rounded bg-slate-100 p-2 text-sm dark:bg-slate-800">{customer.meter?.model || 'N/A'}</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Status</label>
+                                            <Select
+                                                value={selectedMeterStatus || customer.meter?.status || ''}
+                                                onValueChange={setSelectedMeterStatus}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Select meter status..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="active">
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                                                            <span>Active</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                    <SelectItem value="inactive">
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                                                            <span>Inactive</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                    <SelectItem value="maintenance">
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
+                                                            <span>Maintenance</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                    <SelectItem value="damaged">
+                                                        <div className="flex items-center space-x-2">
+                                                            <div className="h-2 w-2 rounded-full bg-orange-500"></div>
+                                                            <span>Damaged</span>
+                                                        </div>
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Action Buttons */}
+                            <div className="flex justify-between">
+                                <Button variant="outline" onClick={handleReplaceMeter} className="bg-orange-600 text-white hover:bg-orange-700">
+                                    <Settings className="mr-2 h-4 w-4" />
+                                    Replace Meter
+                                </Button>
+                                <div className="flex space-x-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => {
+                                            setShowManageMeterModal(false);
+                                            setSelectedMeterStatus('');
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        onClick={handleUpdateMeterStatus}
+                                        disabled={!selectedMeterStatus || selectedMeterStatus === customer.meter?.status}
+                                        className="bg-blue-600 hover:bg-blue-700"
+                                    >
+                                        <Settings className="mr-2 h-4 w-4" />
+                                        Update Status
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} className="no-print">
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center text-red-600">
+                            <AlertCircle className="mr-2 h-5 w-5" />
+                            Delete Customer
+                        </DialogTitle>
+                        <DialogDescription className="text-base">
+                            Are you sure you want to delete{' '}
+                            <strong>
+                                {customer.first_name} {customer.last_name}
+                            </strong>
+                            ? This action cannot be undone and will permanently remove all customer data including:
+                            <ul className="mt-2 list-inside list-disc space-y-1 text-sm">
+                                <li>Customer profile information</li>
+                                <li>Meter readings and history</li>
+                                <li>Bills and invoices</li>
+                                <li>Payment records</li>
+                            </ul>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-6 flex justify-end space-x-2">
+                        <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleDeleteCustomer} className="bg-red-600 hover:bg-red-700">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Customer
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>

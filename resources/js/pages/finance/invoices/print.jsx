@@ -134,29 +134,6 @@ export default function InvoicePrint({ invoice }) {
                     </div>
                 </div>
 
-                {/* Payment History */}
-                {invoice?.payments && invoice.payments.length > 0 && (
-                    <div className="mb-6">
-                        <h3 className="mb-3 text-sm font-semibold">PAYMENT HISTORY</h3>
-                        <div className="space-y-2">
-                            {invoice.payments.map((payment) => (
-                                <div key={payment.id} className="flex items-center justify-between rounded bg-gray-50 p-2 text-sm">
-                                    <div>
-                                        <div className="font-medium">{formatCurrency(payment.amount_paid)}</div>
-                                        <div className="text-xs text-gray-600">
-                                            {payment.payment_date ? formatDateLong(payment.payment_date) : '—'}
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-xs font-medium capitalize">{String(payment.payment_method || '').replace('_', ' ')}</div>
-                                        <div className="text-xs text-gray-600">{payment.reference_number || '—'}</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {/* Footer */}
                 <div className="mb-6 flex items-center justify-between text-sm">
                     <div>

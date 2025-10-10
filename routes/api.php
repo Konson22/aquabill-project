@@ -69,6 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/token/refresh', [ApiAuthController::class, 'refresh']);
     
     Route::get('/customers', [ApiCustomerController::class, 'index']);
+    Route::post('/customers/{customer}/assign-meter', [ApiCustomerController::class, 'assignMeter']);
     Route::post('/readings', [ApiReadingController::class, 'store']);
 });
 

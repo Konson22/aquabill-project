@@ -1,5 +1,18 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Activity, Calculator, ChevronLeft, ChevronRight, DollarSign, Droplets, Home, UserCheck, Users } from 'lucide-react';
+import {
+    Activity,
+    Calculator,
+    ChevronLeft,
+    ChevronRight,
+    CreditCard,
+    DollarSign,
+    Droplets,
+    FileText,
+    Home,
+    Receipt,
+    UserCheck,
+    Users,
+} from 'lucide-react';
 import { useState } from 'react';
 
 const allNavItems = [
@@ -8,7 +21,6 @@ const allNavItems = [
         href: '/',
         icon: Home,
         description: 'Overview and analytics',
-        badge: 'New',
         key: 'dashboard',
     },
     {
@@ -26,6 +38,27 @@ const allNavItems = [
         key: 'finance',
     },
     {
+        title: 'Bills',
+        href: '/billing',
+        icon: FileText,
+        description: 'Water bill management',
+        key: 'bills',
+    },
+    {
+        title: 'Invoices',
+        href: '/invoices',
+        icon: Receipt,
+        description: 'Invoice management',
+        key: 'invoices',
+    },
+    {
+        title: 'Payments',
+        href: '/payments',
+        icon: CreditCard,
+        description: 'Payment processing',
+        key: 'payments',
+    },
+    {
         title: 'Meters',
         href: '/meters',
         icon: Droplets,
@@ -40,14 +73,14 @@ const allNavItems = [
         key: 'readings',
     },
     {
-        title: 'Categories & Tariffs',
+        title: 'Tariffs',
         href: '/categories',
         icon: Calculator,
         description: 'Pricing structures',
         key: 'tariffs',
     },
     {
-        title: 'Users Management',
+        title: 'Users',
         href: '/users',
         icon: UserCheck,
         description: 'User management',
@@ -74,11 +107,13 @@ export function AppSidebar({ onCollapseChange }) {
         if (item.key === 'dashboard') return true;
 
         // For Billing department, hide Finance, Categories & Tariffs, and Users Management
+        // But show Bills, Invoices, and Payments
         if (userDepartment === 'Billing') {
             if (item.key === 'finance' || item.key === 'tariffs' || item.key === 'users') return false;
         }
 
         // For Finance department, hide Users Management
+        // Show all financial items including Bills, Invoices, and Payments
         if (userDepartment === 'Finance') {
             if (item.key === 'users') return false;
         }
@@ -98,7 +133,7 @@ export function AppSidebar({ onCollapseChange }) {
     return (
         <div
             className={`fixed top-0 left-0 z-[60] h-screen overflow-hidden bg-gradient-to-b from-[#2975a1] to-[#1e3a5f] text-white shadow-xl transition-all duration-300 ease-in-out ${
-                isCollapsed ? 'w-16' : 'w-64'
+                isCollapsed ? 'w-16' : 'w-48'
             }`}
         >
             {/* Header */}
@@ -121,7 +156,7 @@ export function AppSidebar({ onCollapseChange }) {
             </div>
 
             {/* Navigation Items - Fixed height container */}
-            <nav className="h-[calc(100vh-8rem)] overflow-hidden px-2">
+            <nav className="h-[calc(100vh-4rem)] overflow-hidden px-2">
                 <div className="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-[#3d6b9a]/50 hover:scrollbar-thumb-[#3d6b9a]/70 h-full overflow-y-auto">
                     <div className="py-4">
                         {filteredNavItems.map((item) => {
@@ -136,7 +171,7 @@ export function AppSidebar({ onCollapseChange }) {
                                 >
                                     <Link
                                         href={item.href}
-                                        className={`group flex items-center rounded-lg px-3 py-3 transition-all duration-200 ${
+                                        className={`group flex items-center rounded-lg px-3 py-2 transition-all duration-200 ${
                                             isActive
                                                 ? 'scale-[1.02] transform border border-[#3d6b9a] bg-gradient-to-r from-[#2975a1] to-[#2d5a8a] text-white shadow-lg ring-2 ring-[#b3d9f2]'
                                                 : 'text-[#e8f4fd] hover:bg-[#b3d9f2] hover:text-[#1e3a5f] hover:shadow-md'
@@ -177,13 +212,6 @@ export function AppSidebar({ onCollapseChange }) {
                     </div>
                 </div>
             </nav>
-
-            {/* Footer */}
-            {!isCollapsed && (
-                <div className="absolute right-0 bottom-0 left-0 border-t border-[#3d6b9a]/50 bg-[#2975a1]/90 p-4 backdrop-blur-sm">
-                    <div className="text-center text-xs text-[#e8f4fd]">Water Billing System</div>
-                </div>
-            )}
         </div>
     );
 }

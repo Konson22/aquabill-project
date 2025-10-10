@@ -56,8 +56,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/readings/statistics', [MeterReadingController::class, 'statistics'])->name('readings.statistics');
     
     // Core Billing System
-    // Invoice print route
+    // Invoice print routes
     Route::get('/invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
+    Route::get('/invoices/print-multiple', [InvoiceController::class, 'printMultiple'])->name('invoices.print-multiple');
 
     // Apply department restrictions to core resources
     Route::middleware(['department.restriction'])->group(function () {
@@ -83,6 +84,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/customers/{customer}/export-bills', [CustomerController::class, 'exportBills'])->name('customers.export-bills');
     Route::get('/customers/{customer}/export-readings', [CustomerController::class, 'exportReadings'])->name('customers.export-readings');
     Route::get('/customers/{customer}/export', [CustomerController::class, 'exportCustomer'])->name('customers.export');
+    Route::post('/customers/{customer}/assign-meter', [CustomerController::class, 'assignMeter'])->name('customers.assign-meter');
+    Route::post('/customers/{customer}/update-meter-status', [CustomerController::class, 'updateMeterStatus'])->name('customers.update-meter-status');
 
     // Additional MeterLog routes
     Route::get('/customers/{customer}/meter-logs', [MeterLogController::class, 'customerLogs'])->name('meter-logs.customer');

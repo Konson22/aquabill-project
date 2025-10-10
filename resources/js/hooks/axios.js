@@ -4,13 +4,8 @@ const token = sessionStorage.getItem('etixss_token');
 
 // Get API base URL from environment variables
 const getApiBaseUrl = () => {
-    // For development
-    if (__DEV__) {
-        return 'http://10.103.26.43'; // Your working dev IP without port
-    }
-    
     // For production builds (EAS)
-    return process.env.EXPO_PUBLIC_API_URL || 'https://your-production-domain.com';
+    return 'https://10.115.154.43';
 };
 
 // Enable credentials for CSRF and sessions

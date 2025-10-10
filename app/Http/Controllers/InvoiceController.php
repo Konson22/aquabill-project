@@ -141,6 +141,31 @@ class InvoiceController extends Controller
     }
 
     /**
+     * Print multiple invoices.
+     */
+    public function printMultiple(Request $request)
+    {
+        $ids = $request->get('ids');
+        
+        if (!$ids) {
+            return redirect()->route('invoices.index')->with('error', 'No invoices selected for printing.');
+        }
+
+        $invoiceIds = explode(',', $ids);
+        $invoices = Invoice::with(['customer', 'meter', 'payments'])
+            ->whereIn('id', $invoiceIds)
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return redirect()->route('invoices.index')->with('error', 'No invoices found for printing.');
+        }
+
+        return Inertia::render('finance/invoices/print-multiple', [
+            'invoices' => $invoices
+        ]);
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(Invoice $invoice)
