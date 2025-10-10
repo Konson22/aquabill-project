@@ -216,7 +216,7 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
 
                                 {/* Account Fields */}
                                 <div className="space-y-2">
-                                    <Label htmlFor="contract">Contract Number</Label>
+                                    <Label htmlFor="contract">Contract Number (Optional)</Label>
                                     <Input
                                         id="contract"
                                         value={data.contract}
@@ -338,7 +338,7 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                 {/* Location Details */}
                                 <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="plot_number">Plot Number</Label>
+                                        <Label htmlFor="plot_number">Plot Number (Optional)</Label>
                                         <Input
                                             id="plot_number"
                                             value={data.plot_number}

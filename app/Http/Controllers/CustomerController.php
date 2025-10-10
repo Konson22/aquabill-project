@@ -56,7 +56,7 @@ class CustomerController extends Controller
             'account_number' => 'nullable|string|max:255|unique:customers',
             'is_active' => 'nullable|boolean',
             'meter_id' => 'nullable|exists:meters,id',
-            'plot_number' => 'required|string|max:20',
+            'plot_number' => 'nullable|string|max:20',
             'address' => 'required|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -79,7 +79,13 @@ class CustomerController extends Controller
         }
 
         // Generate account number if not provided
-        $accountNumber = $request->input('account_number') ?: 'ACC' . str_pad(Customer::count() + 1, 5, '0', STR_PAD_LEFT);
+        $accountNumber = $request->input('account_number');
+        if (!$accountNumber) {
+            do {
+                $nextNumber = Customer::max('id') + 1;
+                $accountNumber = 'ACC' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
+            } while (Customer::where('account_number', $accountNumber)->exists());
+        }
 
         $neighborhoodId = $request->input('neighborhood_id');
 
@@ -304,7 +310,7 @@ class CustomerController extends Controller
             'meter_id' => 'nullable|exists:meters,id',
             'account_number' => 'nullable|string|max:255|unique:customers,account_number,' . $id,
             'is_active' => 'nullable|boolean',
-            'plot_number' => 'required|string|max:20',
+            'plot_number' => 'nullable|string|max:20',
             'address' => 'required|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
