@@ -15,18 +15,7 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             RoleSeeder::class,
             UserSeeder::class,
-            NeighborhoodSeeder::class,
-            CategorySeeder::class,
             MeterSeeder::class,
-            CustomerSeeder::class,
-            SupplierSeeder::class,
-            InventoryItemSeeder::class,
-            VehicleSeeder::class,
-            ChargeSeeder::class,
-            MeterReadingSeeder::class,
-            BillSeeder::class,
-            InvoiceSeeder::class,
-            PaymentSeeder::class,
         ]);
     }
 }
