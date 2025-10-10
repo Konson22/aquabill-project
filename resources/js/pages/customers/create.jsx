@@ -7,8 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, FileText, MapPin, Save, User } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, FileText, MapPin, Save, User, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 const breadcrumbs = [
     {
@@ -23,6 +23,66 @@ const breadcrumbs = [
 
 export default function CreateCustomer({ areas, meters, categories, neighborhoods, errors = {} }) {
     const [createNewNeighborhood, setCreateNewNeighborhood] = useState(false);
+    const [meterSearch, setMeterSearch] = useState('');
+    const [showMeterDropdown, setShowMeterDropdown] = useState(false);
+    const [filteredMeters, setFilteredMeters] = useState(meters);
+    const [selectedMeter, setSelectedMeter] = useState(null);
+    const meterDropdownRef = useRef(null);
+
+    // Filter meters based on search
+    useEffect(() => {
+        if (meterSearch.trim() === '') {
+            setFilteredMeters(meters);
+        } else {
+            const filtered = meters.filter(
+                (meter) =>
+                    (meter.serial && meter.serial.toLowerCase().includes(meterSearch.toLowerCase())) ||
+                    (meter.meter_number && meter.meter_number.toLowerCase().includes(meterSearch.toLowerCase())) ||
+                    (meter.model && meter.model.toLowerCase().includes(meterSearch.toLowerCase())),
+            );
+            setFilteredMeters(filtered);
+        }
+    }, [meterSearch, meters]);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (meterDropdownRef.current && !meterDropdownRef.current.contains(event.target)) {
+                setShowMeterDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    // Handle meter selection
+    const handleMeterSelect = (meter) => {
+        setSelectedMeter(meter);
+        setData('meter_id', meter.id);
+        setMeterSearch(meter.serial || meter.meter_number || `Meter #${meter.id}`);
+        setShowMeterDropdown(false);
+    };
+
+    // Handle meter search input
+    const handleMeterSearch = (value) => {
+        setMeterSearch(value);
+        setShowMeterDropdown(true);
+        if (value === '') {
+            setSelectedMeter(null);
+            setData('meter_id', '');
+        }
+    };
+
+    // Clear meter selection
+    const clearMeterSelection = () => {
+        setSelectedMeter(null);
+        setData('meter_id', '');
+        setMeterSearch('');
+        setShowMeterDropdown(false);
+    };
 
     const { data, setData, post, processing, reset } = useForm({
         // Customer fields
@@ -43,7 +103,7 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
         latitude: '',
         longitude: '',
 
-        // Neighborhood fields
+        // Zone fields
         neighborhood_id: '',
         new_neighborhood_name: '',
 
@@ -57,9 +117,9 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Validate that at least one neighborhood option is provided
+        // Validate that at least one zone option is provided
         if (!data.neighborhood_id && !data.new_neighborhood_name.trim()) {
-            alert('Please either select an existing neighborhood or add a new one.');
+            alert('Please either select an existing zone or add a new one.');
             return;
         }
 
@@ -207,22 +267,51 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                 {/* Meter Assignment */}
                                 <div className="space-y-2">
                                     <Label htmlFor="meter_id">Meter Assignment (Optional)</Label>
-                                    <Select
-                                        value={data.meter_id || 'none'}
-                                        onValueChange={(value) => setData('meter_id', value === 'none' ? '' : value)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select meter (optional)" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">No Meter Assigned</SelectItem>
-                                            {meters.map((meter) => (
-                                                <SelectItem key={meter.id} value={meter.id.toString()}>
-                                                    {meter.serial || meter.meter_number} - {meter.model || 'Unknown Model'}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <div className="relative" ref={meterDropdownRef}>
+                                        <div className="relative">
+                                            <Input
+                                                id="meter_id"
+                                                value={meterSearch}
+                                                onChange={(e) => handleMeterSearch(e.target.value)}
+                                                onFocus={() => setShowMeterDropdown(true)}
+                                                placeholder="Search meters by serial, number, or model..."
+                                            />
+                                            {selectedMeter && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="absolute top-1/2 right-1 h-6 w-6 -translate-y-1/2 p-0 hover:bg-slate-100"
+                                                    onClick={clearMeterSelection}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {showMeterDropdown && (
+                                            <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                                                {filteredMeters.length > 0 ? (
+                                                    filteredMeters.map((meter) => (
+                                                        <div
+                                                            key={meter.id}
+                                                            className="cursor-pointer px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                                                            onClick={() => handleMeterSelect(meter)}
+                                                        >
+                                                            <div className="font-medium">
+                                                                {meter.serial || meter.meter_number || `Meter #${meter.id}`}
+                                                            </div>
+                                                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                                                {meter.model || 'Unknown Model'} - Status: {meter.status || 'Unknown'}
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400">No meters found</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                     {errors.meter_id && <InputError message={errors.meter_id} />}
                                 </div>
 
@@ -297,18 +386,18 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                         </div>
                                     </div>
 
-                                    {/* Neighborhood Selection */}
+                                    {/* Zone Selection */}
                                     <div className="space-y-3">
-                                        <Label>Neighborhood *</Label>
-                                        <p className="text-sm text-slate-600 dark:text-slate-400">Select an existing neighborhood or add a new one</p>
+                                        <Label>Zone *</Label>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Select an existing zone or add a new one</p>
 
-                                        {/* Neighborhood Select */}
+                                        {/* Zone Select */}
                                         <div className="space-y-2">
                                             <Select
                                                 value={data.neighborhood_id || 'none'}
                                                 onValueChange={(value) => {
                                                     setData('neighborhood_id', value === 'none' ? '' : value);
-                                                    // Clear new neighborhood name when selecting existing
+                                                    // Clear new zone name when selecting existing
                                                     if (value !== 'none') {
                                                         setData('new_neighborhood_name', '');
                                                         setCreateNewNeighborhood(false);
@@ -316,10 +405,10 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                                 }}
                                             >
                                                 <SelectTrigger>
-                                                    <SelectValue placeholder="Choose existing neighborhood" />
+                                                    <SelectValue placeholder="Choose existing zone" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="none">No Neighborhood Selected</SelectItem>
+                                                    <SelectItem value="none">No Zone Selected</SelectItem>
                                                     {neighborhoods.map((neighborhood) => (
                                                         <SelectItem key={neighborhood.id} value={neighborhood.id.toString()}>
                                                             {neighborhood.name}
@@ -330,7 +419,7 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                             {errors.neighborhood_id && <InputError message={errors.neighborhood_id} />}
                                         </div>
 
-                                        {/* Add New Neighborhood Button */}
+                                        {/* Add New Zone Button */}
                                         <div className="flex items-center space-x-2">
                                             <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
                                             <span className="text-sm text-slate-500 dark:text-slate-400">OR</span>
@@ -343,25 +432,25 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                             size="sm"
                                             onClick={() => {
                                                 setCreateNewNeighborhood(!createNewNeighborhood);
-                                                // Clear existing neighborhood selection when adding new
+                                                // Clear existing zone selection when adding new
                                                 if (!createNewNeighborhood) {
                                                     setData('neighborhood_id', '');
                                                 }
                                             }}
                                             className="w-full"
                                         >
-                                            {createNewNeighborhood ? 'Cancel Adding New' : 'Add New Neighborhood'}
+                                            {createNewNeighborhood ? 'Cancel Adding New' : 'Add New Zone'}
                                         </Button>
 
-                                        {/* New Neighborhood Field */}
+                                        {/* New Zone Field */}
                                         {createNewNeighborhood && (
                                             <div className="space-y-2">
-                                                <Label htmlFor="new_neighborhood_name">New Neighborhood Name *</Label>
+                                                <Label htmlFor="new_neighborhood_name">New Zone Name *</Label>
                                                 <Input
                                                     id="new_neighborhood_name"
                                                     value={data.new_neighborhood_name}
                                                     onChange={(e) => setData('new_neighborhood_name', e.target.value)}
-                                                    placeholder="Enter new neighborhood name"
+                                                    placeholder="Enter new zone name"
                                                 />
                                                 {errors.new_neighborhood_name && <InputError message={errors.new_neighborhood_name} />}
                                             </div>

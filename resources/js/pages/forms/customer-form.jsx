@@ -31,7 +31,7 @@ export default function CustomerForm({ customer = null, categories = [], neighbo
         latitude: customer?.latitude || '',
         longitude: customer?.longitude || '',
 
-        // Neighborhood fields
+        // Zone fields
         neighborhood_id: customer?.neighborhood_id || '',
         new_neighborhood_name: '',
 
@@ -276,18 +276,18 @@ export default function CustomerForm({ customer = null, categories = [], neighbo
                                     </div>
                                 </div>
 
-                                {/* Neighborhood Selection */}
+                                {/* Zone Selection */}
                                 <div className="space-y-3">
-                                    <Label>Neighborhood *</Label>
-                                    <p className="text-sm text-slate-600 dark:text-slate-400">Select an existing neighborhood or add a new one</p>
+                                    <Label>Zone *</Label>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400">Select an existing zone or add a new one</p>
 
-                                    {/* Neighborhood Select */}
+                                    {/* Zone Select */}
                                     <div className="space-y-2">
                                         <Select
                                             value={data.neighborhood_id || 'none'}
                                             onValueChange={(value) => {
                                                 setData('neighborhood_id', value === 'none' ? '' : value);
-                                                // Clear new neighborhood name when selecting existing
+                                                // Clear new zone name when selecting existing
                                                 if (value !== 'none') {
                                                     setData('new_neighborhood_name', '');
                                                     setCreateNewNeighborhood(false);
@@ -295,10 +295,10 @@ export default function CustomerForm({ customer = null, categories = [], neighbo
                                             }}
                                         >
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Choose existing neighborhood" />
+                                                <SelectValue placeholder="Choose existing zone" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="none">No Neighborhood Selected</SelectItem>
+                                                <SelectItem value="none">No Zone Selected</SelectItem>
                                                 {neighborhoods.map((neighborhood) => (
                                                     <SelectItem key={neighborhood.id} value={neighborhood.id.toString()}>
                                                         {neighborhood.name}
@@ -309,7 +309,7 @@ export default function CustomerForm({ customer = null, categories = [], neighbo
                                         {errors.neighborhood_id && <InputError message={errors.neighborhood_id} />}
                                     </div>
 
-                                    {/* Add New Neighborhood Button */}
+                                    {/* Add New Zone Button */}
                                     <div className="flex items-center space-x-2">
                                         <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
                                         <span className="text-sm text-slate-500 dark:text-slate-400">OR</span>
@@ -322,25 +322,25 @@ export default function CustomerForm({ customer = null, categories = [], neighbo
                                         size="sm"
                                         onClick={() => {
                                             setCreateNewNeighborhood(!createNewNeighborhood);
-                                            // Clear existing neighborhood selection when adding new
+                                            // Clear existing zone selection when adding new
                                             if (!createNewNeighborhood) {
                                                 setData('neighborhood_id', '');
                                             }
                                         }}
                                         className="w-full"
                                     >
-                                        {createNewNeighborhood ? 'Cancel Adding New' : 'Add New Neighborhood'}
+                                        {createNewNeighborhood ? 'Cancel Adding New' : 'Add New Zone'}
                                     </Button>
 
-                                    {/* New Neighborhood Field */}
+                                    {/* New Zone Field */}
                                     {createNewNeighborhood && (
                                         <div className="space-y-2">
-                                            <Label htmlFor="new_neighborhood_name">New Neighborhood Name *</Label>
+                                            <Label htmlFor="new_neighborhood_name">New Zone Name *</Label>
                                             <Input
                                                 id="new_neighborhood_name"
                                                 value={data.new_neighborhood_name}
                                                 onChange={(e) => setData('new_neighborhood_name', e.target.value)}
-                                                placeholder="Enter new neighborhood name"
+                                                placeholder="Enter new zone name"
                                             />
                                             {errors.new_neighborhood_name && <InputError message={errors.new_neighborhood_name} />}
                                         </div>
