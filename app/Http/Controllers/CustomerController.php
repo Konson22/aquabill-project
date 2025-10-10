@@ -278,7 +278,7 @@ class CustomerController extends Controller
                 'new_meter_id' => $newMeterId,
                 'action_type' => $actionType,
                 'reason' => $reason,
-                'effective_date' => now(),
+                'effective_date' => today(),
                 'performed_by' => auth()->id(),
                 'notes' => $notes,
                 'old_meter_data' => $oldMeterId ? \App\Models\Meter::find($oldMeterId)?->toArray() : null,
@@ -780,7 +780,7 @@ public function exportReadings(Customer $customer)
 
         $oldMeter = $customer->meter;
         $newMeter = Meter::find($request->meter_id);
-        $actionType = $oldMeter ? 'replacement' : 'assignment';
+        $actionType = $oldMeter ? 'meter_replacement' : 'initial_assignment';
 
         // If customer already has a meter, set it to inactive
         if ($oldMeter) {
@@ -802,8 +802,8 @@ public function exportReadings(Customer $customer)
             'new_meter_id' => $newMeter->id,
             'action_type' => $actionType,
             'reason' => $request->input('reason', 'Meter ' . $actionType),
-            'effective_date' => now(),
-            'installation_date' => now(),
+            'effective_date' => today(),
+            'installation_date' => today(),
             'performed_by' => auth()->id(),
             'old_meter_data' => $oldMeter ? [
                 'serial' => $oldMeter->serial,
