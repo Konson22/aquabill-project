@@ -81,17 +81,18 @@ class CustomerController extends Controller
         // Generate account number if not provided
         $accountNumber = $request->input('account_number');
         if (!$accountNumber) {
-            // Find the highest existing account number and increment it
-            $lastAccountNumber = Customer::where('account_number', 'like', 'ACC%')
-                ->orderBy('account_number', 'desc')
-                ->value('account_number');
+            // Use a more robust approach: find the highest numeric part of existing account numbers
+            $existingNumbers = Customer::where('account_number', 'like', 'ACC%')
+                ->pluck('account_number')
+                ->map(function($accNum) {
+                    return (int) substr($accNum, 3);
+                })
+                ->filter()
+                ->toArray();
             
-            if ($lastAccountNumber) {
-                // Extract the number part and increment it
-                $lastNumber = (int) substr($lastAccountNumber, 3);
-                $nextNumber = $lastNumber + 1;
+            if (!empty($existingNumbers)) {
+                $nextNumber = max($existingNumbers) + 1;
             } else {
-                // If no account numbers exist, start from 1
                 $nextNumber = 1;
             }
             
@@ -100,6 +101,13 @@ class CustomerController extends Controller
                 $accountNumber = 'ACC' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
                 $nextNumber++;
             } while (Customer::where('account_number', $accountNumber)->exists());
+            
+            // Log for debugging
+            \Log::info('Generated account number', [
+                'account_number' => $accountNumber,
+                'existing_numbers' => $existingNumbers,
+                'next_number' => $nextNumber - 1
+            ]);
         }
 
         $neighborhoodId = $request->input('neighborhood_id');
@@ -112,24 +120,35 @@ class CustomerController extends Controller
             $neighborhoodId = $neighborhood->id;
         }
 
-        $customer = Customer::create([
-            'first_name' => $request->input('first_name'),
-            'last_name' => $request->input('last_name'),
-            'phone' => $request->input('phone'),
-            'email' => $request->input('email'),
-            'category_id' => $request->input('category_id'),
-            'neighborhood_id' => $neighborhoodId,
-            'plot_number' => $request->input('plot_number'),
-            'address' => $request->input('address'),
-            'latitude' => $request->input('latitude'),
-            'longitude' => $request->input('longitude'),
-            'meter_id' => $request->input('meter_id'),
-            'date' => $request->input('date') ?? Carbon::now(),
-            'contract' => $request->input('contract'),
-            'credit' => $request->input('credit') ?? 0,
-            'account_number' => $accountNumber,
-            'is_active' => $request->input('is_active', true),
-        ]);
+        // Use database transaction to ensure atomicity
+        $customer = \DB::transaction(function () use ($request, $neighborhoodId, $accountNumber) {
+            // Double-check uniqueness within transaction
+            $finalAccountNumber = $accountNumber;
+            $counter = 1;
+            while (Customer::where('account_number', $finalAccountNumber)->exists()) {
+                $finalAccountNumber = 'ACC' . str_pad($counter, 5, '0', STR_PAD_LEFT);
+                $counter++;
+            }
+
+            return Customer::create([
+                'first_name' => $request->input('first_name'),
+                'last_name' => $request->input('last_name'),
+                'phone' => $request->input('phone'),
+                'email' => $request->input('email'),
+                'category_id' => $request->input('category_id'),
+                'neighborhood_id' => $neighborhoodId,
+                'plot_number' => $request->input('plot_number'),
+                'address' => $request->input('address'),
+                'latitude' => $request->input('latitude'),
+                'longitude' => $request->input('longitude'),
+                'meter_id' => $request->input('meter_id'),
+                'date' => $request->input('date') ?? Carbon::now(),
+                'contract' => $request->input('contract'),
+                'credit' => $request->input('credit') ?? 0,
+                'account_number' => $finalAccountNumber,
+                'is_active' => $request->input('is_active', true),
+            ]);
+        });
 
         // Set meter status to active when assigned to customer during creation
         if ($request->input('meter_id')) {
