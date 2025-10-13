@@ -15,201 +15,71 @@ class CustomerSeeder extends Seeder
         // Get some neighborhoods, categories, and meters for relationships
         $neighborhoods = Neighborhood::all();
         $categories = Category::all();
-        $meters = Meter::all();
+        $meters = Meter::where('status', 'active')->get(); // Only use active meters
 
         if ($neighborhoods->isEmpty() || $categories->isEmpty() || $meters->isEmpty()) {
             $this->command->warn('Please run NeighborhoodSeeder, CategorySeeder, and MeterSeeder first.');
             return;
         }
 
-        $customers = [
-            [
-                'first_name' => 'John',
-                'last_name' => 'Doe',
-                'phone' => '+1234567890',
-                'plot_number' => 'A-001',
-                'address' => '123 Main Street',
-                'credit' => 0.00,
-                'email' => 'john.doe@email.com',
-                'contract' => 'CON-001',
-                'date' => now()->subMonths(12),
-                'latitude' => 40.7128,
-                'longitude' => -74.0060,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'RES_STD')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-001',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'Jane',
-                'last_name' => 'Smith',
-                'phone' => '+1234567891',
-                'plot_number' => 'B-002',
-                'address' => '456 Oak Avenue',
-                'credit' => 50.00,
-                'email' => 'jane.smith@email.com',
-                'contract' => 'CON-002',
-                'date' => now()->subMonths(8),
-                'latitude' => 40.7589,
-                'longitude' => -73.9851,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'RES_HIGH')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-002',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'Robert',
-                'last_name' => 'Johnson',
-                'phone' => '+1234567892',
-                'plot_number' => 'C-003',
-                'address' => '789 Pine Road',
-                'credit' => 0.00,
-                'email' => 'robert.johnson@email.com',
-                'contract' => 'CON-003',
-                'date' => now()->subMonths(6),
-                'latitude' => 40.6892,
-                'longitude' => -74.0445,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'RES_LOW')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-003',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'Sarah',
-                'last_name' => 'Williams',
-                'phone' => '+1234567893',
-                'plot_number' => 'D-004',
-                'address' => '321 Elm Street',
-                'credit' => 25.00,
-                'email' => 'sarah.williams@email.com',
-                'contract' => 'CON-004',
-                'date' => now()->subMonths(10),
-                'latitude' => 40.7505,
-                'longitude' => -73.9934,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'COM_SMALL')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-004',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'Michael',
-                'last_name' => 'Brown',
-                'phone' => '+1234567894',
-                'plot_number' => 'E-005',
-                'address' => '654 Maple Drive',
-                'credit' => 0.00,
-                'email' => 'michael.brown@email.com',
-                'contract' => 'CON-005',
-                'date' => now()->subMonths(4),
-                'latitude' => 40.7282,
-                'longitude' => -73.7949,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'RES_STD')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-005',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'Emily',
-                'last_name' => 'Davis',
-                'phone' => '+1234567895',
-                'plot_number' => 'F-006',
-                'address' => '987 Cedar Lane',
-                'credit' => 100.00,
-                'email' => 'emily.davis@email.com',
-                'contract' => 'CON-006',
-                'date' => now()->subMonths(15),
-                'latitude' => 40.7614,
-                'longitude' => -73.9776,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'COM_MED')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-006',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'David',
-                'last_name' => 'Wilson',
-                'phone' => '+1234567896',
-                'plot_number' => 'G-007',
-                'address' => '147 Birch Court',
-                'credit' => 0.00,
-                'email' => 'david.wilson@email.com',
-                'contract' => 'CON-007',
-                'date' => now()->subMonths(3),
-                'latitude' => 40.6892,
-                'longitude' => -74.0445,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'IND_LIGHT')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-007',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'Lisa',
-                'last_name' => 'Anderson',
-                'phone' => '+1234567897',
-                'plot_number' => 'H-008',
-                'address' => '258 Spruce Street',
-                'credit' => 75.00,
-                'email' => 'lisa.anderson@email.com',
-                'contract' => 'CON-008',
-                'date' => now()->subMonths(18),
-                'latitude' => 40.7505,
-                'longitude' => -73.9934,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'RES_HIGH')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-008',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'James',
-                'last_name' => 'Taylor',
-                'phone' => '+1234567898',
-                'plot_number' => 'I-009',
-                'address' => '369 Willow Way',
-                'credit' => 0.00,
-                'email' => 'james.taylor@email.com',
-                'contract' => 'CON-009',
-                'date' => now()->subMonths(7),
-                'latitude' => 40.7282,
-                'longitude' => -73.7949,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'GOV')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-009',
-                'is_active' => true,
-            ],
-            [
-                'first_name' => 'Maria',
-                'last_name' => 'Garcia',
-                'phone' => '+1234567899',
-                'plot_number' => 'J-010',
-                'address' => '741 Poplar Place',
-                'credit' => 150.00,
-                'email' => 'maria.garcia@email.com',
-                'contract' => 'CON-010',
-                'date' => now()->subMonths(20),
-                'latitude' => 40.7614,
-                'longitude' => -73.9776,
-                'neighborhood_id' => $neighborhoods->random()->id,
-                'category_id' => $categories->where('type_id', 'EDU')->first()->id,
-                'meter_id' => $meters->random()->id,
-                'account_number' => 'ACC-010',
-                'is_active' => true,
-            ],
-        ];
+        $this->command->info('Generating 10 customers with existing active meters...');
 
-        foreach ($customers as $customer) {
+        // Sample customer data
+        $firstNames = ['John', 'Jane', 'Robert', 'Sarah', 'Michael', 'Emily', 'David', 'Lisa', 'James', 'Maria'];
+        $lastNames = ['Doe', 'Smith', 'Johnson', 'Williams', 'Brown', 'Davis', 'Wilson', 'Anderson', 'Taylor', 'Garcia'];
+        $streets = ['Main Street', 'Oak Avenue', 'Pine Road', 'Elm Street', 'Maple Drive', 'Cedar Lane', 'Birch Court', 'Spruce Street', 'Willow Way', 'Poplar Place'];
+        $plotPrefixes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+
+        // Generate 10 customers
+        for ($i = 1; $i <= 10; $i++) {
+            $firstName = $firstNames[$i - 1];
+            $lastName = $lastNames[$i - 1];
+            $street = $streets[$i - 1];
+            $plotPrefix = $plotPrefixes[$i - 1];
+            
+            // Random credit amount (0-200)
+            $credit = fake()->randomFloat(2, 0, 200);
+            
+            // Random contract date (1-24 months ago)
+            $contractDate = now()->subMonths(fake()->numberBetween(1, 24));
+            
+            // Random coordinates around Juba, South Sudan
+            $latitude = fake()->latitude(4.8, 5.0);
+            $longitude = fake()->longitude(31.5, 31.7);
+            
+            // Get random neighborhood and category
+            $neighborhood = $neighborhoods->random();
+            $category = $categories->random();
+            
+            // Get a random active meter that's not already assigned
+            $availableMeters = $meters->whereNotIn('id', Customer::pluck('meter_id')->filter());
+            $meter = $availableMeters->isNotEmpty() ? $availableMeters->random() : $meters->random();
+
+            $customer = [
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'phone' => '+211' . fake()->numerify('########'),
+                'plot_number' => $plotPrefix . '-' . str_pad($i, 3, '0', STR_PAD_LEFT),
+                'address' => fake()->numberBetween(100, 999) . ' ' . $street,
+                'credit' => $credit,
+                'email' => strtolower($firstName . '.' . $lastName . '@email.com'),
+                'contract' => 'CON-' . str_pad($i, 3, '0', STR_PAD_LEFT),
+                'date' => $contractDate,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'neighborhood_id' => $neighborhood->id,
+                'category_id' => $category->id,
+                'meter_id' => $meter->id,
+                'account_number' => 'ACC-' . str_pad($i, 3, '0', STR_PAD_LEFT),
+                'is_active' => true,
+            ];
+
             Customer::firstOrCreate(
                 ['account_number' => $customer['account_number']],
                 $customer
             );
         }
+
+        $this->command->info('Successfully generated 10 customers with existing active meters!');
     }
 }

@@ -524,7 +524,7 @@ export default function BillingIndex({ bills, filters = {} }) {
                                                     <div>
                                                         <Link
                                                             href={`/billing/${bill.id}`}
-                                                            className="font-medium text-slate-900 hover:text-green-600 dark:text-slate-100 dark:hover:text-green-400"
+                                                            className="text-slate-900 hover:text-green-600 dark:text-slate-100 dark:hover:text-green-400"
                                                         >
                                                             {bill.billing_period_start && bill.billing_period_end
                                                                 ? `${new Date(bill.billing_period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${new Date(bill.billing_period_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
@@ -536,9 +536,6 @@ export default function BillingIndex({ bills, filters = {} }) {
                                                     <div>
                                                         <p className="text-slate-900 dark:text-slate-100">
                                                             {bill.customer ? `${bill.customer.first_name} ${bill.customer.last_name}` : '—'}
-                                                        </p>
-                                                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                                                            {bill.customer?.account_number || 'No account'}
                                                         </p>
                                                     </div>
                                                 </td>

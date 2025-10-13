@@ -52,6 +52,10 @@ export default function MetersPage({ meters, customers, types, stats }) {
                 const meterNumber = meter.meter_number?.toLowerCase() || '';
                 if (meterNumber.includes(searchLower)) return true;
 
+                // Search in serial number
+                const serial = meter.serial?.toLowerCase() || '';
+                if (serial.includes(searchLower)) return true;
+
                 // Search in customer name
                 const customerName = `${meter.customer?.first_name || ''} ${meter.customer?.last_name || ''}`.toLowerCase();
                 if (customerName.includes(searchLower)) return true;
@@ -63,6 +67,18 @@ export default function MetersPage({ meters, customers, types, stats }) {
                 // Search in status
                 const status = meter.status?.toLowerCase() || '';
                 if (status.includes(searchLower)) return true;
+
+                // Search in size
+                const size = meter.size?.toLowerCase() || '';
+                if (size.includes(searchLower)) return true;
+
+                // Search in model
+                const model = meter.model?.toLowerCase() || '';
+                if (model.includes(searchLower)) return true;
+
+                // Search in manufactory
+                const manufactory = meter.manufactory?.toLowerCase() || '';
+                if (manufactory.includes(searchLower)) return true;
 
                 return false;
             });
@@ -221,7 +237,12 @@ export default function MetersPage({ meters, customers, types, stats }) {
                         </div>
                         <div className="flex w-full items-center sm:w-80">
                             <Search className="mr-4 text-gray-400" />
-                            <Input type="text" placeholder="Search meters..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                            <Input
+                                type="text"
+                                placeholder="Search by number, serial, customer, location, status, size, model, or manufactory..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
                         </div>
                     </div>
                 </CardHeader>

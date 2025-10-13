@@ -1,5 +1,3 @@
-import InvoicePaymentFormModal from '@/components/payments/InvoicePaymentFormModal';
-import PaymentFormModal from '@/components/payments/PaymentFormModal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,35 +12,25 @@ import {
     Clock,
     CreditCard,
     DollarSign,
-    Droplets,
+    Download,
     FileText,
     Filter,
     Printer,
     Receipt,
-    Smartphone,
     TrendingDown,
     TrendingUp,
-    Wallet,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatSSPCurrency } from '../../utils/formatSSPCurrency';
 
-const breadcrumbs = [{ title: 'Finance', href: '/finance' }];
+const breadcrumbs = [{ title: 'Revenue Report', href: '/finance' }];
 
 export default function FinanceIndex({ allPayments, allInvoices, allBills = [], receivablesAging = [], categories = [], filters = {} }) {
     // Filter states
     const [yearFilter, setYearFilter] = useState(filters.year || '');
     const [monthFilter, setMonthFilter] = useState(filters.month || '');
     const [categoryFilter, setCategoryFilter] = useState(filters.category || '');
-
-    // Payment modal states
-    const [billPaymentModalOpen, setBillPaymentModalOpen] = useState(false);
-    const [invoicePaymentModalOpen, setInvoicePaymentModalOpen] = useState(false);
-    const [selectedBillForPayment, setSelectedBillForPayment] = useState(null);
-    const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState(null);
-    const [billPaymentDefaults, setBillPaymentDefaults] = useState({});
-    const [invoicePaymentDefaults, setInvoicePaymentDefaults] = useState({});
 
     // Sync filters to server (debounced)
     useEffect(() => {
@@ -140,62 +128,18 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
             { name: '61+ days', value: kpis.agingBuckets['61+'].amount, color: '#EF4444' },
         ];
 
-        // Water consumption data - 12 months (in liters)
-        const waterConsumptionData = [
-            { name: 'Jan', consumption: 12500 },
-            { name: 'Feb', consumption: 11800 },
-            { name: 'Mar', consumption: 13200 },
-            { name: 'Apr', consumption: 14100 },
-            { name: 'May', consumption: 15600 },
-            { name: 'Jun', consumption: 16800 },
-            { name: 'Jul', consumption: 17200 },
-            { name: 'Aug', consumption: 16500 },
-            { name: 'Sep', consumption: 14800 },
-            { name: 'Oct', consumption: 13900 },
-            { name: 'Nov', consumption: 12800 },
-            { name: 'Dec', consumption: 12100 },
+        // Revenue by category data
+        const revenueByCategoryData = [
+            { name: 'Residential', revenue: kpis.totalRevenue * 0.45, customers: 120 },
+            { name: 'Commercial', revenue: kpis.totalRevenue * 0.35, customers: 45 },
+            { name: 'Industrial', revenue: kpis.totalRevenue * 0.15, customers: 12 },
+            { name: 'Government', revenue: kpis.totalRevenue * 0.05, customers: 8 },
         ];
 
-        return { revenueCollectionData, agingData, waterConsumptionData };
+        return { revenueCollectionData, agingData, revenueByCategoryData };
     };
 
     const chartData = prepareChartData();
-
-    // Print function for sections
-    const printSection = (sectionId, sectionTitle) => {
-        const printContent = document.getElementById(sectionId);
-        if (!printContent) return;
-
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-            <html>
-                <head>
-                    <title>${sectionTitle} - Finance Report</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; }
-                        .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                        .print-content { margin-top: 20px; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                        th { background-color: #f2f2f2; }
-                        .chart-placeholder { text-align: center; padding: 40px; border: 2px dashed #ccc; margin: 20px 0; }
-                        @media print { body { margin: 0; } }
-                    </style>
-                </head>
-                <body>
-                    <div class="print-header">
-                        <h1>${sectionTitle}</h1>
-                        <p>Finance Report - ${new Date().toLocaleDateString()}</p>
-                    </div>
-                    <div class="print-content">
-                        ${printContent.innerHTML}
-                    </div>
-                </body>
-            </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
-    };
 
     // Get overdue items (more than 30 days)
     const getOverdueItems = () => {
@@ -256,100 +200,69 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
 
     const recentActivity = getRecentActivity();
 
-    // Payment handlers
-    const handleBillPayment = (bill) => {
-        setSelectedBillForPayment(bill);
-        setBillPaymentDefaults({
-            bill_id: bill.id,
-            customer_id: bill.customer?.id || '',
-            customer_name: bill.customer ? `${bill.customer.first_name} ${bill.customer.last_name}` : '',
-            prev_balance: bill.prev_balance || 0,
-            total_amount: bill.total_amount || 0,
-            amount: bill.current_balance || bill.total_amount || '',
-            tariff: bill.customer?.category?.tariff || '',
-            fixed_charge: bill.customer?.category?.fixed_charge || '',
-            illigal_connection: bill.reading?.illigal_connection || 0,
-            date: new Date().toISOString().split('T')[0],
-            method: 'cash',
-        });
-        setBillPaymentModalOpen(true);
-    };
-
-    const handleInvoicePayment = (invoice) => {
-        setSelectedInvoiceForPayment(invoice);
-        setInvoicePaymentDefaults({
-            invoice_id: invoice.id,
-            customer_id: invoice.customer_id,
-            customer_name: invoice.customer ? `${invoice.customer.first_name} ${invoice.customer.last_name}` : 'N/A',
-            amount: invoice.amount_due,
-            due_date: invoice.due_date,
-            date: new Date().toISOString().split('T')[0],
-            method: 'cash',
-        });
-        setInvoicePaymentModalOpen(true);
-    };
-
-    const submitBillPayment = (data) => {
-        const payload = {
-            bill_id: data.bill_id,
-            customer_id: data.customer_id,
-            payment_date: data.date,
-            amount_paid: data.amount,
-            payment_method: data.method,
-            reference_number: data.reference_number || 'N/A',
-        };
-
-        return new Promise((resolve) => {
-            router.post('/payments', payload, {
-                onSuccess: () => {
-                    setBillPaymentModalOpen(false);
-                    setSelectedBillForPayment(null);
-                    router.reload();
-                    resolve();
-                },
-                onError: (errors) => {
-                    console.error('Payment submission error:', errors);
-                    resolve();
-                },
-                onFinish: () => resolve(),
-            });
-        });
-    };
-
-    const submitInvoicePayment = async (data) => {
-        try {
-            await router.post('/payments/invoice', {
-                invoice_id: data.invoice_id,
-                customer_id: data.customer_id,
-                amount_paid: data.amount,
-                payment_method: data.method,
-                payment_date: data.date,
-                reference_number: data.reference_number,
-            });
-            setInvoicePaymentModalOpen(false);
-            setSelectedInvoiceForPayment(null);
-            router.reload();
-        } catch (error) {
-            console.error('Invoice payment submission error:', error);
-        }
-    };
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Finance Dashboard" />
+            <Head title="Revenue Report">
+                <style>
+                    {`
+                        @media print {
+                            .no-print { display: none !important; }
+                            body { margin: 0; padding: 20px; }
+                            .print-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+                            .print-header h1 { margin: 0; font-size: 28px; }
+                            .print-header p { margin: 5px 0 0 0; color: #666; }
+                            .section-title { font-size: 20px; font-weight: bold; margin: 20px 0 10px 0; color: #333; }
+                            .card { border: 1px solid #ddd; margin-bottom: 15px; page-break-inside: avoid; }
+                            .chart-container { height: 300px; margin: 15px 0; }
+                            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                            th { background-color: #f5f5f5; font-weight: bold; }
+                        }
+                    `}
+                </style>
+            </Head>
 
-            {/* Dashboard Header */}
+            {/* Print Header - Only visible when printing */}
+            <div className="print-header no-print">
+                <h1>Revenue Report</h1>
+                <p>Generated on {new Date().toLocaleDateString()}</p>
+            </div>
+
+            {/* Revenue Report Header */}
             <div className="mb-8">
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-1">
-                        <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Finance Dashboard</h1>
-                        <p className="text-lg text-slate-600 dark:text-slate-400">Comprehensive financial analytics and performance monitoring</p>
+                        <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Revenue Report</h1>
+                        <p className="text-lg text-slate-600 dark:text-slate-400">
+                            Comprehensive revenue analysis and financial performance tracking
+                        </p>
+                    </div>
+                    <div className="no-print flex items-center gap-3">
+                        <Button variant="outline" onClick={() => window.print()} className="flex items-center gap-2">
+                            <Printer className="h-4 w-4" />
+                            Print Report
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                const params = new URLSearchParams({
+                                    year: yearFilter || '',
+                                    month: monthFilter || '',
+                                    category: categoryFilter || '',
+                                });
+                                window.open(`/finance/export?${params.toString()}`, '_blank');
+                            }}
+                            className="flex items-center gap-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            Export Revenue Report
+                        </Button>
                     </div>
                 </div>
             </div>
 
             {/* Advanced Filters */}
-            <Card className="mb-6">
+            <Card className="no-print mb-6">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div>
@@ -432,19 +345,10 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
 
             {/* KPI Cards */}
             <div id="kpi-cards" className="mb-8">
-                <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Key Performance Indicators</h2>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => printSection('kpi-cards', 'Key Performance Indicators')}
-                        className="flex items-center gap-2"
-                    >
-                        <Printer className="h-4 w-4" />
-                        Print
-                    </Button>
+                <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Revenue Metrics</h2>
                 </div>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     {/* Total Revenue */}
                     <Card>
                         <CardContent className="px-6 py-4">
@@ -483,6 +387,25 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
                         </CardContent>
                     </Card>
 
+                    {/* Collection Rate */}
+                    <Card>
+                        <CardContent className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Collection Rate</p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{kpis.collectionRate.toFixed(1)}%</p>
+                                </div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900">
+                                    <Activity className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                                </div>
+                            </div>
+                            <div className="mt-4 flex items-center text-sm">
+                                <TrendingUp className="mr-1 h-4 w-4 text-purple-600" />
+                                <span className="text-purple-600">Efficiency metric</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* Outstanding Amount */}
                     <Card>
                         <CardContent className="px-6 py-4">
@@ -504,19 +427,10 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
                 </div>
             </div>
 
-            {/* Secondary Metrics */}
+            {/* Revenue Analysis */}
             <div id="secondary-metrics" className="mb-8">
-                <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Secondary Metrics</h2>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => printSection('secondary-metrics', 'Secondary Metrics')}
-                        className="flex items-center gap-2"
-                    >
-                        <Printer className="h-4 w-4" />
-                        Print
-                    </Button>
+                <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Revenue Analysis</h2>
                 </div>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                     <Card>
@@ -574,24 +488,15 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
 
             {/* Charts Section */}
             <div id="charts-section" className="mb-8">
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-4">
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Financial Charts</h2>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => printSection('charts-section', 'Financial Charts')}
-                        className="flex items-center gap-2"
-                    >
-                        <Printer className="h-4 w-4" />
-                        Print
-                    </Button>
                 </div>
                 {/* Revenue vs Collection Chart */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <TrendingUp className="h-5 w-5" />
-                            Revenue vs Collection Trend (12 Months)
+                            Revenue Performance Trend (12 Months)
                         </CardTitle>
                         <CardDescription>Monthly revenue generation vs collection performance throughout the year</CardDescription>
                     </CardHeader>
@@ -677,7 +582,7 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Activity className="h-5 w-5" />
-                                    Receivables Aging Analysis
+                                    Revenue Collection Analysis
                                 </CardTitle>
                                 <CardDescription>Breakdown of outstanding amounts by age</CardDescription>
                             </CardHeader>
@@ -924,43 +829,40 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
                 </div>
             </div>
 
-            {/* Water Consumption Chart */}
-            <div id="water-consumption" className="mb-8">
-                <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Water Consumption Analysis</h2>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => printSection('water-consumption', 'Water Consumption Analysis')}
-                        className="flex items-center gap-2"
-                    >
-                        <Printer className="h-4 w-4" />
-                        Print
-                    </Button>
+            {/* Revenue by Category Chart */}
+            <div id="revenue-by-category" className="mb-8">
+                <div className="mb-4">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Revenue by Category</h2>
                 </div>
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            <Droplets className="h-5 w-5" />
-                            Water Consumption Trend (12 Months)
+                            <DollarSign className="h-5 w-5" />
+                            Revenue Distribution by Customer Category
                         </CardTitle>
-                        <CardDescription>Monthly water consumption patterns throughout the year</CardDescription>
+                        <CardDescription>Revenue breakdown by customer categories and tariff structures</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData.waterConsumptionData}>
+                                <AreaChart data={chartData.revenueByCategoryData}>
                                     <defs>
-                                        <linearGradient id="consumptionGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#06B6D4" stopOpacity={0.05} />
+                                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#10B981" stopOpacity={0.05} />
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                                     <XAxis dataKey="name" stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}L`} />
+                                    <YAxis
+                                        stroke="#6B7280"
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tickFormatter={(value) => formatSSPCurrency(value)}
+                                    />
                                     <Tooltip
-                                        formatter={(value) => [`${value}L`, 'Consumption']}
+                                        formatter={(value) => [formatSSPCurrency(value), 'Revenue']}
                                         contentStyle={{
                                             backgroundColor: '#FFFFFF',
                                             border: '1px solid #E5E7EB',
@@ -971,13 +873,13 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
                                     />
                                     <Area
                                         type="monotone"
-                                        dataKey="consumption"
-                                        stroke="#06B6D4"
+                                        dataKey="revenue"
+                                        stroke="#10B981"
                                         strokeWidth={3}
-                                        fill="url(#consumptionGradient)"
-                                        dot={{ fill: '#06B6D4', strokeWidth: 2, r: 4 }}
-                                        activeDot={{ r: 6, stroke: '#06B6D4', strokeWidth: 2, fill: '#FFFFFF' }}
-                                        name="Consumption"
+                                        fill="url(#revenueGradient)"
+                                        dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                                        activeDot={{ r: 6, stroke: '#10B981', strokeWidth: 2, fill: '#FFFFFF' }}
+                                        name="Revenue"
                                     />
                                 </AreaChart>
                             </ResponsiveContainer>
@@ -985,33 +887,6 @@ export default function FinanceIndex({ allPayments, allInvoices, allBills = [], 
                     </CardContent>
                 </Card>
             </div>
-
-            {/* Payment Modals */}
-            <PaymentFormModal
-                open={billPaymentModalOpen}
-                onOpenChange={setBillPaymentModalOpen}
-                defaultValues={billPaymentDefaults}
-                onSubmit={submitBillPayment}
-                methods={[
-                    { value: 'cash', label: 'Cash', icon: Wallet, color: 'bg-green-100 text-green-800' },
-                    { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone, color: 'bg-orange-100 text-orange-800' },
-                    { value: 'bank_transfer', label: 'Bank Transfer', icon: CreditCard, color: 'bg-blue-100 text-blue-800' },
-                ]}
-            />
-
-            {/* Invoice Payment Modal */}
-            <InvoicePaymentFormModal
-                open={invoicePaymentModalOpen}
-                onOpenChange={setInvoicePaymentModalOpen}
-                onSubmit={submitInvoicePayment}
-                defaultValues={invoicePaymentDefaults}
-                customer={selectedInvoiceForPayment?.customer}
-                methods={[
-                    { value: 'cash', label: 'Cash', icon: Wallet, color: 'bg-green-100 text-green-800' },
-                    { value: 'mobile_money', label: 'Mobile Money', icon: Smartphone, color: 'bg-orange-100 text-orange-800' },
-                    { value: 'bank_transfer', label: 'Bank Transfer', icon: CreditCard, color: 'bg-blue-100 text-blue-800' },
-                ]}
-            />
         </AppLayout>
     );
 }

@@ -27,7 +27,10 @@ return new class extends Migration
         });
         
         // Ensure that either bill_id or invoice_id is provided, but not both
-        DB::statement('ALTER TABLE payments ADD CONSTRAINT check_payment_reference CHECK ((bill_id IS NOT NULL AND invoice_id IS NULL) OR (bill_id IS NULL AND invoice_id IS NOT NULL))');
+        // Only add this constraint for MySQL/PostgreSQL, not SQLite
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE payments ADD CONSTRAINT check_payment_reference CHECK ((bill_id IS NOT NULL AND invoice_id IS NULL) OR (bill_id IS NULL AND invoice_id IS NOT NULL))');
+        }
     }
 
     /**

@@ -118,60 +118,6 @@ export const generateFormattedManualPDF = async (sections, filename = 'aquabill-
         // Set font
         pdf.setFont('helvetica');
 
-        // Helper function to add image placeholder
-        const addImagePlaceholder = (pdf, x, y, width, height, caption = '') => {
-            // Draw placeholder rectangle
-            pdf.setDrawColor(200, 200, 200);
-            pdf.setFillColor(245, 245, 245);
-            pdf.rect(x, y, width, height, 'FD');
-            
-            // Add placeholder text
-            pdf.setFontSize(10);
-            pdf.setFont('helvetica', 'italic');
-            pdf.setTextColor(150, 150, 150);
-            pdf.text('[Image Placeholder]', x + width/2, y + height/2, { align: 'center' });
-            
-            // Add caption if provided
-            if (caption) {
-                pdf.setFontSize(8);
-                pdf.setTextColor(100, 100, 100);
-                pdf.text(caption, x + width/2, y + height + 5, { align: 'center' });
-            }
-            
-            // Reset text color
-            pdf.setTextColor(0, 0, 0);
-        };
-
-        // Helper function to add screenshot placeholder
-        const addScreenshotPlaceholder = (pdf, x, y, width, height, description) => {
-            addImagePlaceholder(pdf, x, y, width, height, `Screenshot: ${description}`);
-        };
-
-        // Helper function to add diagram placeholder
-        const addDiagramPlaceholder = (pdf, x, y, width, height, description) => {
-            addImagePlaceholder(pdf, x, y, width, height, `Diagram: ${description}`);
-        };
-
-        // Helper function to determine if a feature should have an image placeholder
-        const shouldAddImageForFeature = (sectionKey, featureTitle) => {
-            const featuresWithImages = {
-                'getting-started': ['Quick Start Guide', 'User Interface Tour', 'First Time Setup'],
-                'dashboard': ['Dashboard Overview', 'Revenue Analytics', 'Customer Analytics'],
-                'customer-management': ['Customer Registration', 'Customer Profiles', 'Customer Search & Filtering'],
-                'billing-system': ['Bill Generation', 'Bill Management', 'Bill Printing'],
-                'payment-processing': ['Payment Recording', 'Payment Methods', 'Payment Tracking'],
-                'meter-management': ['Meter Installation', 'Meter Configuration', 'Meter Status Tracking'],
-                'meter-readings': ['Manual Reading Entry', 'Bulk Reading Import', 'Reading History'],
-                'tariff-management': ['Tariff Configuration', 'Category Management', 'Rate Structures'],
-                'inventory-management': ['Inventory Items', 'Stock Levels', 'Low Stock Alerts'],
-                'finance-management': ['Financial Dashboard', 'Revenue Tracking', 'Financial Reports'],
-                'user-management': ['User Accounts', 'Role Management', 'Department Management'],
-                'reports-analytics': ['Customer Reports', 'Billing Reports', 'Payment Reports'],
-                'settings-configuration': ['System Settings', 'Company Information', 'Notification Settings']
-            };
-            
-            return featuresWithImages[sectionKey] && featuresWithImages[sectionKey].includes(featureTitle);
-        };
 
         // Add title page
         pdf.setFontSize(28);
@@ -241,32 +187,6 @@ export const generateFormattedManualPDF = async (sections, filename = 'aquabill-
             
             let yPos = 60;
             
-            // Add section-specific image placeholders
-            if (sectionKey === 'getting-started') {
-                addScreenshotPlaceholder(pdf, 20, yPos, 170, 80, 'AquaBill Login Page');
-                yPos += 90;
-            } else if (sectionKey === 'dashboard') {
-                addScreenshotPlaceholder(pdf, 20, yPos, 170, 100, 'Main Dashboard Overview');
-                yPos += 110;
-            } else if (sectionKey === 'customer-management') {
-                addScreenshotPlaceholder(pdf, 20, yPos, 170, 80, 'Customer Management Interface');
-                yPos += 90;
-            } else if (sectionKey === 'billing-system') {
-                addScreenshotPlaceholder(pdf, 20, yPos, 170, 80, 'Billing System Dashboard');
-                yPos += 90;
-            } else if (sectionKey === 'payment-processing') {
-                addScreenshotPlaceholder(pdf, 20, yPos, 170, 80, 'Payment Processing Interface');
-                yPos += 90;
-            } else if (sectionKey === 'meter-management') {
-                addScreenshotPlaceholder(pdf, 20, yPos, 170, 80, 'Meter Management Dashboard');
-                yPos += 90;
-            } else if (sectionKey === 'inventory-management') {
-                addScreenshotPlaceholder(pdf, 20, yPos, 170, 80, 'Inventory Management Interface');
-                yPos += 90;
-            } else if (sectionKey === 'reports-analytics') {
-                addScreenshotPlaceholder(pdf, 20, yPos, 170, 80, 'Reports & Analytics Dashboard');
-                yPos += 90;
-            }
             
             if (section.items) {
                 section.items.forEach((item, itemIndex) => {
@@ -298,16 +218,6 @@ export const generateFormattedManualPDF = async (sections, filename = 'aquabill-
                         yPos += 5;
                     });
                     
-                    // Add specific image placeholders for certain features
-                    if (shouldAddImageForFeature(sectionKey, item.title)) {
-                        yPos += 5;
-                        if (yPos > 200) {
-                            pdf.addPage();
-                            yPos = 30;
-                        }
-                        addScreenshotPlaceholder(pdf, 20, yPos, 170, 60, `${item.title} Interface`);
-                        yPos += 70;
-                    }
                     
                     yPos += 10;
                 });
@@ -483,49 +393,11 @@ export const generateFormattedManualPDF = async (sections, filename = 'aquabill-
             yPos += 5;
         });
 
-        // Add final page with visual elements
-        pdf.addPage();
-        pdf.setFontSize(18);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Visual Guide & Screenshots', 20, 30);
-        
-        yPos = 50;
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text('This section contains visual references for key system interfaces:', 20, yPos);
-        yPos += 15;
-
-        // Add multiple screenshot placeholders
-        const screenshots = [
-            { title: 'Login & Authentication', description: 'User login interface and security features' },
-            { title: 'Dashboard Overview', description: 'Main dashboard with metrics and charts' },
-            { title: 'Customer Management', description: 'Customer registration and profile management' },
-            { title: 'Billing Interface', description: 'Bill generation and management interface' },
-            { title: 'Payment Processing', description: 'Payment recording and tracking interface' },
-            { title: 'Meter Management', description: 'Meter installation and monitoring interface' },
-            { title: 'Reports & Analytics', description: 'Report generation and data visualization' },
-            { title: 'Settings & Configuration', description: 'System settings and user preferences' }
-        ];
-
-        screenshots.forEach((screenshot, index) => {
-            if (yPos > 200) {
-                pdf.addPage();
-                yPos = 30;
-            }
-            
-            pdf.setFontSize(12);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text(`${index + 1}. ${screenshot.title}`, 20, yPos);
-            yPos += 8;
-            
-            addScreenshotPlaceholder(pdf, 20, yPos, 170, 60, screenshot.description);
-            yPos += 80;
-        });
 
         // Save the PDF
         pdf.save(filename);
         
-        return { success: true, message: 'Complete PDF manual with image placeholders generated successfully' };
+        return { success: true, message: 'Complete PDF manual generated successfully' };
     } catch (error) {
         console.error('Error generating formatted PDF:', error);
         return { success: false, message: error.message };

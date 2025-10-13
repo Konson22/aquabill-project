@@ -580,18 +580,20 @@ export default function Show({ customer, availableMeters = [] }) {
                                         </TabsTrigger>
                                     </>
                                 )}
-                                <TabsTrigger
-                                    value="payments"
-                                    className="flex items-center space-x-2 px-4 py-2 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
-                                >
-                                    <CreditCard className="h-4 w-4" />
-                                    <span className="text-sm font-medium">Payments</span>
-                                    {customer.payments?.length > 0 && (
-                                        <Badge variant="secondary" className="h-5 px-1.5 py-0 text-xs">
-                                            {customer.payments.length}
-                                        </Badge>
-                                    )}
-                                </TabsTrigger>
+                                {!isBillingDepartment && (
+                                    <TabsTrigger
+                                        value="payments"
+                                        className="flex items-center space-x-2 px-4 py-2 whitespace-nowrap data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700"
+                                    >
+                                        <CreditCard className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Payments</span>
+                                        {customer.payments?.length > 0 && (
+                                            <Badge variant="secondary" className="h-5 px-1.5 py-0 text-xs">
+                                                {customer.payments.length}
+                                            </Badge>
+                                        )}
+                                    </TabsTrigger>
+                                )}
                             </TabsList>
 
                             <TabsContent value="meters" className="mt-6 space-y-6">
@@ -1123,79 +1125,83 @@ export default function Show({ customer, availableMeters = [] }) {
                                 </>
                             )}
 
-                            <TabsContent value="payments" className="mt-6 space-y-4">
-                                {customer.payments && customer.payments.length > 0 ? (
-                                    <Card>
-                                        <CardHeader>
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <CardTitle className="flex items-center">
-                                                        <Receipt className="mr-2 h-5 w-5" />
-                                                        Payment History
-                                                    </CardTitle>
-                                                    <CardDescription>All payments made by this customer</CardDescription>
+                            {!isBillingDepartment && (
+                                <TabsContent value="payments" className="mt-6 space-y-4">
+                                    {customer.payments && customer.payments.length > 0 ? (
+                                        <Card>
+                                            <CardHeader>
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <CardTitle className="flex items-center">
+                                                            <Receipt className="mr-2 h-5 w-5" />
+                                                            Payment History
+                                                        </CardTitle>
+                                                        <CardDescription>All payments made by this customer</CardDescription>
+                                                    </div>
+                                                    <a href={`/customers/${customer.id}/export`}>
+                                                        <Button variant="outline" size="sm">
+                                                            <Download className="mr-2 h-4 w-4" />
+                                                            Export
+                                                        </Button>
+                                                    </a>
                                                 </div>
-                                                <a href={`/customers/${customer.id}/export`}>
-                                                    <Button variant="outline" size="sm">
-                                                        <Download className="mr-2 h-4 w-4" />
-                                                        Export
-                                                    </Button>
-                                                </a>
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <Table>
-                                                <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead>Payment Date</TableHead>
-                                                        <TableHead>Amount</TableHead>
-                                                        <TableHead>Method</TableHead>
-                                                        <TableHead>Reference</TableHead>
-                                                        <TableHead>Status</TableHead>
-                                                        <TableHead>Received By</TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {customer.payments
-                                                        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                                                        .map((payment, index) => (
-                                                            <TableRow key={index}>
-                                                                <TableCell>
-                                                                    {payment.created_at ? new Date(payment.created_at).toLocaleDateString() : 'N/A'}
-                                                                </TableCell>
-                                                                <TableCell className="font-medium">${payment.amount || 0}</TableCell>
-                                                                <TableCell>
-                                                                    <Badge variant="outline">{payment.method || 'Unknown'}</Badge>
-                                                                </TableCell>
-                                                                <TableCell>{payment.reference || 'N/A'}</TableCell>
-                                                                <TableCell>
-                                                                    <Badge
-                                                                        className={
-                                                                            payment.status === 'completed'
-                                                                                ? 'bg-green-100 text-green-800'
-                                                                                : payment.status === 'pending'
-                                                                                  ? 'bg-yellow-100 text-yellow-800'
-                                                                                  : 'bg-red-100 text-red-800'
-                                                                        }
-                                                                    >
-                                                                        {payment.status || 'Unknown'}
-                                                                    </Badge>
-                                                                </TableCell>
-                                                                <TableCell>{payment.receivedBy?.name || 'N/A'}</TableCell>
-                                                            </TableRow>
-                                                        ))}
-                                                </TableBody>
-                                            </Table>
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    <div className="py-8 text-center">
-                                        <Receipt className="mx-auto h-12 w-12 text-slate-400" />
-                                        <h3 className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">No payments found</h3>
-                                        <p className="mt-1 text-sm text-slate-500">No payments have been recorded for this customer yet.</p>
-                                    </div>
-                                )}
-                            </TabsContent>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow>
+                                                            <TableHead>Payment Date</TableHead>
+                                                            <TableHead>Amount</TableHead>
+                                                            <TableHead>Method</TableHead>
+                                                            <TableHead>Reference</TableHead>
+                                                            <TableHead>Status</TableHead>
+                                                            <TableHead>Received By</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {customer.payments
+                                                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                                                            .map((payment, index) => (
+                                                                <TableRow key={index}>
+                                                                    <TableCell>
+                                                                        {payment.created_at
+                                                                            ? new Date(payment.created_at).toLocaleDateString()
+                                                                            : 'N/A'}
+                                                                    </TableCell>
+                                                                    <TableCell className="font-medium">${payment.amount || 0}</TableCell>
+                                                                    <TableCell>
+                                                                        <Badge variant="outline">{payment.method || 'Unknown'}</Badge>
+                                                                    </TableCell>
+                                                                    <TableCell>{payment.reference || 'N/A'}</TableCell>
+                                                                    <TableCell>
+                                                                        <Badge
+                                                                            className={
+                                                                                payment.status === 'completed'
+                                                                                    ? 'bg-green-100 text-green-800'
+                                                                                    : payment.status === 'pending'
+                                                                                      ? 'bg-yellow-100 text-yellow-800'
+                                                                                      : 'bg-red-100 text-red-800'
+                                                                            }
+                                                                        >
+                                                                            {payment.status || 'Unknown'}
+                                                                        </Badge>
+                                                                    </TableCell>
+                                                                    <TableCell>{payment.receivedBy?.name || 'N/A'}</TableCell>
+                                                                </TableRow>
+                                                            ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </CardContent>
+                                        </Card>
+                                    ) : (
+                                        <div className="py-8 text-center">
+                                            <Receipt className="mx-auto h-12 w-12 text-slate-400" />
+                                            <h3 className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">No payments found</h3>
+                                            <p className="mt-1 text-sm text-slate-500">No payments have been recorded for this customer yet.</p>
+                                        </div>
+                                    )}
+                                </TabsContent>
+                            )}
                         </Tabs>
                     </CardContent>
                 </Card>

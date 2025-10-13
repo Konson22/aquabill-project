@@ -115,15 +115,15 @@ export const DEPARTMENT_ACCESS = {
                 delete: false
             },
             invoices: {
-                view: true,
-                create: true,
-                edit: true,
+                view: false,
+                create: false,
+                edit: false,
                 delete: false
             },
             payments: {
-                view: true,
-                create: true,
-                edit: true,
+                view: false,
+                create: false,
+                edit: false,
                 delete: false
             },
             customers: {

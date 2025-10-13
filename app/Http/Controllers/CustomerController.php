@@ -212,6 +212,16 @@ class CustomerController extends Controller
     {
         $customer = Customer::findOrFail($id);
 
+        // Debug logging
+        \Log::info('Customer update request received', [
+            'customer_id' => $id,
+            'request_data' => $request->all(),
+            'has_first_name' => $request->has('first_name'),
+            'has_meter_id' => $request->has('meter_id'),
+            'has_reason' => $request->has('reason'),
+            'has_notes' => $request->has('notes'),
+        ]);
+
         // Check if this is a status toggle update (only is_active field)
         if ($request->has('is_active') && count($request->only(['is_active', '_method'])) === 2) {
             \Log::info('Status toggle request received', [
@@ -236,8 +246,8 @@ class CustomerController extends Controller
             ]);
         }
 
-        // Check if this is a meter assignment update
-        if ($request->has('meter_id') || $request->has('reason') || $request->has('notes')) {
+        // Check if this is a meter assignment update (only if it has reason or notes, not just meter_id)
+        if (($request->has('reason') || $request->has('notes')) && !$request->has('first_name')) {
             // Handle meter assignment
             $request->validate([
                 'meter_id' => 'nullable|exists:meters,id',
@@ -295,6 +305,11 @@ class CustomerController extends Controller
         }
 
         // Regular customer update
+        \Log::info('Processing regular customer update', [
+            'customer_id' => $id,
+            'request_data' => $request->all()
+        ]);
+        
         $request->validate([
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -336,7 +351,7 @@ class CustomerController extends Controller
         $oldMeterId = $customer->meter_id;
         $newMeterId = $request->input('meter_id');
 
-        $customer->update([
+        $updateData = [
             'first_name' => $request->input('first_name'),
             'last_name' => $request->input('last_name'),
             'phone' => $request->input('phone'),
@@ -353,6 +368,18 @@ class CustomerController extends Controller
             'meter_id' => $request->input('meter_id'),
             'account_number' => $request->input('account_number'),
             'is_active' => $request->input('is_active', true),
+        ];
+
+        \Log::info('Updating customer with data', [
+            'customer_id' => $id,
+            'update_data' => $updateData
+        ]);
+
+        $customer->update($updateData);
+
+        \Log::info('Customer updated successfully', [
+            'customer_id' => $id,
+            'updated_customer' => $customer->fresh()->toArray()
         ]);
 
         // Update meter status based on assignment changes
@@ -377,13 +404,30 @@ class CustomerController extends Controller
      */
     public function destroy(string $id)
     {
-        $customer = Customer::findOrFail($id);
-        
-        // Permanently delete the customer from database
-        $customer->forceDelete();
+        try {
+            $customer = Customer::findOrFail($id);
+            
+            // Permanently delete the customer from database
+            // All related records (invoices, bills, payments, readings, meter logs) 
+            // will be automatically deleted due to cascade foreign key constraints
+            $customer->forceDelete();
 
-        return redirect()->route('customers.index')
-            ->with('success', 'Customer permanently deleted successfully.');
+            return redirect()->route('customers.index')
+                ->with('success', 'Customer and all associated records permanently deleted successfully.');
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle foreign key constraint violations
+            if ($e->getCode() == 23000) {
+                return redirect()->route('customers.index')
+                    ->with('error', 'Cannot delete customer. This customer has associated records that must be removed first.');
+            }
+            
+            // Handle other database errors
+            return redirect()->route('customers.index')
+                ->with('error', 'An error occurred while deleting the customer. Please try again.');
+        } catch (\Exception $e) {
+            return redirect()->route('customers.index')
+                ->with('error', 'An unexpected error occurred. Please try again.');
+        }
     }
 
     /**

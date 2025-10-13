@@ -1,13 +1,14 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Building2, Edit, Eye, Plus, Search, UserCheck, Users, X } from 'lucide-react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { AlertCircle, Building2, Edit, Eye, Plus, Search, Trash2, UserCheck, Users, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const breadcrumbs = [
@@ -28,6 +29,8 @@ export default function UserManagement({ users, departments }) {
     const [filteredDepartments, setFilteredDepartments] = useState(departments);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [activeTab, setActiveTab] = useState('users');
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [userToDelete, setUserToDelete] = useState(null);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
@@ -112,6 +115,27 @@ export default function UserManagement({ users, departments }) {
                 setShowCreateForm(false);
             },
         });
+    };
+
+    const handleDeleteUser = (user) => {
+        setUserToDelete(user);
+        setShowDeleteDialog(true);
+    };
+
+    const confirmDeleteUser = () => {
+        if (userToDelete) {
+            router.delete(`/users/${userToDelete.id}`, {
+                onSuccess: () => {
+                    setShowDeleteDialog(false);
+                    setUserToDelete(null);
+                },
+                onError: (errors) => {
+                    console.error('Error deleting user:', errors);
+                    setShowDeleteDialog(false);
+                    setUserToDelete(null);
+                },
+            });
+        }
     };
 
     return (
@@ -376,6 +400,14 @@ export default function UserManagement({ users, departments }) {
                                                         <Edit className="h-4 w-4" />
                                                     </Button>
                                                 </Link>
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    onClick={() => handleDeleteUser(user)}
+                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             </div>
                                         </div>
                                     ))}

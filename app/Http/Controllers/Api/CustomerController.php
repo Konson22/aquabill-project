@@ -60,13 +60,13 @@ class CustomerController extends Controller
                 'latitude' => $customer->latitude,
                 'longitude' => $customer->longitude,
                 'is_active' => $customer->is_active,
-                'category_name' => $customer->category->name,  
+                'category_name' => $customer->category ? $customer->category->name : null,  
                 'meter_id' => $customer->meter_id,
-                'tariff' => $customer->category->tariff,  
-                'fixed_charge' => $customer->category->fixed_charge,  
-                'neighborhood' => $customer->neighborhood->name,
-                'meter_serial' => $customer->meter->serial,
-                'meter_status' => $customer->meter->status,
+                'tariff' => $customer->category ? $customer->category->tariff : null,  
+                'fixed_charge' => $customer->category ? $customer->category->fixed_charge : null,  
+                'neighborhood' => $customer->neighborhood ? $customer->neighborhood->name : null,
+                'meter_serial' => $customer->meter ? $customer->meter->serial : null,
+                'meter_status' => $customer->meter ? $customer->meter->status : null,
                 'latest_reading' => $last_reading ? $last_reading->value : 0,
                 'latest_reading_date' => $last_reading ? $last_reading->created_at : null,
                 'last_bill_balance' => $last_bill ? $last_bill->current_balance : 0,
@@ -225,13 +225,36 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer): JsonResponse
     {
-        // Permanently delete the customer from database
-        $customer->forceDelete();
+        try {
+            // Permanently delete the customer from database
+            // All related records (invoices, bills, payments, readings, meter logs) 
+            // will be automatically deleted due to cascade foreign key constraints
+            $customer->forceDelete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Customer permanently deleted successfully'
-        ], 200);
+            return response()->json([
+                'success' => true,
+                'message' => 'Customer and all associated records permanently deleted successfully'
+            ], 200);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle foreign key constraint violations
+            if ($e->getCode() == 23000) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete customer. This customer has associated records that must be removed first.'
+                ], 422);
+            }
+            
+            // Handle other database errors
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while deleting the customer. Please try again.'
+            ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An unexpected error occurred. Please try again.'
+            ], 500);
+        }
     }
 
     /**
@@ -340,6 +363,28 @@ class CustomerController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Customer status updated successfully'
+        ], 200);
+    }
+
+    /**
+     * Clean up customers with non-existent meters
+     */
+    public function cleanupOrphanedMeters(): JsonResponse
+    {
+        $customersWithOrphanedMeters = Customer::whereNotNull('meter_id')
+            ->whereDoesntHave('meter')
+            ->get();
+
+        $cleanedCount = 0;
+        foreach ($customersWithOrphanedMeters as $customer) {
+            $customer->update(['meter_id' => null]);
+            $cleanedCount++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Cleaned up {$cleanedCount} customers with orphaned meter references",
+            'cleaned_count' => $cleanedCount
         ], 200);
     }
 

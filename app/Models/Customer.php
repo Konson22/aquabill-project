@@ -94,4 +94,42 @@ class Customer extends Model
     {
         return $this->hasMany(MeterLog::class);
     }
+
+    /**
+     * Check if customer has any related records that would prevent deletion
+     */
+    public function hasRelatedRecords(): bool
+    {
+        return $this->invoices()->exists() || 
+               $this->bills()->exists() || 
+               $this->payments()->exists() || 
+               $this->readings()->exists() || 
+               $this->meterLogs()->exists();
+    }
+
+    /**
+     * Get a list of related record types that prevent deletion
+     */
+    public function getRelatedRecordTypes(): array
+    {
+        $relatedTypes = [];
+        
+        if ($this->invoices()->exists()) {
+            $relatedTypes[] = 'invoices';
+        }
+        if ($this->bills()->exists()) {
+            $relatedTypes[] = 'bills';
+        }
+        if ($this->payments()->exists()) {
+            $relatedTypes[] = 'payments';
+        }
+        if ($this->readings()->exists()) {
+            $relatedTypes[] = 'meter readings';
+        }
+        if ($this->meterLogs()->exists()) {
+            $relatedTypes[] = 'meter logs';
+        }
+        
+        return $relatedTypes;
+    }
 }

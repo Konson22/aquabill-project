@@ -64,6 +64,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['department.restriction'])->group(function () {
         // Finance route - restricted from Billing department
         Route::get('/finance', [FinanceController::class, 'index'])->name('finance.index');
+        Route::get('/finance/export', [FinanceController::class, 'export'])->name('finance.export');
         Route::resources([
             '/customers' => CustomerController::class,
             '/meters' => MeterController::class,
@@ -112,16 +113,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         '/maintenance' => MaintenanceRequestController::class,
     ]);
 
-    // User Management
-    Route::resources([
-        '/users' => UserController::class,
-        '/departments' => DepartmentController::class,
-        // '/roles' => RoleController::class, // Commented out - RoleController not implemented
-    ]);
-
-    // User export routes
-    Route::get('/users/{user}/export-readings', [UserController::class, 'exportReadings'])->name('users.export-readings');
-    Route::get('/users/{user}/export-bills', [UserController::class, 'exportBills'])->name('users.export-bills');
+    // User Management - Apply department restrictions
+    Route::middleware(['department.restriction'])->group(function () {
+        Route::resources([
+            '/users' => UserController::class,
+            '/departments' => DepartmentController::class,
+            // '/roles' => RoleController::class, // Commented out - RoleController not implemented
+        ]);
+        
+        // User export routes
+        Route::get('/users/{user}/export-readings', [UserController::class, 'exportReadings'])->name('users.export-readings');
+        Route::get('/users/{user}/export-bills', [UserController::class, 'exportBills'])->name('users.export-bills');
+    });
 
     // Legacy routes (keeping for compatibility) - Apply department restrictions
     Route::middleware(['department.restriction'])->group(function () {

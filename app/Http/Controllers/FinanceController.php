@@ -11,6 +11,7 @@ use App\Models\Customer;
 use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Response;
 
 class FinanceController extends Controller
 {
@@ -297,6 +298,162 @@ class FinanceController extends Controller
                     'bill_count' => (int) $debtor->bill_count
                 ];
             });
+    }
+
+    public function export(Request $request)
+    {
+        $year = $request->get('year');
+        $month = $request->get('month');
+        $category = $request->get('category');
+
+        // Build query for bills
+        $billsQuery = Bill::with(['customer', 'customer.category']);
+        if ($year) {
+            $billsQuery->whereYear('created_at', $year);
+        }
+        if ($month) {
+            $billsQuery->whereMonth('created_at', $month);
+        }
+        if ($category) {
+            $billsQuery->whereHas('customer.category', function($q) use ($category) {
+                $q->where('id', $category);
+            });
+        }
+        $bills = $billsQuery->get();
+
+        // Build query for invoices
+        $invoicesQuery = Invoice::with(['customer', 'customer.category']);
+        if ($year) {
+            $invoicesQuery->whereYear('created_at', $year);
+        }
+        if ($month) {
+            $invoicesQuery->whereMonth('created_at', $month);
+        }
+        if ($category) {
+            $invoicesQuery->whereHas('customer.category', function($q) use ($category) {
+                $q->where('id', $category);
+            });
+        }
+        $invoices = $invoicesQuery->get();
+
+        // Build query for payments
+        $paymentsQuery = Payment::with(['customer', 'receivedBy']);
+        if ($year) {
+            $paymentsQuery->whereYear('payment_date', $year);
+        }
+        if ($month) {
+            $paymentsQuery->whereMonth('payment_date', $month);
+        }
+        if ($category) {
+            $paymentsQuery->whereHas('customer.category', function($q) use ($category) {
+                $q->where('id', $category);
+            });
+        }
+        $payments = $paymentsQuery->get();
+
+        // Calculate summary statistics
+        $totalRevenue = $invoices->sum('amount_due');
+        $totalCollected = $payments->sum('amount_paid');
+        $totalBills = $bills->count();
+        $totalInvoices = $invoices->count();
+        $totalPayments = $payments->count();
+        $outstandingAmount = $bills->where('current_balance', '>', 0)->sum('current_balance') + 
+                           $invoices->where('status', '!=', 'paid')->sum('amount_due');
+        $collectionRate = $totalRevenue > 0 ? ($totalCollected / $totalRevenue) * 100 : 0;
+
+        // Generate CSV content
+        $csvContent = $this->generateCsvContent($bills, $invoices, $payments, [
+            'totalRevenue' => $totalRevenue,
+            'totalCollected' => $totalCollected,
+            'totalBills' => $totalBills,
+            'totalInvoices' => $totalInvoices,
+            'totalPayments' => $totalPayments,
+            'outstandingAmount' => $outstandingAmount,
+            'collectionRate' => $collectionRate,
+            'year' => $year,
+            'month' => $month,
+            'category' => $category,
+        ]);
+
+        $filename = 'finance_report_' . date('Y-m-d_H-i-s') . '.csv';
+
+        return response($csvContent)
+            ->header('Content-Type', 'text/csv')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+    }
+
+    private function generateCsvContent($bills, $invoices, $payments, $summary)
+    {
+        $csv = '';
+        
+        // Summary section
+        $csv .= "FINANCE GENERAL REPORT\n";
+        $csv .= "Generated on: " . date('Y-m-d H:i:s') . "\n";
+        if ($summary['year']) {
+            $csv .= "Year: " . $summary['year'] . "\n";
+        }
+        if ($summary['month']) {
+            $csv .= "Month: " . $summary['month'] . "\n";
+        }
+        $csv .= "\n";
+        
+        $csv .= "SUMMARY STATISTICS\n";
+        $csv .= "Total Revenue,Total Collected,Total Bills,Total Invoices,Total Payments,Outstanding Amount,Collection Rate\n";
+        $csv .= $summary['totalRevenue'] . "," . $summary['totalCollected'] . "," . 
+                $summary['totalBills'] . "," . $summary['totalInvoices'] . "," . 
+                $summary['totalPayments'] . "," . $summary['outstandingAmount'] . "," . 
+                round($summary['collectionRate'], 2) . "%\n\n";
+
+        // Bills section
+        $csv .= "BILLS\n";
+        $csv .= "ID,Customer Name,Account Number,Category,Bill Period Start,Bill Period End,Total Amount,Current Balance,Status,Created At\n";
+        foreach ($bills as $bill) {
+            $csv .= $bill->id . ",";
+            $csv .= '"' . ($bill->customer ? $bill->customer->first_name . ' ' . $bill->customer->last_name : 'N/A') . '",';
+            $csv .= '"' . ($bill->customer ? $bill->customer->account_number : 'N/A') . '",';
+            $csv .= '"' . ($bill->customer && $bill->customer->category ? $bill->customer->category->name : 'N/A') . '",';
+            $csv .= $bill->billing_period_start . ",";
+            $csv .= $bill->billing_period_end . ",";
+            $csv .= $bill->total_amount . ",";
+            $csv .= $bill->current_balance . ",";
+            $csv .= $bill->status . ",";
+            $csv .= $bill->created_at . "\n";
+        }
+        $csv .= "\n";
+
+        // Invoices section
+        $csv .= "INVOICES\n";
+        $csv .= "ID,Customer Name,Account Number,Category,Invoice Number,Issue Date,Due Date,Amount Due,Status,Created At\n";
+        foreach ($invoices as $invoice) {
+            $csv .= $invoice->id . ",";
+            $csv .= '"' . ($invoice->customer ? $invoice->customer->first_name . ' ' . $invoice->customer->last_name : 'N/A') . '",';
+            $csv .= '"' . ($invoice->customer ? $invoice->customer->account_number : 'N/A') . '",';
+            $csv .= '"' . ($invoice->customer && $invoice->customer->category ? $invoice->customer->category->name : 'N/A') . '",';
+            $csv .= '"' . ($invoice->invoice_number ?: 'N/A') . '",';
+            $csv .= $invoice->issue_date . ",";
+            $csv .= $invoice->due_date . ",";
+            $csv .= $invoice->amount_due . ",";
+            $csv .= $invoice->status . ",";
+            $csv .= $invoice->created_at . "\n";
+        }
+        $csv .= "\n";
+
+        // Payments section
+        $csv .= "PAYMENTS\n";
+        $csv .= "ID,Customer Name,Account Number,Payment Date,Amount Paid,Payment Method,Reference Number,Received By,Created At\n";
+        foreach ($payments as $payment) {
+            $csv .= $payment->id . ",";
+            $csv .= '"' . ($payment->customer ? $payment->customer->first_name . ' ' . $payment->customer->last_name : 'N/A') . '",';
+            $csv .= '"' . ($payment->customer ? $payment->customer->account_number : 'N/A') . '",';
+            $csv .= $payment->payment_date . ",";
+            $csv .= $payment->amount_paid . ",";
+            $csv .= $payment->payment_method . ",";
+            $csv .= '"' . ($payment->reference_number ?: 'N/A') . '",';
+            $csv .= '"' . ($payment->receivedBy ? $payment->receivedBy->name : 'N/A') . '",';
+            $csv .= $payment->created_at . "\n";
+        }
+
+        return $csv;
     }
 }
 

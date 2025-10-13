@@ -47,6 +47,22 @@ class DepartmentRestriction
                 return redirect()->route('dashboard')->with('error', 'You do not have permission to access the Categories & Tariffs section.');
             }
             
+            // Block access to invoices routes
+            if (str_contains($currentRoute, 'invoices')) {
+                if ($request->expectsJson()) {
+                    return response()->json(['error' => 'You do not have permission to access the Invoices section.'], 403);
+                }
+                return redirect()->route('dashboard')->with('error', 'You do not have permission to access the Invoices section.');
+            }
+            
+            // Block access to payments routes
+            if (str_contains($currentRoute, 'payments')) {
+                if ($request->expectsJson()) {
+                    return response()->json(['error' => 'You do not have permission to access the Payments section.'], 403);
+                }
+                return redirect()->route('dashboard')->with('error', 'You do not have permission to access the Payments section.');
+            }
+            
             // Check if the current route is allowed for billing department
             $isAllowed = false;
             foreach ($allowedRoutes as $allowedRoute) {
@@ -69,8 +85,8 @@ class DepartmentRestriction
             $currentRoute = $request->route()->getName();
             $method = $request->method();
             
-            // Block edit operations for customers and readings
-            if (str_contains($currentRoute, 'customers') && in_array($method, ['PUT', 'PATCH', 'DELETE'])) {
+            // Block edit operations for customers and readings (but allow DELETE for customers)
+            if (str_contains($currentRoute, 'customers') && in_array($method, ['PUT', 'PATCH'])) {
                 if ($request->expectsJson()) {
                     return response()->json(['error' => 'You cannot edit customer information.'], 403);
                 }
@@ -82,6 +98,26 @@ class DepartmentRestriction
                     return response()->json(['error' => 'You cannot edit meter readings.'], 403);
                 }
                 return redirect()->back()->with('error', 'You cannot edit meter readings.');
+            }
+        }
+
+        // Administration department: has full access to user management
+        if ($userDepartment === 'Administration') {
+            // Administration department has full access to all features including user management
+            return $next($request);
+        }
+
+        // For all other departments, restrict user management access
+        if ($userDepartment !== 'Administration' && $userDepartment !== 'Finance') {
+            $currentRoute = $request->route()->getName();
+            $method = $request->method();
+            
+            // Block access to user management for non-admin departments
+            if (str_contains($currentRoute, 'users') && in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'])) {
+                if ($request->expectsJson()) {
+                    return response()->json(['error' => 'You do not have permission to manage users. Only Administration department can manage users.'], 403);
+                }
+                return redirect()->back()->with('error', 'You do not have permission to manage users. Only Administration department can manage users.');
             }
         }
 

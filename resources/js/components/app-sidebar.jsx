@@ -106,10 +106,11 @@ export function AppSidebar({ onCollapseChange }) {
         // Always show dashboard
         if (item.key === 'dashboard') return true;
 
-        // For Billing department, hide Finance, Categories & Tariffs, and Users Management
-        // But show Bills, Invoices, and Payments
+        // For Billing department, hide Finance, Categories & Tariffs, Users Management, Invoices, and Payments
+        // Only show Bills, Customers, Meters, and Readings
         if (userDepartment === 'Billing') {
-            if (item.key === 'finance' || item.key === 'tariffs' || item.key === 'users') return false;
+            if (item.key === 'finance' || item.key === 'tariffs' || item.key === 'users' || item.key === 'invoices' || item.key === 'payments')
+                return false;
         }
 
         // For Finance department, hide Users Management

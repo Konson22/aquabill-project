@@ -23,33 +23,41 @@ class MeterSeeder extends Seeder
         $statuses = ['active', 'inactive', 'maintenance', 'damaged'];
         $statusWeights = [70, 15, 10, 5]; // 70% active, 15% inactive, 10% maintenance, 5% damaged
 
-        $this->command->info('Generating 66,800 meters with serial numbers SSUW/ZH/JB/2310000001 to SSUW/ZH/JB/23100066800...');
+        // Configure desired meter count and serial range
+        $desiredCount = 800;
+        $startSerialIndex = 66001;    // inclusive (produces 2310066001)
+        $endSerialIndex = $startSerialIndex + $desiredCount - 1; // inclusive
+        $totalMeters = $desiredCount;
 
-        // Generate 66,800 meters
-        $totalMeters = 66800;
+        $this->command->info(
+            'Generating ' . $totalMeters . ' meters with serial numbers SSUW/ZH/JB/231' .
+            str_pad($startSerialIndex, 7, '0', STR_PAD_LEFT) . ' to SSUW/ZH/JB/231' .
+            str_pad($endSerialIndex, 7, '0', STR_PAD_LEFT) . '...'
+        );
         $batchSize = 1000; // Process in batches to avoid memory issues
 
         for ($batch = 0; $batch < ceil($totalMeters / $batchSize); $batch++) {
             $meters = [];
-            $startNumber = ($batch * $batchSize) + 1;
-            $endNumber = min(($batch + 1) * $batchSize, $totalMeters);
+            // Compute actual serial index boundaries for this batch within the desired range
+            $batchSerialStart = $startSerialIndex + ($batch * $batchSize);
+            $batchSerialEnd = min($startSerialIndex + (($batch + 1) * $batchSize) - 1, $endSerialIndex);
 
-            for ($i = $startNumber; $i <= $endNumber; $i++) {
-                // Generate serial number: SSUW/ZH/JB/2310000001, SSUW/ZH/JB/2310000002, etc.
-                $serialNumber = 'SSUW/ZH/JB/231' . str_pad($i, 7, '0', STR_PAD_LEFT);
+            for ($serialIndex = $batchSerialStart; $serialIndex <= $batchSerialEnd; $serialIndex++) {
+                // Generate serial number: SSUW/ZH/JB/2310006601 ... SSUW/ZH/JB/23100066800
+                $serialNumber = 'SSUW/ZH/JB/231' . str_pad($serialIndex, 7, '0', STR_PAD_LEFT);
                 
-                // Randomly select meter specifications
+                // Randomly select meter size (model/manufactory will be N/A)
                 $spec = $meterSpecs[array_rand($meterSpecs)];
                 
-                // Randomly select status based on weights
-                $status = $this->getWeightedRandomStatus($statuses, $statusWeights);
+                // Set all meters to inactive status
+                $status = 'inactive';
 
                 $meters[] = [
                     'serial' => $serialNumber,
                     'status' => $status,
                     'size' => $spec['size'],
-                    'model' => $spec['model'],
-                    'manufactory' => $spec['manufactory'],
+                    'model' => 'N/A',
+                    'manufactory' => 'N/A',
                 ];
             }
 
@@ -61,8 +69,10 @@ class MeterSeeder extends Seeder
                 );
             }
 
-            // Show progress
-            $this->command->info("Generated meters {$startNumber} to {$endNumber} of {$totalMeters}");
+            // Show progress (report relative progress within the total count)
+            $relativeStart = ($batch * $batchSize) + 1;
+            $relativeEnd = min(($batch + 1) * $batchSize, $totalMeters);
+            $this->command->info("Generated meters {$relativeStart} to {$relativeEnd} of {$totalMeters}");
         }
 
         $this->command->info('Meter generation completed!');
