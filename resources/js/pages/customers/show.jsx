@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,7 +29,7 @@ import {
     Trash2,
     User,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const breadcrumbs = [
     { title: 'Customers', href: '/customers' },
@@ -37,7 +38,7 @@ const breadcrumbs = [
 
 export default function Show({ customer, availableMeters = [] }) {
     const page = usePage();
-    const { auth } = page.props;
+    const { auth, errors = {} } = page.props;
     const userDepartment = auth.user?.department?.name;
     const isBillingDepartment = userDepartment === 'Billing';
     const isFinanceDepartment = userDepartment === 'Finance';
@@ -47,6 +48,7 @@ export default function Show({ customer, availableMeters = [] }) {
     const [showManageMeterModal, setShowManageMeterModal] = useState(false);
     const [selectedMeterId, setSelectedMeterId] = useState('');
     const [selectedMeterStatus, setSelectedMeterStatus] = useState('');
+    const [previousReading, setPreviousReading] = useState('');
 
     const getStatusColor = (isActive) => {
         return isActive
@@ -215,7 +217,7 @@ export default function Show({ customer, availableMeters = [] }) {
     };
 
     const handleAssignMeter = () => {
-        if (!selectedMeterId) {
+        if (!selectedMeterId || previousReading === '') {
             return;
         }
 
@@ -223,11 +225,13 @@ export default function Show({ customer, availableMeters = [] }) {
             `/customers/${customer.id}/assign-meter`,
             {
                 meter_id: selectedMeterId,
+                previous_reading: Number(previousReading),
             },
             {
                 onSuccess: () => {
                     setShowAssignMeterModal(false);
                     setSelectedMeterId('');
+                    setPreviousReading('');
                     // Refresh the page to show the updated meter information
                     router.reload();
                 },
@@ -267,6 +271,13 @@ export default function Show({ customer, availableMeters = [] }) {
         setShowManageMeterModal(false);
         setShowAssignMeterModal(true);
     };
+
+    useEffect(() => {
+        if (!showAssignMeterModal) {
+            setSelectedMeterId('');
+            setPreviousReading('');
+        }
+    }, [showAssignMeterModal]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -1271,6 +1282,21 @@ export default function Show({ customer, availableMeters = [] }) {
                                         </div>
                                     )}
                                 </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Previous Reading</label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="Enter latest reading value"
+                                        value={previousReading}
+                                        onChange={(e) => setPreviousReading(e.target.value)}
+                                    />
+                                    <p className="text-xs text-slate-500">
+                                        This value becomes the current reading for the new meter. Previous reading will be set to 0 automatically.
+                                    </p>
+                                    {errors.previous_reading && <p className="text-xs text-red-600">{errors.previous_reading}</p>}
+                                </div>
                             </div>
 
                             {/* Action Buttons */}
@@ -1280,11 +1306,16 @@ export default function Show({ customer, availableMeters = [] }) {
                                     onClick={() => {
                                         setShowAssignMeterModal(false);
                                         setSelectedMeterId('');
+                                        setPreviousReading('');
                                     }}
                                 >
                                     Cancel
                                 </Button>
-                                <Button onClick={handleAssignMeter} disabled={!selectedMeterId} className="bg-green-600 hover:bg-green-700">
+                                <Button
+                                    onClick={handleAssignMeter}
+                                    disabled={!selectedMeterId || previousReading === ''}
+                                    className="bg-green-600 hover:bg-green-700"
+                                >
                                     <Plus className="mr-2 h-4 w-4" />
                                     Assign Meter
                                 </Button>

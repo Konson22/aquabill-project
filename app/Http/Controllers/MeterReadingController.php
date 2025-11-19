@@ -29,7 +29,8 @@ class MeterReadingController extends Controller
             'month' => 'nullable|integer|min:1|max:12',
         ]);
 
-        $query = MeterReading::with(['meter.customer.category', 'meter.customer.neighborhood', 'recordedBy', 'bills']);
+        $query = MeterReading::with(['meter.customer.category', 'meter.customer.neighborhood', 'recordedBy', 'bills'])
+            ->whereHas('bills');
 
         // Search functionality
         if ($request->filled('search')) {

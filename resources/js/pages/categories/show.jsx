@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, BarChart3, Calendar, DollarSign, Edit, Eye, Mail, MapPin, Phone, Settings, Tag, TrendingUp, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, Calendar, DollarSign, Edit, Eye, History, Mail, MapPin, Phone, Settings, Tag, TrendingUp, Users } from 'lucide-react';
 
 const breadcrumbs = [
     {
@@ -18,16 +18,42 @@ const breadcrumbs = [
 ];
 
 export default function ShowCategory({ category }) {
+    const tariffHistories = category.tariff_histories || [];
+
     const formatCurrency = (amount) => {
         return `SSP ${(amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     const formatDate = (date) => {
+        if (!date) {
+            return '—';
+        }
+
         return new Date(date).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
         });
+    };
+
+    const formatConsumptionRange = (min, max) => {
+        if (max === null || typeof max === 'undefined') {
+            return `${min} m³+`;
+        }
+
+        return `${min} - ${max} m³`;
+    };
+
+    const historyStatusStyles = {
+        active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
+        pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
+        expired: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+    };
+
+    const historyStatusLabels = {
+        active: 'Active',
+        pending: 'Scheduled',
+        expired: 'Expired',
     };
 
     return (
@@ -78,6 +104,10 @@ export default function ShowCategory({ category }) {
                     <TabsTrigger value="analytics" className="flex items-center gap-2">
                         <BarChart3 className="h-4 w-4" />
                         Analytics
+                    </TabsTrigger>
+                    <TabsTrigger value="history" className="flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        Tariff History
                     </TabsTrigger>
                 </TabsList>
 
@@ -307,6 +337,83 @@ export default function ShowCategory({ category }) {
                                 <p className="text-lg font-medium text-slate-500">Analytics coming soon</p>
                                 <p className="mt-2 text-sm text-slate-400">This will show detailed analytics and reports for this category.</p>
                             </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="history" className="space-y-6">
+                    <Card className="border-0 shadow-lg">
+                        <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900/20 dark:to-slate-800/20">
+                            <CardTitle className="flex items-center gap-2">
+                                <History className="h-5 w-5 text-slate-600" />
+                                Tariff Change Log
+                            </CardTitle>
+                            <CardDescription>Track all pricing updates and consumption range changes</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6 p-6">
+                            {tariffHistories.length > 0 ? (
+                                <div className="space-y-6">
+                                    {tariffHistories.map((history, index) => (
+                                        <div
+                                            key={history.id ?? index}
+                                            className="relative rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/40"
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-4">
+                                                <div>
+                                                    <p className="text-sm text-slate-500">
+                                                        Effective {formatDate(history.effective_from)}
+                                                        {history.effective_to ? ` - ${formatDate(history.effective_to)}` : ''}
+                                                    </p>
+                                                    <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                                        {formatCurrency(history.unit_price)}
+                                                    </p>
+                                                </div>
+                                                <Badge className={historyStatusStyles[history.status] || 'bg-slate-200 text-slate-700'}>
+                                                    {historyStatusLabels[history.status] || history.status}
+                                                </Badge>
+                                            </div>
+
+                                            <div className="mt-4 grid gap-4 md:grid-cols-3">
+                                                <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+                                                    <p className="text-xs text-slate-500 uppercase">Fixed Charge</p>
+                                                    <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                                                        {formatCurrency(history.fixed_charge)}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+                                                    <p className="text-xs text-slate-500 uppercase">Consumption Range</p>
+                                                    <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                                                        {formatConsumptionRange(history.min_consumption, history.max_consumption)}
+                                                    </p>
+                                                </div>
+                                                <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
+                                                    <p className="text-xs text-slate-500 uppercase">Updated By</p>
+                                                    <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                                                        {history.changed_by?.name || 'System'}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {history.change_reason && (
+                                                <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-800/60 dark:text-slate-300">
+                                                    <p className="font-medium text-slate-800 dark:text-slate-100">Reason</p>
+                                                    <p>{history.change_reason}</p>
+                                                </div>
+                                            )}
+
+                                            <div className="mt-4 text-xs text-slate-500">Logged on {formatDate(history.created_at)}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="py-12 text-center">
+                                    <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                                        <History className="h-8 w-8 text-slate-400" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">No tariff history yet</h3>
+                                    <p className="mt-2 text-slate-600 dark:text-slate-400">Updates to this category's pricing will appear here.</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

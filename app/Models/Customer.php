@@ -60,6 +60,14 @@ class Customer extends Model
         return $this->belongsTo(Neighborhood::class);
     }
 
+    /**
+     * Alias relationship for neighborhood to maintain compatibility with existing UI references.
+     */
+    public function location()
+    {
+        return $this->belongsTo(Neighborhood::class, 'neighborhood_id');
+    }
+
     public function category()
     {
         return $this->belongsTo(Category::class);

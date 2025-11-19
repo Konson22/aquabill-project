@@ -642,13 +642,13 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth,
 
                             {/* Neighborhood Filter */}
                             <div className="space-y-2">
-                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Neighborhood</label>
+                                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Zone</label>
                                 <Select value={neighborhoodFilter} onValueChange={setNeighborhoodFilter}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="All neighborhoods" />
+                                        <SelectValue placeholder="All Zones" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All neighborhoods</SelectItem>
+                                        <SelectItem value="all">All Zones</SelectItem>
                                         {neighborhoods.map((neighborhood) => (
                                             <SelectItem key={neighborhood.id} value={neighborhood.id.toString()}>
                                                 {neighborhood.name}

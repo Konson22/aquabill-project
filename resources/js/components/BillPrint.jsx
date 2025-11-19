@@ -45,7 +45,7 @@ export default function BillPrint({ bill }) {
                         </p>
                     </div>
                     <div className="h-16 w-16 object-contain">
-                        <img className="h-full w-full object-contain" src="/logo.jpg" alt="Logo" />
+                        <img className="h-full w-full object-contain" src="/images/water.png" alt="Logo" />
                     </div>
                 </div>
                 {/* Main details (reverted three-column layout) */}
@@ -70,9 +70,9 @@ export default function BillPrint({ bill }) {
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
-                            <span className="font-medium">PLOT NO:</span>
+                            <span className="font-medium">METER NO:</span>
                             <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
-                                {bill?.customer?.plot_number ? bill.customer.plot_number : '—'}
+                                {bill?.meter?.serial || '—'}
                             </span>
                         </div>
                     </div>

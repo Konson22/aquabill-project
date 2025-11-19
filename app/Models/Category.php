@@ -58,6 +58,14 @@ class Category extends Model
     }
 
     /**
+     * History of tariff changes for this category.
+     */
+    public function tariffHistories()
+    {
+        return $this->hasMany(TariffHistory::class);
+    }
+
+    /**
      * Check if the category has any active customers.
      */
     public function hasActiveCustomers()

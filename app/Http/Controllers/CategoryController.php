@@ -72,9 +72,16 @@ class CategoryController extends Controller
      */
     public function show($id)
     {
-        $category = Category::with(['customers' => function($query) {
-            $query->with(['location', 'meter']);
-        }])->findOrFail($id);
+        $category = Category::with([
+            'customers' => function ($query) {
+                $query->with(['location', 'meter']);
+            },
+            'tariffHistories' => function ($query) {
+                $query->with('changedBy')
+                    ->orderByDesc('effective_from')
+                    ->orderByDesc('created_at');
+            },
+        ])->findOrFail($id);
 
         return Inertia::render('categories/show', [
             'category' => $category,

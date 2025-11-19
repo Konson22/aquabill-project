@@ -89,6 +89,10 @@ export default function Customers({ areas, categories, customers, meters = [] })
                 const locationName = customer.location?.name?.toLowerCase() || '';
                 if (locationName.includes(searchLower)) return true;
 
+                // Search in meter serial
+                const meterSerial = customer.meter?.serial?.toLowerCase() || '';
+                if (meterSerial.includes(searchLower)) return true;
+
                 return false;
             });
 
@@ -230,6 +234,9 @@ export default function Customers({ areas, categories, customers, meters = [] })
                                                             {customer.first_name} {customer.last_name}
                                                         </span>
                                                         {customer.contract && <p className="text-xs text-slate-500">#{customer.account_number}</p>}
+                                                        {customer.meter?.serial && (
+                                                            <p className="text-xs text-slate-500">Meter: {customer.meter.serial}</p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>

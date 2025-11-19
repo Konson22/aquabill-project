@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\Meter;
 use App\Models\Category;
 use App\Models\MeterLog;
+use App\Models\MeterReading;
 use App\Models\Invoice;
 use Carbon\Carbon;
 
@@ -47,7 +48,7 @@ class CustomerController extends Controller
         $request->validate([
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
+            'phone' => 'nullable|string|max:20',
             'email' => 'nullable|string|email|max:255',
             'category_id' => 'required|exists:categories,id',
             'date' => 'nullable|date',
@@ -815,6 +816,7 @@ public function exportReadings(Customer $customer)
     {
         $request->validate([
             'meter_id' => 'required|exists:meters,id',
+            'previous_reading' => 'required|numeric|min:0',
         ]);
 
         // Check if meter is already assigned to another customer
@@ -868,6 +870,20 @@ public function exportReadings(Customer $customer)
                 'status' => 'active'
             ],
             'notes' => $request->input('notes', 'Meter ' . $actionType . ' performed')
+        ]);
+
+        $initialReading = $request->input('previous_reading', 0);
+
+        MeterReading::create([
+            'meter_id' => $newMeter->id,
+            'customer_id' => $customer->id,
+            'previous' => $initialReading,
+            'value' => $initialReading,
+            'illigal_connection' => 0,
+            'source' => 'initial_assignment',
+            'note' => 'Initial reading recorded during meter assignment',
+            'billing_officer' => auth()->id(),
+            'date' => now(),
         ]);
 
         $successMessage = $oldMeter 
