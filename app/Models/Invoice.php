@@ -11,6 +11,7 @@ class Invoice extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'invoice_number',
         'customer_id',
         'reason',
         'issue_date',

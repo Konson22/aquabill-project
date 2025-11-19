@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use App\Models\Invoice;
 use App\Models\Customer;
@@ -102,6 +103,7 @@ class InvoiceController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'invoice_number' => 'nullable|string|max:50|unique:invoices,invoice_number',
             'customer_id' => 'required|exists:customers,id',
             'meter_id' => 'nullable|exists:meters,id',
             'reason' => 'nullable|string',
@@ -110,6 +112,8 @@ class InvoiceController extends Controller
             'amount_due' => 'required|numeric|min:0',
             'status' => 'required|in:pending,paid,cancelled',
         ]);
+
+        $validated['invoice_number'] = $validated['invoice_number'] ?: $this->generateInvoiceNumber();
 
         Invoice::create($validated);
 
@@ -186,6 +190,7 @@ class InvoiceController extends Controller
     public function update(Request $request, Invoice $invoice)
     {
         $validated = $request->validate([
+            'invoice_number' => 'required|string|max:50|unique:invoices,invoice_number,' . $invoice->id,
             'customer_id' => 'required|exists:customers,id',
             'meter_id' => 'nullable|exists:meters,id',
             'reason' => 'nullable|string',
@@ -208,5 +213,17 @@ class InvoiceController extends Controller
         $invoice->delete();
 
         return redirect()->route('invoices.index')->with('success', 'Invoice deleted successfully.');
+    }
+
+    /**
+     * Generate a unique invoice number.
+     */
+    protected function generateInvoiceNumber(): string
+    {
+        do {
+            $number = 'INV-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(4));
+        } while (Invoice::where('invoice_number', $number)->exists());
+
+        return $number;
     }
 }

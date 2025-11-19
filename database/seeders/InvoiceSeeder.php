@@ -3,11 +3,17 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 use App\Models\Invoice;
 use App\Models\Customer;
 
 class InvoiceSeeder extends Seeder
 {
+    /**
+     * Cache generated numbers to avoid duplicates during a single run.
+     */
+    private array $generatedNumbers = [];
+
     public function run(): void
     {
         // Get customers for relationships
@@ -31,6 +37,7 @@ class InvoiceSeeder extends Seeder
                 $dueDate = $issueDate->copy()->addDays(rand(15, 30));
                 
                 $invoices[] = [
+                    'invoice_number' => $this->generateInvoiceNumber(),
                     'customer_id' => $customer->id,
                     'reason' => $this->getRandomReason(),
                     'issue_date' => $issueDate->format('Y-m-d'),
@@ -95,5 +102,16 @@ class InvoiceSeeder extends Seeder
         }
         
         return 'pending'; // Fallback
+    }
+
+    private function generateInvoiceNumber(): string
+    {
+        do {
+            $number = 'INV-' . strtoupper(Str::random(10));
+        } while (in_array($number, $this->generatedNumbers, true) || Invoice::where('invoice_number', $number)->exists());
+
+        $this->generatedNumbers[] = $number;
+
+        return $number;
     }
 }
