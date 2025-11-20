@@ -14,32 +14,35 @@ export default function BillPrint({ bill }) {
                 {`
                     @media print {
                         .bill-print-root {
+                            font-size: 13px !important;
+                            line-height: 1.35 !important;
+                        }
+                        .bill-print-root .bill-print-heading {
                             font-size: 18px !important;
+                            line-height: 1.4 !important;
+                            letter-spacing: 0.02em;
                         }
-                        .bill-print-root .text-xs {
-                            font-size: 14px !important;
-                        }
-                        .bill-print-root .text-sm {
-                            font-size: 15px !important;
-                        }
-                        .bill-print-root h1, .bill-print-root h2, .bill-print-root h3 {
-                            font-size: 20px !important;
-                        }
-                        .bill-print-root .text-base {
-                            font-size: 18px !important;
+                        .bill-print-root .text-xs,
+                        .bill-print-root .text-sm,
+                        .bill-print-root .text-base,
+                        .bill-print-root p,
+                        .bill-print-root span,
+                        .bill-print-root li {
+                            font-size: inherit !important;
+                            line-height: inherit !important;
                         }
                     }
                 `}
             </style>
-            <div className="bill-print-root mb-8 w-full bg-gray-200 p-8 text-base print:text-xs">
+            <div className="bill-print-root my-5 w-full bg-gray-200 p-6 text-base print:text-xs">
                 {/* Header */}
                 <div className="mb-4 flex items-center justify-between">
                     <div className="h-16 w-16 object-contain">
                         <img className="h-full w-full object-contain" src="/logo.jpg" alt="Logo" />
                     </div>
                     <div className="text-center">
-                        <p className="text-base leading-5 font-semibold print:text-base print:leading-5">
-                            SOUTH SUDAN URBAN WATER CORPERATION
+                        <p className="bill-print-heading text-base leading-5 font-semibold print:text-base print:leading-5">
+                            SOUTH SUDAN URBAN WATER CORPERATION CES/JUBA
                             <br /> WATER BILL
                             <br /> Receipt No: <span className="font-semibold text-red-600">#{bill?.id}</span>
                         </p>
@@ -53,25 +56,31 @@ export default function BillPrint({ bill }) {
                     <div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">CUSTOMER NAME</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="flex- my-0.5 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.customer ? `${bill.customer.first_name} ${bill.customer.last_name}` : '—'}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">CUSTOMER TYPE</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.customer?.category?.type_id || '—'}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
+                            <span className="font-medium">ZONE:</span>
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
+                                {bill?.customer?.neighborhood?.name || '—'}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">AREA:</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.customer?.address ? bill.customer.address : '—'}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">METER NO:</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.meter?.serial || '—'}
                             </span>
                         </div>
@@ -80,25 +89,25 @@ export default function BillPrint({ bill }) {
                     <div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">DATE</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {formatDateLong(bill?.billing_period_end)}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">PREVIOUS READING</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.reading?.previous ?? 0}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">CURRENT READING</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.reading?.value ?? 0}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">CONSUMPTION</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.reading ? bill.reading.value - bill.reading.previous : 0} M³
                             </span>
                         </div>
@@ -107,25 +116,25 @@ export default function BillPrint({ bill }) {
                     <div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">OUTSTANDING</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {formatCurrency(bill?.prev_balance)}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">FIXED CHARGES:</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {formatCurrency(bill?.customer?.category?.fixed_charge)}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">TARIFF</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {formatCurrency(bill?.customer?.category?.tariff ?? 0)}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
                             <span className="font-medium">VOLUM/CHARGES</span>
-                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs print:text-xs">
+                            <span className="my-0.5 flex-1 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.reading && bill?.customer?.category
                                     ? formatCurrency((bill.reading.value - bill.reading.previous) * bill.customer.category.tariff)
                                     : formatCurrency(0)}
@@ -151,7 +160,7 @@ export default function BillPrint({ bill }) {
                 </div>
 
                 <ul className="list-disc space-y-0.5 pl-4 text-xs text-slate-600 print:text-xs">
-                    <li>Make the settlement of water bills monthly and take care of water tap in your premise.</li>
+                    <li>Make the settlement of water bills monthly within seven days to avoid disconnection and take care of your water tap</li>
                     <li>To report to Juba-Station management in case of damage or enquiry Call: +211929928736 / +211929928737</li>
                 </ul>
             </div>

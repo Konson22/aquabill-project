@@ -258,7 +258,7 @@ class BillingController extends Controller
      */
     public function printOnly(Bill $bill)
     {
-        $bill->load(['customer', 'customer.category', 'meter', 'reading', 'generatedBy']);
+        $bill->load(['customer', 'customer.neighborhood', 'customer.category', 'meter', 'reading', 'generatedBy']);
 
         return Inertia::render('billing/print-only', [
             'bill' => $bill,
@@ -281,7 +281,7 @@ class BillingController extends Controller
             ->unique()
             ->values();
 
-        $bills = Bill::with(['customer.category', 'meter', 'reading', 'generatedBy'])
+        $bills = Bill::with(['customer.category', 'customer.neighborhood', 'meter', 'reading', 'generatedBy'])
             ->whereIn('id', $ids)
             ->orderBy('billing_period_end', 'desc')
             ->get();
