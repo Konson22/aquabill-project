@@ -4,10 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -1425,17 +1426,19 @@ export default function Show({ customer, availableMeters = [] }) {
                             <Droplets className="mr-2 h-5 w-5 text-blue-600" />
                             Record Initial Meter Reading
                         </DialogTitle>
-                        <DialogDescription>Set the starting reading for {customer.meter ? customer.meter.serial || `Meter #${customer.meter.id}` : 'this meter'}.</DialogDescription>
+                        <DialogDescription>
+                            Set the starting reading for {customer.meter ? customer.meter.serial || `Meter #${customer.meter.id}` : 'this meter'}.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-5">
                         <div className="rounded-lg border bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
-                            <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Meter</p>
+                            <p className="text-xs text-slate-500 uppercase dark:text-slate-400">Meter</p>
                             <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                                 {customer.meter ? customer.meter.serial || `Meter #${customer.meter.id}` : 'No meter assigned'}
                             </p>
                             <p className="text-xs text-slate-500 dark:text-slate-400">
-                                The value you enter will be stored as both the previous and current reading. Future readings will build on
-                                this baseline without generating extra consumption.
+                                The value you enter will be stored as both the previous and current reading. Future readings will build on this
+                                baseline without generating extra consumption.
                             </p>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
