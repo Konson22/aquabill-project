@@ -2,10 +2,13 @@ import InvoiceModal from '@/components/modals/invoice-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, usePage } from '@inertiajs/react';
-import { Activity, Calendar, DollarSign, Download, FileText, Plus, Search, Users } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Activity, Calendar, DollarSign, Download, Droplets, FileText, Plus, Search, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const breadcrumbs = [
@@ -17,7 +20,7 @@ const breadcrumbs = [
 
 export default function Customers({ areas, categories, customers, meters = [] }) {
     const page = usePage();
-    const { auth } = page.props;
+    const { auth, errors = {} } = page.props;
     const userDepartment = auth.user?.department?.name;
     const isBillingDepartment = userDepartment === 'Billing';
     const isFinanceDepartment = userDepartment === 'Finance';
@@ -35,6 +38,16 @@ export default function Customers({ areas, categories, customers, meters = [] })
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
     const [selectedCustomerForInvoice, setSelectedCustomerForInvoice] = useState(null);
 
+    // Initial reading modal state
+    const [isInitialReadingModalOpen, setIsInitialReadingModalOpen] = useState(false);
+    const [selectedCustomerForInitialReading, setSelectedCustomerForInitialReading] = useState(null);
+    const [initialReadingValue, setInitialReadingValue] = useState('');
+    const [initialReadingDate, setInitialReadingDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [initialReadingNote, setInitialReadingNote] = useState('');
+    const [isSavingInitialReading, setIsSavingInitialReading] = useState(false);
+
+    const getToday = () => new Date().toISOString().split('T')[0];
+
     // Handle invoice modal
     const handleCreateInvoice = (customer) => {
         setSelectedCustomerForInvoice(customer);
@@ -49,6 +62,67 @@ export default function Customers({ areas, categories, customers, meters = [] })
     const handleInvoiceSuccess = () => {
         // Optionally refresh the page or show a success message
         window.location.reload();
+    };
+
+    const canCaptureInitialReading = (customer) => {
+        if (!customer?.meter) return false;
+        if (Array.isArray(customer.meter.readings)) {
+            return customer.meter.readings.length === 0;
+        }
+        if (typeof customer.meter.readings_count === 'number') {
+            return customer.meter.readings_count === 0;
+        }
+        if (Array.isArray(customer.readings)) {
+            return customer.readings.length === 0;
+        }
+        return true;
+    };
+
+    const openInitialReadingModal = (customer) => {
+        if (!customer?.meter) return;
+        setSelectedCustomerForInitialReading(customer);
+        setInitialReadingValue('');
+        setInitialReadingNote('');
+        setInitialReadingDate(getToday());
+        setIsInitialReadingModalOpen(true);
+    };
+
+    const closeInitialReadingModal = () => {
+        setIsInitialReadingModalOpen(false);
+        setSelectedCustomerForInitialReading(null);
+        setInitialReadingValue('');
+        setInitialReadingNote('');
+        setInitialReadingDate(getToday());
+        setIsSavingInitialReading(false);
+    };
+
+    const handleInitialReadingSubmit = () => {
+        if (initialReadingValue === '' || Number(initialReadingValue) < 0 || !selectedCustomerForInitialReading?.meter) {
+            return;
+        }
+
+        setIsSavingInitialReading(true);
+        router.post(
+            `/customers/${selectedCustomerForInitialReading.id}/initial-reading`,
+            {
+                value: Number(initialReadingValue),
+                date: initialReadingDate,
+                note: initialReadingNote,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    closeInitialReadingModal();
+                    router.reload();
+                },
+                onError: () => {
+                    setIsSavingInitialReading(false);
+                },
+                onFinish: () => {
+                    setIsSavingInitialReading(false);
+                },
+            },
+        );
     };
 
     // Filter customers based on search query
@@ -276,6 +350,17 @@ export default function Customers({ areas, categories, customers, meters = [] })
                                                                 <FileText className="h-3 w-3" />
                                                                 Invoice
                                                             </Button>
+                                                            {canCaptureInitialReading(customer) && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => openInitialReadingModal(customer)}
+                                                                    className="gap-1"
+                                                                >
+                                                                    <Droplets className="h-3 w-3" />
+                                                                    Initial
+                                                                </Button>
+                                                            )}
                                                         </>
                                                     )}
                                                 </div>
@@ -320,6 +405,85 @@ export default function Customers({ areas, categories, customers, meters = [] })
                 selectedCustomer={selectedCustomerForInvoice}
                 onSuccess={handleInvoiceSuccess}
             />
+
+            {/* Initial Reading Modal */}
+            <Dialog open={isInitialReadingModalOpen} onOpenChange={(open) => (open ? null : closeInitialReadingModal())}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Droplets className="h-5 w-5 text-blue-600" />
+                            Record Initial Reading
+                        </DialogTitle>
+                        <DialogDescription>
+                            {selectedCustomerForInitialReading
+                                ? `Capture the initial meter reading for ${selectedCustomerForInitialReading.first_name} ${selectedCustomerForInitialReading.last_name}.`
+                                : 'Capture the initial meter reading.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-5">
+                        {selectedCustomerForInitialReading && (
+                            <div className="rounded-lg border bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                                <p className="text-xs text-slate-500 uppercase dark:text-slate-400">Meter</p>
+                                <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                    {selectedCustomerForInitialReading.meter?.serial || `Meter #${selectedCustomerForInitialReading.meter?.id}`}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    This value sets the baseline for future consumption calculations.
+                                </p>
+                            </div>
+                        )}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="initial-reading-value">Initial Reading (m³)</Label>
+                                <Input
+                                    id="initial-reading-value"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={initialReadingValue}
+                                    onChange={(e) => setInitialReadingValue(e.target.value)}
+                                    placeholder="Enter reading value"
+                                />
+                                {errors.value && <p className="text-xs text-red-600">{errors.value}</p>}
+                                <p className="text-xs text-slate-500">Use the latest display from the meter.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="initial-reading-date">Reading Date</Label>
+                                <Input
+                                    id="initial-reading-date"
+                                    type="date"
+                                    value={initialReadingDate}
+                                    max={getToday()}
+                                    onChange={(e) => setInitialReadingDate(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="initial-reading-note">Notes (optional)</Label>
+                            <Textarea
+                                id="initial-reading-note"
+                                rows={3}
+                                placeholder="Describe how this reading was captured"
+                                value={initialReadingNote}
+                                onChange={(e) => setInitialReadingNote(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                            <Button type="button" variant="outline" onClick={closeInitialReadingModal} disabled={isSavingInitialReading}>
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={handleInitialReadingSubmit}
+                                disabled={initialReadingValue === '' || Number(initialReadingValue) < 0 || isSavingInitialReading}
+                            >
+                                {isSavingInitialReading ? 'Saving...' : 'Save Initial Reading'}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
