@@ -86,6 +86,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/customers/{customer}/export-readings', [CustomerController::class, 'exportReadings'])->name('customers.export-readings');
     Route::get('/customers/{customer}/export', [CustomerController::class, 'exportCustomer'])->name('customers.export');
     Route::post('/customers/{customer}/assign-meter', [CustomerController::class, 'assignMeter'])->name('customers.assign-meter');
+    Route::post('/customers/{customer}/initial-reading', [CustomerController::class, 'storeInitialReading'])->name('customers.initial-reading');
     Route::post('/customers/{customer}/update-meter-status', [CustomerController::class, 'updateMeterStatus'])->name('customers.update-meter-status');
 
     // Additional MeterLog routes
