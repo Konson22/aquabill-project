@@ -13,22 +13,14 @@ class TariffHistory extends Model
         'category_id',
         'unit_price',
         'fixed_charge',
-        'min_consumption',
-        'max_consumption',
-        'effective_from',
-        'effective_to',
-        'status',
+        'consumption',
         'changed_by',
-        'change_reason',
     ];
 
     protected $casts = [
         'unit_price' => 'decimal:2',
         'fixed_charge' => 'decimal:2',
-        'min_consumption' => 'integer',
-        'max_consumption' => 'integer',
-        'effective_from' => 'date',
-        'effective_to' => 'date',
+        'consumption' => 'integer',
     ];
 
     public function category()

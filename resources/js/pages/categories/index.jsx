@@ -1,12 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Download, Edit, Eye, MoreHorizontal, Plus, Printer, Search, Trash2 } from 'lucide-react';
+import { Download, Edit, Eye, History, Plus, Printer, Search, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatSSPCurrency } from '../../utils/formatSSPCurrency';
 import CategoryForm from '../forms/category-form';
@@ -78,6 +76,17 @@ export default function CategoriesPage({ categories }) {
             style: 'currency',
             currency: 'USD',
         }).format(amount);
+    };
+
+    const formatDate = (date) => {
+        if (!date) {
+            return '—';
+        }
+        return new Date(date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
     };
 
     const handleDelete = (categoryId) => {
@@ -188,6 +197,12 @@ export default function CategoriesPage({ categories }) {
                     <p className="mt-1 text-slate-600 dark:text-slate-400">Manage customer categories and pricing tiers</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Link href={route('categories.all-tariff-histories')}>
+                        <Button variant="outline" className="flex items-center gap-2">
+                            <History className="h-4 w-4" />
+                            All Tariff Histories
+                        </Button>
+                    </Link>
                     <Button variant="outline" onClick={exportToExcel} className="flex items-center gap-2">
                         <Download className="h-4 w-4" />
                         Export Excel
@@ -210,36 +225,18 @@ export default function CategoriesPage({ categories }) {
                 </div>
             </div>
 
-            {/* Search */}
-            <div className="mb-6">
-                <div className="relative w-80">
-                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                    <Input
-                        type="text"
-                        placeholder="Search categories..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                    />
-                </div>
-            </div>
-
             {/* Categories Table */}
             <Card>
-                <CardHeader>
-                    <CardTitle>All Categories</CardTitle>
-                    <CardDescription>Manage customer categories and pricing information</CardDescription>
-                </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-slate-200 dark:border-slate-800">
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Category Name</th>
+                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Tariff Name</th>
                                     <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Tariff Rate</th>
                                     <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Fixed Charge</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Total Customers</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Active Customers</th>
+                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Customers</th>
+                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Date</th>
                                     <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Actions</th>
                                 </tr>
                             </thead>
@@ -265,37 +262,38 @@ export default function CategoriesPage({ categories }) {
                                                 <Badge variant="secondary">{category.customers_count || 0}</Badge>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <Badge variant="secondary">{category.active_customers_count || 0}</Badge>
+                                                <span className="text-sm text-slate-600 dark:text-slate-400">{formatDate(category.created_at)}</span>
                                             </td>
                                             <td className="px-4 py-3">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="outline" size="sm">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem asChild>
-                                                            <Link href={`/categories/${category.id}`} className="flex items-center">
-                                                                <Eye className="mr-2 h-4 w-4" />
-                                                                View
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem asChild>
-                                                            <Link href={`/categories/${category.id}/edit`} className="flex items-center">
-                                                                <Edit className="mr-2 h-4 w-4" />
-                                                                Edit
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() => handleDelete(category.id)}
-                                                            className="text-red-600 focus:text-red-600"
-                                                        >
-                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                            Delete
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                <div className="flex items-center gap-2">
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/categories/${category.id}`}>
+                                                            <Eye className="mr-1 h-4 w-4" />
+                                                            View
+                                                        </Link>
+                                                    </Button>
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={route('categories.tariff-history', category.id)}>
+                                                            <History className="mr-1 h-4 w-4" />
+                                                            History
+                                                        </Link>
+                                                    </Button>
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/categories/${category.id}/edit`}>
+                                                            <Edit className="mr-1 h-4 w-4" />
+                                                            Edit
+                                                        </Link>
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleDelete(category.id)}
+                                                        className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950"
+                                                    >
+                                                        <Trash2 className="mr-1 h-4 w-4" />
+                                                        Delete
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))

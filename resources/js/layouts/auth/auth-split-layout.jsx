@@ -1,43 +1,26 @@
-import AppLogoIcon from '@/components/app-logo-icon';
 import { usePage } from '@inertiajs/react';
 
-export default function AuthSplitLayout({ children, title, description }) {
+export default function AuthSplitLayout({ children }) {
     const { name, quote } = usePage().props;
+    const appName = name || 'GoFinance';
+    const tagline = quote || 'Business popular sem to come handligue this.';
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-100 to-indigo-100">
-            {/* Background Image with Overlay */}
-            <div
-                className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-80"
-                style={{
-                    backgroundImage: 'url(/images/bg-image.jpg)',
-                }}
-            />
+        <div className="flex min-h-screen items-center justify-center bg-blue-50">
+            <div className="flex min-h-screen w-full flex-col lg:flex-row">
+                {/* Left Panel - Blue Gradient (2/3 width) */}
+                <div
+                    style={{
+                        backgroundImage: 'linear-gradient(rgba(15, 78, 214,0.5), rgba(15, 78, 214,0.5)), url(/images/water-bg.png)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                    }}
+                    className="relative hidden overflow-hidden bg-gradient-to-b from-blue-500 to-blue-700 lg:flex lg:w-2/3"
+                ></div>
 
-            {/* Dark Gradient Overlay */}
-            <div className="absolute inset-0" />
-
-            {/* Centered Form Container */}
-            <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-12">
-                <div className="w-full max-w-md">
-                    {/* Form Container */}
-                    <div className="rounded-lg border border-slate-200 bg-white/90 p-8 shadow-2xl">
-                        {/* Logo */}
-                        <div className="mb-8 text-center">
-                            <div className="mx-auto flex h-16 w-20 items-center justify-center rounded-lg border border-slate-200 bg-white shadow-sm">
-                                <AppLogoIcon className="h-full w-full fill-current text-blue-600" />
-                            </div>
-                        </div>
-
-                        {/* Form Header */}
-                        <div className="mb-6 text-center">
-                            <h2 className="mb-2 text-xl font-semibold text-slate-900">{title}</h2>
-                            {description && <p className="text-slate-600">{description}</p>}
-                        </div>
-
-                        {/* Form Content */}
-                        {children}
-                    </div>
+                {/* Right Panel - White Background (1/3 width on desktop, full width on mobile) */}
+                <div className="flex w-full items-center justify-center bg-white p-8 lg:w-1/3">
+                    <div className="w-full max-w-md">{children}</div>
                 </div>
             </div>
         </div>

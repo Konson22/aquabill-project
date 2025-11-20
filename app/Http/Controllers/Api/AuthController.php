@@ -21,11 +21,6 @@ class AuthController extends BaseController
     public function login(Request $request): JsonResponse
     {
         try {
-            Log::info('API Login attempt started', [
-                'email' => $request->email,
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent()
-            ]);
 
             $validator = Validator::make($request->all(), [
                 'email' => 'required|email',
@@ -33,12 +28,6 @@ class AuthController extends BaseController
             ]);
 
             if ($validator->fails()) {
-                Log::warning('API Login validation failed', [
-                    'email' => $request->email,
-                    'errors' => $validator->errors()->toArray(),
-                    'ip' => $request->ip()
-                ]);
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Validation error',
@@ -47,11 +36,6 @@ class AuthController extends BaseController
             }
 
             if (!Auth::attempt($request->only('email', 'password'))) {
-                Log::warning('API Login failed - invalid credentials', [
-                    'email' => $request->email,
-                    'ip' => $request->ip()
-                ]);
-
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid credentials'
@@ -60,16 +44,6 @@ class AuthController extends BaseController
 
             $user = User::where('email', $request->email)->first();
             
-            // Check if user is active
-            if ($user->status !== 'active') {
-                Auth::logout(); // Logout the user if they're not active
-                
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Account is inactive. Please contact administrator.'
-                ], 403);
-            }
-            
             // Revoke existing tokens
             $user->tokens()->delete();
             
@@ -77,13 +51,13 @@ class AuthController extends BaseController
             $token = $user->createToken('auth-token')->plainTextToken;
 
             return response()->json([
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ],
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
                 'token' => $token,
             ], 200);
+
+           
 
         } catch (Exception $e) {
             Log::error('API Login error', [

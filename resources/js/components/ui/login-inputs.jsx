@@ -13,17 +13,16 @@ const LoginInput = forwardRef(({
     return (
         <div className="relative">
             {Icon && (
-                <div className="absolute top-1/2 left-4 h-5 w-5 -translate-y-1/2 transform">
-                    <Icon className="h-5 w-5 text-blue-500" />
+                <div className="absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform">
+                    <Icon className="h-5 w-5 text-gray-400" />
                 </div>
             )}
             <input
                 type={type}
                 className={cn(
-                    "h-14 w-full rounded-xl border-2 border-slate-200 bg-white pl-12 pr-12 text-slate-900 placeholder:text-slate-500 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100 focus:outline-none transition-all duration-300 hover:border-slate-300",
-                    Icon && "pl-12",
-                    RightIcon && "pr-12",
-                    !Icon && !RightIcon && "px-4",
+                    "h-12 w-full rounded-lg border border-gray-300 bg-white text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all duration-200",
+                    Icon ? "pl-11" : "pl-4",
+                    RightIcon ? "pr-11" : "pr-4",
                     className
                 )}
                 ref={ref}
@@ -32,7 +31,7 @@ const LoginInput = forwardRef(({
             {RightIcon && (
                 <button
                     type="button"
-                    className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-500 transition-colors hover:text-blue-600 hover:bg-blue-50 rounded-r-xl"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600"
                     onClick={onRightIconClick}
                 >
                     <RightIcon className="h-5 w-5" />
@@ -50,7 +49,7 @@ const LoginEmailInput = forwardRef(({ className, ...props }, ref) => {
         <LoginInput
             ref={ref}
             type="email"
-            icon={Mail}
+            icon={User}
             placeholder="Username"
             className={className}
             {...props}

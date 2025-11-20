@@ -19,8 +19,6 @@ class CustomerController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $currentMonth = now()->format('Y-m');
-        
         $customers = Customer::with([
             'category',
             'neighborhood',
@@ -32,24 +30,13 @@ class CustomerController extends Controller
                 $query->latest()->limit(1);
             },
         ])->whereNotNull('meter_id')
-        ->whereDoesntHave('readings', function ($query) use ($currentMonth) {
-            $query->whereRaw('DATE_FORMAT(created_at, "%Y-%m") = ?', [$currentMonth]);
-        })
-        ->orWhereHas('readings', function ($query) {
-            $query->whereNull('created_at');
-        })
         ->get()
-        ->filter(function ($customer) use ($currentMonth) {
-            $last_reading = $customer->readings->first();
-            if (!$last_reading) {
-                return true; // Include customers with no readings
-            }
-            // Include customers whose last reading is not from current month
-            return $last_reading->created_at->format('Y-m') !== $currentMonth;
-        })
         ->map(function ($customer) {
             $last_reading = $customer->readings->first();
             $last_bill = $customer->bills->first();
+            $currentMonth = now()->format('Y-m');
+            $has_reading_this_month = $last_reading && $last_reading->created_at->format('Y-m') === $currentMonth;
+            
             $customer = [
                 'id' => $customer->id,
                 'first_name' => $customer->first_name,
@@ -69,8 +56,8 @@ class CustomerController extends Controller
                 'meter_status' => $customer->meter ? $customer->meter->status : null,
                 'latest_reading' => $last_reading ? $last_reading->value : 0,
                 'latest_reading_date' => $last_reading ? $last_reading->created_at : null,
+                'has_reading_this_month' => $has_reading_this_month,
                 'last_bill_balance' => $last_bill ? $last_bill->current_balance : 0,
-                'last_bill_date' => $last_bill ? $last_bill->billing_period_end : null,
                 'last_bill_status' => $last_bill ? $last_bill->status : null,
             ];
             return $customer;

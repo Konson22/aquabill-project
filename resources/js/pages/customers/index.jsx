@@ -119,10 +119,9 @@ export default function Customers({ areas, categories, customers, meters = [] })
             <Head title="Customers" />
 
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="mb-8 flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Customers</h1>
-                    <p className="mt-2 text-slate-600 dark:text-slate-400">Manage customer accounts and information</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <a href="/customers/export">
@@ -143,49 +142,37 @@ export default function Customers({ areas, categories, customers, meters = [] })
             </div>
 
             {/* Stats Cards */}
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Customers</CardTitle>
-                        <Users className="h-4 w-4 text-blue-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.total_customers}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">All customers</p>
-                    </CardContent>
+            <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="p-4">
+                    <div className="flex flex-row items-center justify-between">
+                        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400">Total Customers</h3>
+                        <Users className="h-3.5 w-3.5 text-blue-600" />
+                    </div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{filteredStats.total_customers}</div>
                 </Card>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
-                        <Activity className="h-4 w-4 text-green-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.active_customers}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Currently active</p>
-                    </CardContent>
+                <Card className="p-4">
+                    <div className="flex flex-row items-center justify-between">
+                        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400">Active Customers</h3>
+                        <Activity className="h-3.5 w-3.5 text-green-600" />
+                    </div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{filteredStats.active_customers}</div>
                 </Card>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">With Meters</CardTitle>
-                        <Calendar className="h-4 w-4 text-purple-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.customers_with_meters}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Have assigned meters</p>
-                    </CardContent>
+                <Card className="p-4">
+                    <div className="flex flex-row items-center justify-between">
+                        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400">With Meters</h3>
+                        <Calendar className="h-3.5 w-3.5 text-purple-600" />
+                    </div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{filteredStats.customers_with_meters}</div>
                 </Card>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Inactive</CardTitle>
-                        <DollarSign className="h-4 w-4 text-red-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.inactive_customers}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Inactive accounts</p>
-                    </CardContent>
+                <Card className="p-4">
+                    <div className="flex flex-row items-center justify-between">
+                        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400">Inactive</h3>
+                        <DollarSign className="h-3.5 w-3.5 text-red-600" />
+                    </div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{filteredStats.inactive_customers}</div>
                 </Card>
             </div>
 

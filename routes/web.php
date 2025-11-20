@@ -132,6 +132,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             '/categories' => CategoryController::class,
             // 'types' => TypeController::class, // Commented out - TypeController not implemented
         ]);
+        
+        // Custom category routes
+        Route::get('/categories/{category}/tariff-history', [CategoryController::class, 'tariffHistory'])->name('categories.tariff-history');
+        Route::get('/categories/tariff-histories/all', [CategoryController::class, 'allTariffHistories'])->name('categories.all-tariff-histories');
     });
     
 });

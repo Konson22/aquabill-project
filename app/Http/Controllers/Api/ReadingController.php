@@ -127,7 +127,6 @@ class ReadingController extends BaseController
             'meter_id' => 'required|exists:meters,id',
             'date' => 'required|date',
             'value' => 'required|numeric|min:0',
-            'illigal_connection' => 'nullable|boolean',
             'note' => 'nullable|string|max:500',
         ]);
 
@@ -176,7 +175,6 @@ class ReadingController extends BaseController
             'readings.*.meter_id' => 'required|exists:meters,id',
             'readings.*.date' => 'required|date',
             'readings.*.value' => 'required|numeric|min:0',
-            'readings.*.illigal_connection' => 'nullable|numeric',
             'readings.*.note' => 'nullable|string|max:500',
         ]);
 

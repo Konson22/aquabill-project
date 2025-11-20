@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Category;
+use App\Models\TariffHistory;
 use Inertia\Inertia;
 
 class CategoryController extends Controller
@@ -78,13 +79,47 @@ class CategoryController extends Controller
             },
             'tariffHistories' => function ($query) {
                 $query->with('changedBy')
-                    ->orderByDesc('effective_from')
                     ->orderByDesc('created_at');
             },
         ])->findOrFail($id);
 
+        // Add unit_price as an alias for tariff for frontend compatibility
+        $category->unit_price = $category->tariff;
+
         return Inertia::render('categories/show', [
             'category' => $category,
+        ]);
+    }
+
+    /**
+     * Display the tariff history for a category.
+     */
+    public function tariffHistory($id)
+    {
+        $category = Category::findOrFail($id);
+        
+        $tariffHistories = TariffHistory::where('category_id', $id)
+            ->with('changedBy')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return Inertia::render('categories/tariff-history', [
+            'category' => $category,
+            'tariffHistories' => $tariffHistories,
+        ]);
+    }
+
+    /**
+     * Display all tariff histories across all categories.
+     */
+    public function allTariffHistories()
+    {
+        $tariffHistories = TariffHistory::with(['category', 'changedBy'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return Inertia::render('categories/all-tariff-histories', [
+            'tariffHistories' => $tariffHistories,
         ]);
     }
 
@@ -113,11 +148,32 @@ class CategoryController extends Controller
             ]);
 
             $category = Category::findOrFail($id);
+            
+            // Store original values before updating
+            $originalTariff = $category->tariff;
+            $originalFixedCharge = $category->fixed_charge;
+            
+            // Update the category
             $category->update([
                 'name' => $request->name,
                 'tariff' => $request->tariff,
                 'fixed_charge' => $request->fixed_charge ?? 0,
             ]);
+
+            // Check if tariff or fixed_charge has changed
+            $tariffChanged = (float) $originalTariff !== (float) $request->tariff;
+            $fixedChargeChanged = (float) $originalFixedCharge !== (float) ($request->fixed_charge ?? 0);
+            
+            // Create tariff history entry if tariff or fixed_charge changed
+            if ($tariffChanged || $fixedChargeChanged) {
+                TariffHistory::create([
+                    'category_id' => $category->id,
+                    'unit_price' => $request->tariff, // Map tariff to unit_price
+                    'fixed_charge' => $request->fixed_charge ?? 0,
+                    'consumption' => 0, // Default consumption, can be updated later if needed
+                    'changed_by' => auth()->id(), // Store the user who made the change
+                ]);
+            }
 
             return redirect()->route('categories.index')
                 ->with('success', 'Category updated successfully.');
