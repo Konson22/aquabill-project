@@ -65,17 +65,27 @@ export default function Customers({ areas, categories, customers, meters = [] })
     };
 
     const canCaptureInitialReading = (customer) => {
-        if (!customer?.meter) return false;
-        if (Array.isArray(customer.meter.readings)) {
-            return customer.meter.readings.length === 0;
+        if (!customer?.meter) {
+            return false;
         }
+
         if (typeof customer.meter.readings_count === 'number') {
             return customer.meter.readings_count === 0;
         }
+
+        if (Array.isArray(customer.meter.readings)) {
+            return customer.meter.readings.length === 0;
+        }
+
+        if (typeof customer.readings_count === 'number') {
+            return customer.readings_count === 0;
+        }
+
         if (Array.isArray(customer.readings)) {
             return customer.readings.length === 0;
         }
-        return true;
+
+        return false;
     };
 
     const openInitialReadingModal = (customer) => {

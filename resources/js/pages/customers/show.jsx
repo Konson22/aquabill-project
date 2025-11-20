@@ -32,7 +32,7 @@ import {
     User,
     X,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const breadcrumbs = [
     { title: 'Customers', href: '/customers' },
@@ -57,6 +57,7 @@ export default function Show({ customer, availableMeters = [] }) {
     const [initialReadingDate, setInitialReadingDate] = useState(() => new Date().toISOString().split('T')[0]);
     const [initialReadingNote, setInitialReadingNote] = useState('');
     const [isSavingInitialReading, setIsSavingInitialReading] = useState(false);
+    const [isEditingInitialReading, setIsEditingInitialReading] = useState(false);
 
     // Meter search state
     const [meterSearch, setMeterSearch] = useState('');
@@ -65,10 +66,56 @@ export default function Show({ customer, availableMeters = [] }) {
     const [selectedMeter, setSelectedMeter] = useState(null);
     const meterDropdownRef = useRef(null);
 
+    const meterReadings = customer?.meter?.readings ?? [];
+    const initialMeterReading = useMemo(() => {
+        if (!meterReadings.length) {
+            return null;
+        }
+
+        const sortedReadings = [...meterReadings].sort((a, b) => {
+            const aTime = a.date ? new Date(a.date).getTime() : 0;
+            const bTime = b.date ? new Date(b.date).getTime() : 0;
+            return aTime - bTime;
+        });
+
+        return (
+            sortedReadings.find((reading) => {
+                const source = reading.source || '';
+                const isInitialSource = source.startsWith('initial');
+                const previousValue = Number(reading.previous ?? 0);
+                const currentValue = Number(reading.value ?? 0);
+                return isInitialSource || previousValue === currentValue;
+            }) ?? sortedReadings[0]
+        );
+    }, [meterReadings]);
+
+    const canAddInitialReading = Boolean(customer.meter) && meterReadings.length === 0;
+    const canEditInitialReading = Boolean(customer.meter) && Boolean(initialMeterReading);
+    const initialReadingSummary = initialMeterReading
+        ? {
+              rawValue: Number(initialMeterReading.value ?? 0),
+              valueDisplay: Number(initialMeterReading.value ?? 0).toLocaleString(undefined, {
+                  maximumFractionDigits: 2,
+              }),
+              date: initialMeterReading.date ? new Date(initialMeterReading.date).toLocaleDateString() : 'Not set',
+              note: initialMeterReading.note,
+          }
+        : null;
+
     const getStatusColor = (isActive) => {
         return isActive
             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
             : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+    };
+
+    const normalizeDateForInput = (value) => {
+        if (!value) {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        const normalizedValue = typeof value === 'string' ? value : value.toString();
+
+        return normalizedValue.includes('T') ? normalizedValue.split('T')[0] : normalizedValue;
     };
 
     const handlePrint = () => {
@@ -271,9 +318,6 @@ export default function Show({ customer, availableMeters = [] }) {
         };
     }, []);
 
-    // Handle meter selection
-    const canAddInitialReading = Boolean(customer.meter) && (!customer.readings || customer.readings.length === 0);
-
     const handleMeterSelect = (meter) => {
         setSelectedMeter(meter);
         setSelectedMeterId(meter.id.toString());
@@ -301,9 +345,19 @@ export default function Show({ customer, availableMeters = [] }) {
 
     const openInitialReadingModal = () => {
         if (!customer.meter) return;
+        setIsEditingInitialReading(false);
         setInitialReadingValue('');
         setInitialReadingNote('');
         setInitialReadingDate(new Date().toISOString().split('T')[0]);
+        setShowInitialReadingModal(true);
+    };
+
+    const openEditInitialReadingModal = () => {
+        if (!initialMeterReading) return;
+        setIsEditingInitialReading(true);
+        setInitialReadingValue(initialMeterReading.value?.toString() ?? '');
+        setInitialReadingNote(initialMeterReading.note ?? '');
+        setInitialReadingDate(normalizeDateForInput(initialMeterReading.date));
         setShowInitialReadingModal(true);
     };
 
@@ -314,6 +368,7 @@ export default function Show({ customer, availableMeters = [] }) {
             setInitialReadingNote('');
             setInitialReadingDate(new Date().toISOString().split('T')[0]);
             setIsSavingInitialReading(false);
+            setIsEditingInitialReading(false);
         }
     };
 
@@ -323,31 +378,39 @@ export default function Show({ customer, availableMeters = [] }) {
         }
 
         setIsSavingInitialReading(true);
-        router.post(
-            `/customers/${customer.id}/initial-reading`,
-            {
-                value: Number(initialReadingValue),
-                date: initialReadingDate,
-                note: initialReadingNote,
+
+        const payload = {
+            value: Number(initialReadingValue),
+            date: initialReadingDate,
+            note: initialReadingNote,
+        };
+
+        const options = {
+            preserveScroll: true,
+            onSuccess: () => {
+                handleInitialReadingModalChange(false);
+                router.reload();
             },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setShowInitialReadingModal(false);
-                    setInitialReadingValue('');
-                    setInitialReadingNote('');
-                    setInitialReadingDate(new Date().toISOString().split('T')[0]);
-                    setIsSavingInitialReading(false);
-                    router.reload();
-                },
-                onError: () => {
-                    setIsSavingInitialReading(false);
-                },
-                onFinish: () => {
-                    setIsSavingInitialReading(false);
-                },
+            onError: () => {
+                setIsSavingInitialReading(false);
             },
-        );
+            onFinish: () => {
+                setIsSavingInitialReading(false);
+            },
+        };
+
+        if (isEditingInitialReading) {
+            router.post(
+                `/customers/${customer.id}/initial-reading`,
+                {
+                    ...payload,
+                    _method: 'put',
+                },
+                options,
+            );
+        } else {
+            router.post(`/customers/${customer.id}/initial-reading`, payload, options);
+        }
     };
 
     const handleAssignMeter = () => {
@@ -784,6 +847,42 @@ export default function Show({ customer, availableMeters = [] }) {
                                                 <Droplets className="h-4 w-4" />
                                                 Add Initial Reading
                                             </Button>
+                                        </div>
+                                    </div>
+                                )}
+                                {!canAddInitialReading && canEditInitialReading && initialReadingSummary && (
+                                    <div className="rounded-lg border border-slate-200 bg-white/70 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/30">
+                                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                                            <div className="flex items-start gap-3">
+                                                <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
+                                                    <Droplets className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                        Initial reading captured
+                                                    </p>
+                                                    <div className="mt-1 flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-400">
+                                                        <span className="flex items-center gap-1 font-semibold text-blue-700 dark:text-blue-300">
+                                                            {initialReadingSummary.valueDisplay} m³
+                                                        </span>
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="h-4 w-4 text-slate-400" />
+                                                            {initialReadingSummary.date}
+                                                        </span>
+                                                    </div>
+                                                    {initialReadingSummary.note && (
+                                                        <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                                                            Note: {initialReadingSummary.note}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <Button variant="outline" className="gap-2" onClick={openEditInitialReadingModal}>
+                                                    <Edit className="h-4 w-4" />
+                                                    Edit Initial Reading
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -1424,10 +1523,16 @@ export default function Show({ customer, availableMeters = [] }) {
                     <DialogHeader>
                         <DialogTitle className="flex items-center">
                             <Droplets className="mr-2 h-5 w-5 text-blue-600" />
-                            Record Initial Meter Reading
+                            {isEditingInitialReading ? 'Edit Initial Meter Reading' : 'Record Initial Meter Reading'}
                         </DialogTitle>
                         <DialogDescription>
-                            Set the starting reading for {customer.meter ? customer.meter.serial || `Meter #${customer.meter.id}` : 'this meter'}.
+                            {isEditingInitialReading
+                                ? `Update the baseline reading for ${
+                                      customer.meter ? customer.meter.serial || `Meter #${customer.meter.id}` : 'this meter'
+                                  }. This affects subsequent consumption calculations.`
+                                : `Set the starting reading for ${
+                                      customer.meter ? customer.meter.serial || `Meter #${customer.meter.id}` : 'this meter'
+                                  }.`}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-5">
@@ -1493,7 +1598,7 @@ export default function Show({ customer, availableMeters = [] }) {
                                 onClick={handleInitialReadingSubmit}
                                 disabled={initialReadingValue === '' || Number(initialReadingValue) < 0 || isSavingInitialReading}
                             >
-                                {isSavingInitialReading ? 'Saving...' : 'Save Initial Reading'}
+                                {isSavingInitialReading ? 'Saving...' : isEditingInitialReading ? 'Update Initial Reading' : 'Save Initial Reading'}
                             </Button>
                         </div>
                     </div>

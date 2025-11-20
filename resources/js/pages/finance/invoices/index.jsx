@@ -63,6 +63,9 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
         return list;
     }, [invoiceItems, searchQuery, statusFilter, yearFilter, monthFilter]);
 
+    const selectableInvoices = useMemo(() => filteredInvoices.filter((invoice) => invoice.status !== 'paid'), [filteredInvoices]);
+    const selectableInvoiceIds = useMemo(() => selectableInvoices.map((invoice) => invoice.id), [selectableInvoices]);
+
     // Sync filters to server (debounced)
     useEffect(() => {
         const handle = setTimeout(() => {
@@ -76,6 +79,10 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
         }, 400);
         return () => clearTimeout(handle);
     }, [searchQuery, statusFilter, yearFilter, monthFilter]);
+
+    useEffect(() => {
+        setSelectedIds((prev) => prev.filter((id) => selectableInvoiceIds.includes(id)));
+    }, [selectableInvoiceIds]);
 
     const handleExport = () => {
         const headers = ['Invoice ID', 'Customer Name', 'Issue Date', 'Amount Due', 'Status', 'Reference Number', 'Reason', 'Due Date'];
@@ -139,20 +146,22 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
     // Selection helpers
     const isSelected = (id) => selectedIds.includes(id);
     const toggleSelect = (id) => {
+        if (!selectableInvoiceIds.includes(id)) return;
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
     };
-    const allSelected = filteredInvoices.length > 0 && filteredInvoices.every((invoice) => selectedIds.includes(invoice.id));
+    const allSelected = selectableInvoiceIds.length > 0 && selectableInvoiceIds.every((id) => selectedIds.includes(id));
     const toggleSelectAll = () => {
+        if (selectableInvoiceIds.length === 0) return;
         if (allSelected) {
-            setSelectedIds((prev) => prev.filter((id) => !filteredInvoices.some((invoice) => invoice.id === id)));
+            setSelectedIds((prev) => prev.filter((id) => !selectableInvoiceIds.includes(id)));
         } else {
-            const ids = filteredInvoices.map((invoice) => invoice.id);
-            setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
+            setSelectedIds((prev) => Array.from(new Set([...prev, ...selectableInvoiceIds])));
         }
     };
     const handlePrintSelected = () => {
-        if (selectedIds.length === 0) return;
-        const url = `/invoices/print-multiple?ids=${selectedIds.join(',')}`;
+        const printableIds = selectedIds.filter((id) => selectableInvoiceIds.includes(id));
+        if (printableIds.length === 0) return;
+        const url = `/invoices/print-multiple?ids=${printableIds.join(',')}`;
         window.open(url, '_blank');
     };
 
@@ -388,34 +397,45 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                checked={allSelected}
-                                onChange={toggleSelectAll}
-                                className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                            />
-                            <span className="text-sm text-slate-600 dark:text-slate-400">Select all</span>
+                    {selectableInvoiceIds.length > 0 && (
+                        <div className="flex items-center justify-between px-4 py-3">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    checked={allSelected}
+                                    onChange={toggleSelectAll}
+                                    className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                                <span className="text-sm text-slate-600 dark:text-slate-400">Select all</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2"
+                                    onClick={handlePrintSelected}
+                                    disabled={selectedIds.length === 0}
+                                >
+                                    <Printer className="h-4 w-4" />
+                                    Print Selected
+                                </Button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="gap-2" onClick={handlePrintSelected} disabled={selectedIds.length === 0}>
-                                <Printer className="h-4 w-4" />
-                                Print Selected
-                            </Button>
-                        </div>
-                    </div>
+                    )}
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="border-b border-slate-200 dark:border-slate-800">
                                     <th className="px-4 py-3 text-left text-sm font-semibold">
-                                        <input
-                                            type="checkbox"
-                                            checked={allSelected}
-                                            onChange={toggleSelectAll}
-                                            className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                                        />
+                                        {selectableInvoiceIds.length > 0 && (
+                                            <input
+                                                type="checkbox"
+                                                checked={allSelected}
+                                                onChange={toggleSelectAll}
+                                                className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                                disabled={selectableInvoiceIds.length === 0}
+                                            />
+                                        )}
                                     </th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
                                     <th className="px-4 py-3 text-left text-sm font-semibold">Issue Date</th>
@@ -438,12 +458,16 @@ export default function InvoiceIndex({ invoices, filters = {}, customers = [], m
                                                 className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
                                             >
                                                 <td className="px-4 py-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected(invoice.id)}
-                                                        onChange={() => toggleSelect(invoice.id)}
-                                                        className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                                                    />
+                                                    {invoice.status !== 'paid' ? (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected(invoice.id)}
+                                                            onChange={() => toggleSelect(invoice.id)}
+                                                            className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400 uppercase">Paid</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm">
                                                     {invoice.customer ? (

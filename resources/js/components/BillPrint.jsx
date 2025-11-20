@@ -31,7 +31,7 @@ export default function BillPrint({ bill }) {
                     }
                 `}
             </style>
-            <div className="bill-print-root w-full bg-gray-50 p-6 text-base print:text-xs">
+            <div className="bill-print-root mb-6 w-full bg-gray-200 p-6 text-base print:text-xs">
                 {/* Header */}
                 <div className="mb-4 flex items-center justify-between">
                     <div className="h-16 w-16 object-contain">
