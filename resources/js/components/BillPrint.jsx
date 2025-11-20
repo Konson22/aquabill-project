@@ -55,7 +55,7 @@ export default function BillPrint({ bill }) {
                 <div className="mb-3 grid grid-cols-3 gap-4">
                     <div>
                         <div className="flex items-center gap-2 text-xs print:text-xs">
-                            <span className="font-medium">CUSTOMER NAME</span>
+                            <span className="font-medium">CUS NAME</span>
                             <span className="flex- my-0.5 rounded bg-white px-2 py-0.5 text-right text-xs uppercase print:text-xs">
                                 {bill?.customer ? `${bill.customer.first_name} ${bill.customer.last_name.charAt(0).toUpperCase()}.` : '—'}
                             </span>
