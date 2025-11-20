@@ -74,6 +74,9 @@ export default function BillingIndex({ bills, filters = {} }) {
         return list;
     }, [billItems, searchQuery, statusFilter, yearFilter, monthFilter]);
 
+    const selectableBills = useMemo(() => filteredBills.filter((bill) => bill.current_balance > 0 && bill.status !== 'paid'), [filteredBills]);
+    const selectableBillIds = useMemo(() => selectableBills.map((bill) => bill.id), [selectableBills]);
+
     const stats = useMemo(() => {
         const total = filteredBills.length;
         const totalAmount = filteredBills.reduce((sum, b) => sum + parseFloat(b.total_amount || 0), 0);
@@ -113,6 +116,10 @@ export default function BillingIndex({ bills, filters = {} }) {
         return () => clearTimeout(handle);
     }, [searchQuery, statusFilter, yearFilter, monthFilter]);
 
+    useEffect(() => {
+        setSelectedIds((prev) => prev.filter((id) => selectableBillIds.includes(id)));
+    }, [selectableBillIds]);
+
     const formatDate = (date) => {
         if (!date) return '';
         return new Date(date).toLocaleDateString('en-US', {
@@ -145,20 +152,22 @@ export default function BillingIndex({ bills, filters = {} }) {
     // Selection helpers
     const isSelected = (id) => selectedIds.includes(id);
     const toggleSelect = (id) => {
+        if (!selectableBillIds.includes(id)) return;
         setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
     };
-    const allSelected = filteredBills.length > 0 && filteredBills.every((b) => selectedIds.includes(b.id));
+    const allSelected = selectableBillIds.length > 0 && selectableBillIds.every((id) => selectedIds.includes(id));
     const toggleSelectAll = () => {
+        if (selectableBillIds.length === 0) return;
         if (allSelected) {
-            setSelectedIds((prev) => prev.filter((id) => !filteredBills.some((b) => b.id === id)));
+            setSelectedIds((prev) => prev.filter((id) => !selectableBillIds.includes(id)));
         } else {
-            const ids = filteredBills.map((b) => b.id);
-            setSelectedIds((prev) => Array.from(new Set([...prev, ...ids])));
+            setSelectedIds((prev) => Array.from(new Set([...prev, ...selectableBillIds])));
         }
     };
     const handlePrintSelected = () => {
-        if (selectedIds.length === 0) return;
-        const url = `/billing/print-multiple-only?ids=${selectedIds.join(',')}`;
+        const printableIds = selectedIds.filter((id) => selectableBillIds.includes(id));
+        if (printableIds.length === 0) return;
+        const url = `/billing/print-multiple-only?ids=${printableIds.join(',')}`;
         window.open(url, '_blank');
     };
 
@@ -467,34 +476,45 @@ export default function BillingIndex({ bills, filters = {} }) {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="flex items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                checked={allSelected}
-                                onChange={toggleSelectAll}
-                                className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                            />
-                            <span className="text-sm text-slate-600 dark:text-slate-400">Select all</span>
+                    {selectableBillIds.length > 0 && (
+                        <div className="flex items-center justify-between px-4 py-3">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="checkbox"
+                                    checked={allSelected}
+                                    onChange={toggleSelectAll}
+                                    className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                />
+                                <span className="text-sm text-slate-600 dark:text-slate-400">Select all</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-2"
+                                    onClick={handlePrintSelected}
+                                    disabled={selectedIds.length === 0}
+                                >
+                                    <Printer className="h-4 w-4" />
+                                    Print Selected
+                                </Button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="gap-2" onClick={handlePrintSelected} disabled={selectedIds.length === 0}>
-                                <Printer className="h-4 w-4" />
-                                Print Selected
-                            </Button>
-                        </div>
-                    </div>
+                    )}
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[800px]">
                             <thead className="border-b border-slate-200 dark:border-slate-700">
                                 <tr className="bg-slate-50 dark:bg-slate-800/50">
                                     <th className="px-4 py-4">
-                                        <input
-                                            type="checkbox"
-                                            checked={allSelected}
-                                            onChange={toggleSelectAll}
-                                            className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                                        />
+                                        {selectableBillIds.length > 0 && (
+                                            <input
+                                                type="checkbox"
+                                                checked={allSelected}
+                                                onChange={toggleSelectAll}
+                                                className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                                disabled={selectableBillIds.length === 0}
+                                            />
+                                        )}
                                     </th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Bill Details</th>
                                     <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900 dark:text-slate-100">Customer</th>
@@ -513,12 +533,16 @@ export default function BillingIndex({ bills, filters = {} }) {
                                         return (
                                             <tr key={bill.id} className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                                 <td className="px-4 py-4">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected(bill.id)}
-                                                        onChange={() => toggleSelect(bill.id)}
-                                                        className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                                                    />
+                                                    {bill.current_balance > 0 ? (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected(bill.id)}
+                                                            onChange={() => toggleSelect(bill.id)}
+                                                            className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400 uppercase">Paid</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div>
@@ -627,13 +651,6 @@ export default function BillingIndex({ bills, filters = {} }) {
                                                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">No bills found</h3>
                                                     <p className="text-slate-500 dark:text-slate-400">Get started by creating your first bill</p>
                                                 </div>
-                                                <Button
-                                                    onClick={() => router.get('/billing/create')}
-                                                    className="gap-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800"
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                    Create Bill
-                                                </Button>
                                             </div>
                                         </td>
                                     </tr>
@@ -683,12 +700,16 @@ export default function BillingIndex({ bills, filters = {} }) {
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-3">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected(bill.id)}
-                                                        onChange={() => toggleSelect(bill.id)}
-                                                        className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                                                    />
+                                                    {bill.current_balance > 0 ? (
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected(bill.id)}
+                                                            onChange={() => toggleSelect(bill.id)}
+                                                            className="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                                                        />
+                                                    ) : (
+                                                        <span className="text-xs text-slate-400 uppercase">Paid</span>
+                                                    )}
                                                 </div>
                                             </div>
 

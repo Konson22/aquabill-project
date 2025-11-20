@@ -12,6 +12,7 @@ use App\Models\MeterLog;
 use App\Models\MeterReading;
 use App\Models\Invoice;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class CustomerController extends Controller
 {
@@ -22,7 +23,15 @@ class CustomerController extends Controller
     {
         $neighborhoods = Neighborhood::all();
         $categories = Category::all();
-        $customers = Customer::with(['neighborhood', 'category', 'meter'])->get();
+        $customers = Customer::with([
+                'neighborhood',
+                'category',
+                'meter' => function ($query) {
+                    $query->withCount('readings');
+                },
+            ])
+            ->withCount('readings')
+            ->get();
         $meters = Meter::with('customer')->get();
         return Inertia::render('customers/index', compact('neighborhoods', 'categories', 'customers', 'meters'));
     }
@@ -968,6 +977,73 @@ public function exportReadings(Customer $customer)
         ]);
 
         return back()->with('success', 'Initial meter reading recorded successfully.');
+    }
+
+    /**
+     * Update the initial reading for a customer's current meter
+     */
+    public function updateInitialReading(Request $request, Customer $customer)
+    {
+        if (!$customer->meter) {
+            return back()->withErrors([
+                'value' => 'Please assign a meter to this customer before updating the initial reading.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'value' => 'required|numeric|min:0',
+            'date' => 'nullable|date',
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        $meterReadings = MeterReading::where('meter_id', $customer->meter_id)
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get();
+
+        if ($meterReadings->isEmpty()) {
+            return back()->withErrors([
+                'value' => 'No initial reading found to update for this meter.',
+            ]);
+        }
+
+        $initialReading = $meterReadings->first(function ($reading) {
+            $source = $reading->source ?? '';
+            return Str::startsWith($source, 'initial') || $reading->value == $reading->previous;
+        }) ?? $meterReadings->first();
+
+        if (!$initialReading) {
+            return back()->withErrors([
+                'value' => 'Unable to determine the initial reading for this meter.',
+            ]);
+        }
+
+        $readingValue = $validated['value'];
+        $readingDate = $validated['date'] ?? $initialReading->date ?? now();
+        $note = $request->has('note') ? $validated['note'] : $initialReading->note;
+
+        $initialReading->update([
+            'value' => $readingValue,
+            'previous' => $readingValue,
+            'date' => $readingDate,
+            'note' => $note,
+            'billing_officer' => auth()->id(),
+        ]);
+
+        $previousValue = $readingValue;
+        foreach ($meterReadings as $reading) {
+            if ($reading->id === $initialReading->id) {
+                continue;
+            }
+
+            $reading->update([
+                'previous' => $previousValue,
+            ]);
+
+            $previousValue = $reading->value;
+        }
+
+        return back()->with('success', 'Initial meter reading updated successfully.');
     }
 
     /**
