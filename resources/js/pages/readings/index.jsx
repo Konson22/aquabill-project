@@ -476,70 +476,70 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth,
             <Head title="Meter Readings" />
 
             {/* Modern Header */}
-            <div className="relative mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-700 dark:bg-slate-800">
-                <div className="relative">
-                    <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="space-y-2">
-                            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Meter Readings</h1>
-                            <p className="text-slate-600 dark:text-slate-400">Track and manage water consumption data across the system</p>
-                        </div>
-                        <div className="flex flex-wrap gap-3">
-                            <AddReadingModal meters={meters} />
-                            <Button variant="outline" asChild>
-                                <Link href="/readings/statistics">
-                                    <BarChart3 className="mr-2 h-4 w-4" />
-                                    Analytics
-                                </Link>
-                            </Button>
-                            <Button variant="outline" onClick={() => window.print()}>
-                                <Printer className="mr-2 h-4 w-4" />
-                                Print
-                            </Button>
-                        </div>
-                    </div>
+            <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-2">
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Meter Readings</h1>
+                    <p className="text-slate-600 dark:text-slate-400">Track and manage water consumption data across the system</p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                    <AddReadingModal meters={meters} />
+                    <Button variant="outline" asChild>
+                        <Link href="/readings/statistics">
+                            <BarChart3 className="mr-2 h-4 w-4" />
+                            Analytics
+                        </Link>
+                    </Button>
+                    <Button variant="outline" onClick={() => window.print()}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print
+                    </Button>
                 </div>
             </div>
 
             {/* Modern Stats Cards */}
-            <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card className="border-0 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg dark:from-blue-900/20 dark:to-blue-800/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 pt-4 pb-1">
-                        <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Readings</CardTitle>
-                        <div className="rounded-lg bg-blue-500 p-1.5">
-                            <Activity className="h-3.5 w-3.5 text-white" />
+            <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-md border-0 bg-gradient-to-br from-blue-50 to-blue-100 px-2 py-1.5 shadow-sm dark:from-blue-900/20 dark:to-blue-800/20">
+                    <div className="flex items-start justify-between p-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-base leading-tight font-medium text-blue-700 dark:text-blue-300">Total Readings</h3>
+                                <Activity className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="mt-1.5 text-xl font-bold text-blue-900 dark:text-blue-100">{filteredStats.total_readings}</div>
+                            <p className="mt-0.5 text-sm leading-tight text-blue-600 dark:text-blue-400">All time readings</p>
                         </div>
-                    </CardHeader>
-                    <CardContent className="px-4 pt-1 pb-4">
-                        <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{filteredStats.total_readings}</div>
-                        <p className="mt-0.5 text-xs text-blue-600 dark:text-blue-400">All time readings</p>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
 
-                <Card className="border-0 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg dark:from-purple-900/20 dark:to-purple-800/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 pt-4 pb-1">
-                        <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300">Total Consumption</CardTitle>
-                        <div className="rounded-lg bg-purple-500 p-1.5">
-                            <Droplets className="h-3.5 w-3.5 text-white" />
+                <div className="rounded-md border-0 bg-gradient-to-br from-purple-50 to-purple-100 px-2 py-1.5 shadow-sm dark:from-purple-900/20 dark:to-purple-800/20">
+                    <div className="flex items-start justify-between p-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-base leading-tight font-medium text-purple-700 dark:text-purple-300">Total Consumption</h3>
+                                <Droplets className="h-4 w-4 flex-shrink-0 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <div className="mt-1.5 text-xl font-bold text-purple-900 dark:text-purple-100">
+                                {formatNumber(filteredStats.total_consumption)}
+                            </div>
+                            <p className="mt-0.5 text-sm leading-tight text-purple-600 dark:text-purple-400">Cubic meters</p>
                         </div>
-                    </CardHeader>
-                    <CardContent className="px-4 pt-1 pb-4">
-                        <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">{formatNumber(filteredStats.total_consumption)}</div>
-                        <p className="mt-0.5 text-xs text-purple-600 dark:text-purple-400">Cubic meters</p>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
 
-                <Card className="border-0 bg-gradient-to-br from-orange-50 to-orange-100 shadow-lg dark:from-orange-900/20 dark:to-orange-800/20">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 px-4 pt-4 pb-1">
-                        <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">Avg Consumption</CardTitle>
-                        <div className="rounded-lg bg-orange-500 p-1.5">
-                            <TrendingUp className="h-3.5 w-3.5 text-white" />
+                <div className="rounded-md border-0 bg-gradient-to-br from-orange-50 to-orange-100 px-2 py-1.5 shadow-sm dark:from-orange-900/20 dark:to-orange-800/20">
+                    <div className="flex items-start justify-between p-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-base leading-tight font-medium text-orange-700 dark:text-orange-300">Avg Consumption</h3>
+                                <TrendingUp className="h-4 w-4 flex-shrink-0 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <div className="mt-1.5 text-xl font-bold text-orange-900 dark:text-orange-100">
+                                {formatNumber(filteredStats.avg_consumption)}
+                            </div>
+                            <p className="mt-0.5 text-sm leading-tight text-orange-600 dark:text-orange-400">Per reading</p>
                         </div>
-                    </CardHeader>
-                    <CardContent className="px-4 pt-1 pb-4">
-                        <div className="text-2xl font-bold text-orange-900 dark:text-orange-100">{formatNumber(filteredStats.avg_consumption)}</div>
-                        <p className="mt-0.5 text-xs text-orange-600 dark:text-orange-400">Per reading</p>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
 
             {/* Modern Search and Filter Section */}
@@ -551,8 +551,7 @@ export default function ReadingsPage({ readings, stats, meters, customers, auth,
                             <CardDescription className="text-slate-600 dark:text-slate-400">Latest meter readings from all customers</CardDescription>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
-                            <div className="relative min-w-[300px] flex-1">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <div className="relative min-w-[400px] flex-1">
                                 <Input
                                     type="text"
                                     placeholder="Search by customer, meter, or date..."

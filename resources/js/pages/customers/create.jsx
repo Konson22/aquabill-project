@@ -7,8 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, FileText, MapPin, Save, User, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, FileText, MapPin, Save, User } from 'lucide-react';
+import { useState } from 'react';
 
 const breadcrumbs = [
     {
@@ -21,68 +21,9 @@ const breadcrumbs = [
     },
 ];
 
-export default function CreateCustomer({ areas, meters, categories, neighborhoods, errors = {} }) {
+export default function CreateCustomer({ areas, meters, categories, neighborhoods, addresses = [], errors = {} }) {
     const [createNewNeighborhood, setCreateNewNeighborhood] = useState(false);
-    const [meterSearch, setMeterSearch] = useState('');
-    const [showMeterDropdown, setShowMeterDropdown] = useState(false);
-    const [filteredMeters, setFilteredMeters] = useState(meters);
-    const [selectedMeter, setSelectedMeter] = useState(null);
-    const meterDropdownRef = useRef(null);
-
-    // Filter meters based on search
-    useEffect(() => {
-        if (meterSearch.trim() === '') {
-            setFilteredMeters(meters);
-        } else {
-            const filtered = meters.filter(
-                (meter) =>
-                    (meter.serial && meter.serial.toLowerCase().includes(meterSearch.toLowerCase())) ||
-                    (meter.meter_number && meter.meter_number.toLowerCase().includes(meterSearch.toLowerCase())) ||
-                    (meter.model && meter.model.toLowerCase().includes(meterSearch.toLowerCase())),
-            );
-            setFilteredMeters(filtered);
-        }
-    }, [meterSearch, meters]);
-
-    // Handle click outside to close dropdown
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (meterDropdownRef.current && !meterDropdownRef.current.contains(event.target)) {
-                setShowMeterDropdown(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, []);
-
-    // Handle meter selection
-    const handleMeterSelect = (meter) => {
-        setSelectedMeter(meter);
-        setData('meter_id', meter.id);
-        setMeterSearch(meter.serial || meter.meter_number || `Meter #${meter.id}`);
-        setShowMeterDropdown(false);
-    };
-
-    // Handle meter search input
-    const handleMeterSearch = (value) => {
-        setMeterSearch(value);
-        setShowMeterDropdown(true);
-        if (value === '') {
-            setSelectedMeter(null);
-            setData('meter_id', '');
-        }
-    };
-
-    // Clear meter selection
-    const clearMeterSelection = () => {
-        setSelectedMeter(null);
-        setData('meter_id', '');
-        setMeterSearch('');
-        setShowMeterDropdown(false);
-    };
+    const [createNewAddress, setCreateNewAddress] = useState(false);
 
     const { data, setData, post, processing, reset } = useForm({
         // Customer fields
@@ -100,8 +41,7 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
         // Location fields
         plot_number: '',
         address: '',
-        latitude: '',
-        longitude: '',
+        new_address: '',
 
         // Zone fields
         neighborhood_id: '',
@@ -123,10 +63,17 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
             return;
         }
 
+        // Validate that at least one address option is provided
+        if (!data.address && !data.new_address.trim()) {
+            alert('Please either select an existing address or add a new one.');
+            return;
+        }
+
         post('/customers', {
             onSuccess: () => {
                 reset();
                 setCreateNewNeighborhood(false);
+                setCreateNewAddress(false);
             },
         });
     };
@@ -214,37 +161,12 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                     </div>
                                 </div>
 
-                                {/* Account Fields */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="contract">Contract Number (Optional)</Label>
-                                    <Input
-                                        id="contract"
-                                        value={data.contract}
-                                        onChange={(e) => setData('contract', e.target.value)}
-                                        placeholder="Enter contract number"
-                                    />
-                                    {errors.contract && <InputError message={errors.contract} />}
-                                </div>
-
                                 {/* Additional Fields */}
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label htmlFor="date">Contract Date</Label>
                                         <Input id="date" value={data.date} onChange={(e) => setData('date', e.target.value)} type="date" />
                                         {errors.date && <InputError message={errors.date} />}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="credit">Credit Balance</Label>
-                                        <Input
-                                            id="credit"
-                                            value={data.credit}
-                                            onChange={(e) => setData('credit', e.target.value)}
-                                            placeholder="0.00"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                        />
-                                        {errors.credit && <InputError message={errors.credit} />}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="category_id">Category *</Label>
@@ -264,57 +186,6 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                     </div>
                                 </div>
 
-                                {/* Meter Assignment */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="meter_id">Meter Assignment (Optional)</Label>
-                                    <div className="relative" ref={meterDropdownRef}>
-                                        <div className="relative">
-                                            <Input
-                                                id="meter_id"
-                                                value={meterSearch}
-                                                onChange={(e) => handleMeterSearch(e.target.value)}
-                                                onFocus={() => setShowMeterDropdown(true)}
-                                                placeholder="Search meters by serial, number, or model..."
-                                            />
-                                            {selectedMeter && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="absolute top-1/2 right-1 h-6 w-6 -translate-y-1/2 p-0 hover:bg-slate-100"
-                                                    onClick={clearMeterSelection}
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </Button>
-                                            )}
-                                        </div>
-
-                                        {showMeterDropdown && (
-                                            <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
-                                                {filteredMeters.length > 0 ? (
-                                                    filteredMeters.map((meter) => (
-                                                        <div
-                                                            key={meter.id}
-                                                            className="cursor-pointer px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
-                                                            onClick={() => handleMeterSelect(meter)}
-                                                        >
-                                                            <div className="font-medium">
-                                                                {meter.serial || meter.meter_number || `Meter #${meter.id}`}
-                                                            </div>
-                                                            <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                                {meter.model || 'Unknown Model'} - Status: {meter.status || 'Unknown'}
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400">No meters found</div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {errors.meter_id && <InputError message={errors.meter_id} />}
-                                </div>
-
                                 {/* Status */}
                                 <div className="flex items-center space-x-2">
                                     <Checkbox id="is_active" checked={data.is_active} onCheckedChange={(checked) => setData('is_active', checked)} />
@@ -322,6 +193,67 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                 </div>
                             </CardContent>
                         </Card>
+                        <div className="mt-6">
+                            {/* Invoice Information */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <FileText className="h-5 w-5 text-purple-600" />
+                                        Service Invoice (Optional)
+                                    </CardTitle>
+                                    <CardDescription>Create an invoice for service payments like meter installation fees</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="invoice_reason">Reason for Invoice</Label>
+                                            <Input
+                                                id="invoice_reason"
+                                                value={data.invoice_reason}
+                                                onChange={(e) => setData('invoice_reason', e.target.value)}
+                                                placeholder="e.g., Meter Installation Fee, Service Connection"
+                                            />
+                                            {errors.invoice_reason && <InputError message={errors.invoice_reason} />}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="invoice_amount_due">Amount Due</Label>
+                                            <Input
+                                                id="invoice_amount_due"
+                                                value={data.invoice_amount_due}
+                                                onChange={(e) => setData('invoice_amount_due', e.target.value)}
+                                                placeholder="0.00"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                            />
+                                            {errors.invoice_amount_due && <InputError message={errors.invoice_amount_due} />}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="invoice_issue_date">Issue Date</Label>
+                                            <Input
+                                                id="invoice_issue_date"
+                                                value={data.invoice_issue_date}
+                                                onChange={(e) => setData('invoice_issue_date', e.target.value)}
+                                                type="date"
+                                            />
+                                            {errors.invoice_issue_date && <InputError message={errors.invoice_issue_date} />}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="invoice_due_date">Due Date</Label>
+                                            <Input
+                                                id="invoice_due_date"
+                                                value={data.invoice_due_date}
+                                                onChange={(e) => setData('invoice_due_date', e.target.value)}
+                                                type="date"
+                                            />
+                                            {errors.invoice_due_date && <InputError message={errors.invoice_due_date} />}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
 
                     {/* Location Information */}
@@ -347,43 +279,75 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                         />
                                         {errors.plot_number && <InputError message={errors.plot_number} />}
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="address">Address</Label>
-                                        <Input
-                                            id="address"
-                                            value={data.address}
-                                            onChange={(e) => setData('address', e.target.value)}
-                                            placeholder="Enter address"
-                                        />
-                                        {errors.address && <InputError message={errors.address} />}
-                                    </div>
+                                    {/* Address Selection */}
+                                    <div className="space-y-3">
+                                        <Label>Address *</Label>
+                                        <p className="text-sm text-slate-600 dark:text-slate-400">Select an existing address or add a new one</p>
 
-                                    {/* Coordinates */}
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        {/* Address Select */}
                                         <div className="space-y-2">
-                                            <Label htmlFor="latitude">Latitude</Label>
-                                            <Input
-                                                id="latitude"
-                                                value={data.latitude}
-                                                onChange={(e) => setData('latitude', e.target.value)}
-                                                placeholder="e.g., -1.2921"
-                                                type="number"
-                                                step="any"
-                                            />
-                                            {errors.latitude && <InputError message={errors.latitude} />}
+                                            <Select
+                                                value={data.address || 'none'}
+                                                onValueChange={(value) => {
+                                                    setData('address', value === 'none' ? '' : value);
+                                                    // Clear new address when selecting existing
+                                                    if (value !== 'none') {
+                                                        setData('new_address', '');
+                                                        setCreateNewAddress(false);
+                                                    }
+                                                }}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Choose existing address" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">No Address Selected</SelectItem>
+                                                    {addresses.map((address, index) => (
+                                                        <SelectItem key={index} value={address}>
+                                                            {address}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {errors.address && <InputError message={errors.address} />}
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="longitude">Longitude</Label>
-                                            <Input
-                                                id="longitude"
-                                                value={data.longitude}
-                                                onChange={(e) => setData('longitude', e.target.value)}
-                                                placeholder="e.g., 36.8219"
-                                                type="number"
-                                                step="any"
-                                            />
-                                            {errors.longitude && <InputError message={errors.longitude} />}
+
+                                        {/* Add New Address Button */}
+                                        <div className="flex items-center space-x-2">
+                                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
+                                            <span className="text-sm text-slate-500 dark:text-slate-400">OR</span>
+                                            <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
                                         </div>
+
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                                setCreateNewAddress(!createNewAddress);
+                                                // Clear existing address selection when adding new
+                                                if (!createNewAddress) {
+                                                    setData('address', '');
+                                                }
+                                            }}
+                                            className="w-full"
+                                        >
+                                            {createNewAddress ? 'Cancel Adding New' : 'Add New Address'}
+                                        </Button>
+
+                                        {/* New Address Field */}
+                                        {createNewAddress && (
+                                            <div className="space-y-2">
+                                                <Label htmlFor="new_address">New Address *</Label>
+                                                <Input
+                                                    id="new_address"
+                                                    value={data.new_address}
+                                                    onChange={(e) => setData('new_address', e.target.value)}
+                                                    placeholder="Enter new address"
+                                                />
+                                                {errors.new_address && <InputError message={errors.new_address} />}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Zone Selection */}
@@ -457,82 +421,21 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                         )}
                                     </div>
                                 </div>
+                                {/* Form Actions */}
+                                <div className="flex justify-end space-x-4">
+                                    <Link href="/customers">
+                                        <Button type="button" variant="outline">
+                                            Cancel
+                                        </Button>
+                                    </Link>
+                                    <Button type="submit" disabled={processing} className="gap-2">
+                                        <Save className="h-4 w-4" />
+                                        {processing ? 'Creating...' : 'Create Customer'}
+                                    </Button>
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
-                </div>
-
-                {/* Invoice Information */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-purple-600" />
-                            Service Invoice (Optional)
-                        </CardTitle>
-                        <CardDescription>Create an invoice for service payments like meter installation fees</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="invoice_reason">Reason for Invoice</Label>
-                                <Input
-                                    id="invoice_reason"
-                                    value={data.invoice_reason}
-                                    onChange={(e) => setData('invoice_reason', e.target.value)}
-                                    placeholder="e.g., Meter Installation Fee, Service Connection"
-                                />
-                                {errors.invoice_reason && <InputError message={errors.invoice_reason} />}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="invoice_amount_due">Amount Due</Label>
-                                <Input
-                                    id="invoice_amount_due"
-                                    value={data.invoice_amount_due}
-                                    onChange={(e) => setData('invoice_amount_due', e.target.value)}
-                                    placeholder="0.00"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                />
-                                {errors.invoice_amount_due && <InputError message={errors.invoice_amount_due} />}
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="invoice_issue_date">Issue Date</Label>
-                                <Input
-                                    id="invoice_issue_date"
-                                    value={data.invoice_issue_date}
-                                    onChange={(e) => setData('invoice_issue_date', e.target.value)}
-                                    type="date"
-                                />
-                                {errors.invoice_issue_date && <InputError message={errors.invoice_issue_date} />}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="invoice_due_date">Due Date</Label>
-                                <Input
-                                    id="invoice_due_date"
-                                    value={data.invoice_due_date}
-                                    onChange={(e) => setData('invoice_due_date', e.target.value)}
-                                    type="date"
-                                />
-                                {errors.invoice_due_date && <InputError message={errors.invoice_due_date} />}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Form Actions */}
-                <div className="flex justify-end space-x-4">
-                    <Link href="/customers">
-                        <Button type="button" variant="outline">
-                            Cancel
-                        </Button>
-                    </Link>
-                    <Button type="submit" disabled={processing} className="gap-2">
-                        <Save className="h-4 w-4" />
-                        {processing ? 'Creating...' : 'Create Customer'}
-                    </Button>
                 </div>
             </form>
         </AppLayout>

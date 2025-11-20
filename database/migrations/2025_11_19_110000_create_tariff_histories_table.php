@@ -19,16 +19,11 @@ return new class extends Migration
                 ->nullOnDelete();
             $table->decimal('unit_price', 10, 2);
             $table->decimal('fixed_charge', 10, 2)->default(0);
-            $table->unsignedInteger('min_consumption')->default(0);
-            $table->unsignedInteger('max_consumption')->nullable();
-            $table->date('effective_from');
-            $table->date('effective_to')->nullable();
-            $table->enum('status', ['pending', 'active', 'expired'])->default('pending');
+            $table->unsignedInteger('consumption')->default(0);
             $table->foreignId('changed_by')
                 ->nullable()
                 ->constrained('users')
                 ->nullOnDelete();
-            $table->string('change_reason')->nullable();
             $table->timestamps();
         });
     }

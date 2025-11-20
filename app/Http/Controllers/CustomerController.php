@@ -35,8 +35,15 @@ class CustomerController extends Controller
         $neighborhoods = Neighborhood::all();
         $meters = Meter::whereDoesntHave('customer')->get();
         $categories = \App\Models\Category::all();
+        $addresses = Customer::whereNotNull('address')
+            ->where('address', '!=', '')
+            ->distinct()
+            ->pluck('address')
+            ->filter()
+            ->values()
+            ->toArray();
         
-        return Inertia::render('customers/create', compact('neighborhoods', 'meters', 'categories'));
+        return Inertia::render('customers/create', compact('neighborhoods', 'meters', 'categories', 'addresses'));
     }
 
     /**
@@ -58,7 +65,8 @@ class CustomerController extends Controller
             'is_active' => 'nullable|boolean',
             'meter_id' => 'nullable|exists:meters,id',
             'plot_number' => 'nullable|string|max:20',
-            'address' => 'required|string|max:255',
+            'address' => 'nullable|string|max:255',
+            'new_address' => 'nullable|string|max:255',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'neighborhood_id' => 'nullable|exists:neighborhoods,id',
@@ -79,6 +87,14 @@ class CustomerController extends Controller
             ])->withInput();
         }
 
+        // Custom validation: at least one address option must be provided
+        if (!$request->filled('address') && !$request->filled('new_address')) {
+            return back()->withErrors([
+                'address' => 'Please either select an existing address or add a new one.',
+                'new_address' => 'Please either select an existing address or add a new one.'
+            ])->withInput();
+        }
+
         $neighborhoodId = $request->input('neighborhood_id');
 
         // Create new neighborhood if provided
@@ -89,6 +105,9 @@ class CustomerController extends Controller
             $neighborhoodId = $neighborhood->id;
         }
 
+        // Use new address if provided, otherwise use selected address
+        $address = $request->filled('new_address') ? $request->input('new_address') : $request->input('address');
+
         // Create customer first to get the ID
         $customer = Customer::create([
             'first_name' => $request->input('first_name'),
@@ -98,7 +117,7 @@ class CustomerController extends Controller
             'category_id' => $request->input('category_id'),
             'neighborhood_id' => $neighborhoodId,
             'plot_number' => $request->input('plot_number'),
-            'address' => $request->input('address'),
+            'address' => $address,
             'latitude' => $request->input('latitude'),
             'longitude' => $request->input('longitude'),
             'meter_id' => $request->input('meter_id'),
