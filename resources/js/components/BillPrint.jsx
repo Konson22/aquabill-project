@@ -14,31 +14,31 @@ export default function BillPrint({ bill }) {
                 {`
                     @media print {
                         .bill-print-root {
-                            font-size: 14px !important;
+                            font-size: 18px !important;
                         }
                         .bill-print-root .text-xs {
-                            font-size: 12px !important;
+                            font-size: 14px !important;
                         }
                         .bill-print-root .text-sm {
-                            font-size: 13px !important;
+                            font-size: 15px !important;
                         }
                         .bill-print-root h1, .bill-print-root h2, .bill-print-root h3 {
-                            font-size: 16px !important;
+                            font-size: 20px !important;
                         }
                         .bill-print-root .text-base {
-                            font-size: 14px !important;
+                            font-size: 18px !important;
                         }
                     }
                 `}
             </style>
-            <div className="bill-print-root mb-6 w-full bg-gray-200 p-6 text-base print:text-xs">
+            <div className="bill-print-root mb-8 w-full bg-gray-200 p-8 text-base print:text-xs">
                 {/* Header */}
                 <div className="mb-4 flex items-center justify-between">
                     <div className="h-16 w-16 object-contain">
                         <img className="h-full w-full object-contain" src="/logo.jpg" alt="Logo" />
                     </div>
                     <div className="text-center">
-                        <p className="text-sm leading-4 font-semibold print:text-xs print:leading-3">
+                        <p className="text-base leading-5 font-semibold print:text-base print:leading-5">
                             SOUTH SUDAN URBAN WATER CORPERATION
                             <br /> WATER BILL
                             <br /> Receipt No: <span className="font-semibold text-red-600">#{bill?.id}</span>
