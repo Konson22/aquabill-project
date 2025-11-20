@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -47,9 +48,14 @@ export default function Show({ customer, availableMeters = [] }) {
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [showAssignMeterModal, setShowAssignMeterModal] = useState(false);
     const [showManageMeterModal, setShowManageMeterModal] = useState(false);
+    const [showInitialReadingModal, setShowInitialReadingModal] = useState(false);
     const [selectedMeterId, setSelectedMeterId] = useState('');
     const [selectedMeterStatus, setSelectedMeterStatus] = useState('');
     const [previousReading, setPreviousReading] = useState('');
+    const [initialReadingValue, setInitialReadingValue] = useState('');
+    const [initialReadingDate, setInitialReadingDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [initialReadingNote, setInitialReadingNote] = useState('');
+    const [isSavingInitialReading, setIsSavingInitialReading] = useState(false);
 
     // Meter search state
     const [meterSearch, setMeterSearch] = useState('');
@@ -265,6 +271,8 @@ export default function Show({ customer, availableMeters = [] }) {
     }, []);
 
     // Handle meter selection
+    const canAddInitialReading = Boolean(customer.meter) && (!customer.readings || customer.readings.length === 0);
+
     const handleMeterSelect = (meter) => {
         setSelectedMeter(meter);
         setSelectedMeterId(meter.id.toString());
@@ -288,6 +296,57 @@ export default function Show({ customer, availableMeters = [] }) {
         setSelectedMeterId('');
         setMeterSearch('');
         setShowMeterDropdown(false);
+    };
+
+    const openInitialReadingModal = () => {
+        if (!customer.meter) return;
+        setInitialReadingValue('');
+        setInitialReadingNote('');
+        setInitialReadingDate(new Date().toISOString().split('T')[0]);
+        setShowInitialReadingModal(true);
+    };
+
+    const handleInitialReadingModalChange = (open) => {
+        setShowInitialReadingModal(open);
+        if (!open) {
+            setInitialReadingValue('');
+            setInitialReadingNote('');
+            setInitialReadingDate(new Date().toISOString().split('T')[0]);
+            setIsSavingInitialReading(false);
+        }
+    };
+
+    const handleInitialReadingSubmit = () => {
+        if (initialReadingValue === '' || Number(initialReadingValue) < 0 || !customer.meter) {
+            return;
+        }
+
+        setIsSavingInitialReading(true);
+        router.post(
+            `/customers/${customer.id}/initial-reading`,
+            {
+                value: Number(initialReadingValue),
+                date: initialReadingDate,
+                note: initialReadingNote,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShowInitialReadingModal(false);
+                    setInitialReadingValue('');
+                    setInitialReadingNote('');
+                    setInitialReadingDate(new Date().toISOString().split('T')[0]);
+                    setIsSavingInitialReading(false);
+                    router.reload();
+                },
+                onError: () => {
+                    setIsSavingInitialReading(false);
+                },
+                onFinish: () => {
+                    setIsSavingInitialReading(false);
+                },
+            },
+        );
     };
 
     const handleAssignMeter = () => {
@@ -711,6 +770,22 @@ export default function Show({ customer, availableMeters = [] }) {
                     <TabsContent value="meters" className="mt-6">
                         {customer.meter ? (
                             <div className="space-y-6">
+                                {canAddInitialReading && (
+                                    <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/60 p-4 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/30">
+                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">Initial reading required</p>
+                                                <p className="text-sm text-blue-800 dark:text-blue-300">
+                                                    This meter has no readings yet. Capture the initial reading so future consumption is accurate.
+                                                </p>
+                                            </div>
+                                            <Button onClick={openInitialReadingModal} className="gap-2 bg-blue-600 hover:bg-blue-700">
+                                                <Droplets className="h-4 w-4" />
+                                                Add Initial Reading
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                                 {/* Meter Status Overview */}
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                     <Card className="border-0 shadow-md">
@@ -1074,6 +1149,14 @@ export default function Show({ customer, availableMeters = [] }) {
                                 <Activity className="mx-auto h-12 w-12 text-slate-400" />
                                 <h3 className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">No readings found</h3>
                                 <p className="mt-1 text-sm text-slate-500">No meter readings have been recorded for this customer yet.</p>
+                                {canAddInitialReading && (
+                                    <div className="mt-4">
+                                        <Button onClick={openInitialReadingModal} className="gap-2 bg-blue-600 hover:bg-blue-700">
+                                            <Droplets className="h-4 w-4" />
+                                            Add Initial Reading
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </TabsContent>
@@ -1335,6 +1418,85 @@ export default function Show({ customer, availableMeters = [] }) {
             </div>
 
             {/* Assign Meter Modal */}
+            <Dialog open={showInitialReadingModal} onOpenChange={handleInitialReadingModalChange} className="no-print">
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center">
+                            <Droplets className="mr-2 h-5 w-5 text-blue-600" />
+                            Record Initial Meter Reading
+                        </DialogTitle>
+                        <DialogDescription>Set the starting reading for {customer.meter ? customer.meter.serial || `Meter #${customer.meter.id}` : 'this meter'}.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-5">
+                        <div className="rounded-lg border bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                            <p className="text-xs uppercase text-slate-500 dark:text-slate-400">Meter</p>
+                            <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                {customer.meter ? customer.meter.serial || `Meter #${customer.meter.id}` : 'No meter assigned'}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                The value you enter will be stored as both the previous and current reading. Future readings will build on
+                                this baseline without generating extra consumption.
+                            </p>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="initial-reading-value">Initial Reading (m³)</Label>
+                                <Input
+                                    id="initial-reading-value"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={initialReadingValue}
+                                    onChange={(e) => setInitialReadingValue(e.target.value)}
+                                    placeholder="Enter reading value"
+                                />
+                                {errors.value && <p className="text-xs text-red-600">{errors.value}</p>}
+                                <p className="text-xs text-slate-500">Use the last known display on the meter.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="initial-reading-date">Reading Date</Label>
+                                <Input
+                                    id="initial-reading-date"
+                                    type="date"
+                                    value={initialReadingDate}
+                                    max={new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setInitialReadingDate(e.target.value)}
+                                />
+                                <p className="text-xs text-slate-500">Defaults to today.</p>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="initial-reading-note">Notes (optional)</Label>
+                            <Textarea
+                                id="initial-reading-note"
+                                rows={3}
+                                placeholder="Describe where this value came from"
+                                value={initialReadingNote}
+                                onChange={(e) => setInitialReadingNote(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleInitialReadingModalChange(false)}
+                                disabled={isSavingInitialReading}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={handleInitialReadingSubmit}
+                                disabled={initialReadingValue === '' || Number(initialReadingValue) < 0 || isSavingInitialReading}
+                            >
+                                {isSavingInitialReading ? 'Saving...' : 'Save Initial Reading'}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <Dialog open={showAssignMeterModal} onOpenChange={setShowAssignMeterModal} className="no-print">
                 <DialogContent className="max-w-md">
                     <DialogHeader>

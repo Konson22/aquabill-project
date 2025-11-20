@@ -64,6 +64,7 @@ class CustomerController extends Controller
             'account_number' => 'nullable|string|max:255',
             'is_active' => 'nullable|boolean',
             'meter_id' => 'nullable|exists:meters,id',
+            'previous_reading' => 'nullable|numeric|min:0',
             'plot_number' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:255',
             'new_address' => 'nullable|string|max:255',
@@ -137,7 +138,22 @@ class CustomerController extends Controller
 
         // Set meter status to active when assigned to customer during creation
         if ($request->input('meter_id')) {
-            Meter::where('id', $request->input('meter_id'))->update(['status' => 'active']);
+            $meterId = $request->input('meter_id');
+            Meter::where('id', $meterId)->update(['status' => 'active']);
+
+            $initialReading = $request->input('previous_reading', 0);
+
+            MeterReading::create([
+                'meter_id' => $meterId,
+                'customer_id' => $customer->id,
+                'previous' => $initialReading,
+                'value' => $initialReading,
+                'illigal_connection' => 0,
+                'source' => 'customer_creation',
+                'note' => 'Initial reading recorded during customer creation',
+                'billing_officer' => auth()->id(),
+                'date' => now(),
+            ]);
         }
 
         // Create invoice if invoice fields are provided
@@ -910,6 +926,48 @@ public function exportReadings(Customer $customer)
             : 'Meter assigned successfully';
 
         return back()->with('success', $successMessage);
+    }
+
+    /**
+     * Store an initial meter reading for existing customers without readings
+     */
+    public function storeInitialReading(Request $request, Customer $customer)
+    {
+        if (!$customer->meter) {
+            return back()->withErrors([
+                'value' => 'Please assign a meter to this customer before recording an initial reading.'
+            ]);
+        }
+
+        $hasExistingReadings = MeterReading::where('meter_id', $customer->meter_id)->exists();
+        if ($hasExistingReadings) {
+            return back()->withErrors([
+                'value' => 'This meter already has readings. Initial readings can only be recorded once.'
+            ]);
+        }
+
+        $validated = $request->validate([
+            'value' => 'required|numeric|min:0',
+            'date' => 'nullable|date',
+            'note' => 'nullable|string|max:255',
+        ]);
+
+        $readingValue = $validated['value'];
+        $readingDate = $validated['date'] ?? now();
+
+        MeterReading::create([
+            'meter_id' => $customer->meter_id,
+            'customer_id' => $customer->id,
+            'previous' => $readingValue,
+            'value' => $readingValue,
+            'illigal_connection' => 0,
+            'source' => 'initial_manual_entry',
+            'note' => $validated['note'] ?? 'Initial reading recorded for existing customer',
+            'billing_officer' => auth()->id(),
+            'date' => $readingDate,
+        ]);
+
+        return back()->with('success', 'Initial meter reading recorded successfully.');
     }
 
     /**

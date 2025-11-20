@@ -2,12 +2,13 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, FileText, MapPin, Save, User } from 'lucide-react';
+import { ArrowLeft, Droplets, FileText, MapPin, Save, User } from 'lucide-react';
 import { useState } from 'react';
 
 const breadcrumbs = [
@@ -24,6 +25,8 @@ const breadcrumbs = [
 export default function CreateCustomer({ areas, meters, categories, neighborhoods, addresses = [], errors = {} }) {
     const [createNewNeighborhood, setCreateNewNeighborhood] = useState(false);
     const [createNewAddress, setCreateNewAddress] = useState(false);
+    const [showInitialReadingModal, setShowInitialReadingModal] = useState(false);
+    const [initialReadingDraft, setInitialReadingDraft] = useState('');
 
     const { data, setData, post, processing, reset } = useForm({
         // Customer fields
@@ -52,7 +55,38 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
         invoice_issue_date: new Date().toISOString().split('T')[0],
         invoice_due_date: '',
         invoice_amount_due: '',
+        previous_reading: '',
     });
+
+    const selectedMeter = data.meter_id ? meters.find((meter) => meter.id.toString() === data.meter_id.toString()) : null;
+    const hasInitialReading = data.previous_reading !== '' && data.previous_reading !== null && data.previous_reading !== undefined;
+
+    const getMeterLabel = (meter) => {
+        if (!meter) return '';
+        return meter.serial || meter.meter_number || `Meter #${meter.id}`;
+    };
+
+    const handleInitialReadingModalToggle = (open) => {
+        setShowInitialReadingModal(open);
+        if (!open) {
+            setInitialReadingDraft('');
+        }
+    };
+
+    const openInitialReadingModal = () => {
+        if (!data.meter_id) return;
+        setInitialReadingDraft(hasInitialReading ? data.previous_reading.toString() : '');
+        setShowInitialReadingModal(true);
+    };
+
+    const handleSaveInitialReading = () => {
+        if (initialReadingDraft === '') {
+            return;
+        }
+
+        setData('previous_reading', initialReadingDraft);
+        handleInitialReadingModalToggle(false);
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -74,6 +108,8 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                 reset();
                 setCreateNewNeighborhood(false);
                 setCreateNewAddress(false);
+                setInitialReadingDraft('');
+                setShowInitialReadingModal(false);
             },
         });
     };
@@ -183,6 +219,85 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                                             </SelectContent>
                                         </Select>
                                         {errors.category_id && <InputError message={errors.category_id} />}
+                                    </div>
+                                </div>
+
+                                {/* Meter Assignment */}
+                                <div className="space-y-3 rounded-lg border border-dashed border-slate-200 p-4 dark:border-slate-700">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <Label htmlFor="meter_id">Meter Assignment (Optional)</Label>
+                                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                                Assign an available meter during creation and capture its initial reading.
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="gap-2"
+                                            disabled={!data.meter_id}
+                                            onClick={openInitialReadingModal}
+                                        >
+                                            <Droplets className="h-4 w-4" />
+                                            {hasInitialReading ? 'Edit Initial Reading' : 'Add Initial Reading'}
+                                        </Button>
+                                    </div>
+                                    <Select
+                                        value={data.meter_id || 'none'}
+                                        onValueChange={(value) => {
+                                            const normalized = value === 'none' ? '' : value;
+                                            setData('meter_id', normalized);
+                                            if (value === 'none') {
+                                                setData('previous_reading', '');
+                                                setInitialReadingDraft('');
+                                            } else {
+                                                setInitialReadingDraft('');
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select meter (optional)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">No Meter Assigned</SelectItem>
+                                            {meters.map((meter) => (
+                                                <SelectItem key={meter.id} value={meter.id.toString()}>
+                                                    {getMeterLabel(meter)} {meter.model ? `• ${meter.model}` : ''}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.meter_id && <InputError message={errors.meter_id} />}
+                                    {errors.previous_reading && <InputError message={errors.previous_reading} />}
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div className="rounded-lg border bg-slate-50 p-4 text-sm dark:border-slate-700 dark:bg-slate-800">
+                                            <p className="text-xs text-slate-500 uppercase dark:text-slate-400">Selected Meter</p>
+                                            <p className="font-semibold text-slate-900 dark:text-slate-100">
+                                                {selectedMeter ? (
+                                                    <>
+                                                        {getMeterLabel(selectedMeter)}
+                                                        {selectedMeter.model ? ` • ${selectedMeter.model}` : ''}
+                                                    </>
+                                                ) : (
+                                                    'None'
+                                                )}
+                                            </p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                Only meters without customers are shown in this list.
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg border bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100">
+                                            <p className="text-xs uppercase opacity-80">Initial Reading</p>
+                                            <p className="text-2xl font-semibold">
+                                                {hasInitialReading ? Number(data.previous_reading) : '--'}
+                                                <span className="ml-1 text-sm font-normal text-blue-700 dark:text-blue-300">m³</span>
+                                            </p>
+                                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                                                {hasInitialReading
+                                                    ? 'This value will be recorded when the customer is created.'
+                                                    : 'No reading captured yet.'}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -438,6 +553,58 @@ export default function CreateCustomer({ areas, meters, categories, neighborhood
                     </div>
                 </div>
             </form>
+
+            <Dialog open={showInitialReadingModal} onOpenChange={handleInitialReadingModalToggle}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Droplets className="h-5 w-5 text-blue-600" />
+                            Initial Meter Reading
+                        </DialogTitle>
+                        <DialogDescription>Record the last known reading for the selected meter before the customer is activated.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6">
+                        <div className="rounded-lg border bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                            <p className="text-xs text-slate-500 uppercase dark:text-slate-400">Selected Meter</p>
+                            <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                                {selectedMeter
+                                    ? `${getMeterLabel(selectedMeter)}${selectedMeter.model ? ` • ${selectedMeter.model}` : ''}`
+                                    : 'No meter selected'}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                This reading will be stored as both the previous and current values for the meter.
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="initial-reading-input">Initial Reading (m³)</Label>
+                            <Input
+                                id="initial-reading-input"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={initialReadingDraft}
+                                onChange={(e) => setInitialReadingDraft(e.target.value)}
+                                placeholder="Enter reading value"
+                            />
+                            <p className="text-xs text-slate-500">Use the most recent reading from the meter before installation.</p>
+                        </div>
+                        <div className="flex justify-end space-x-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                    handleInitialReadingModalToggle(false);
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="button" onClick={handleSaveInitialReading} disabled={initialReadingDraft === ''}>
+                                Save Reading
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
