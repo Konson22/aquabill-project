@@ -14,13 +14,10 @@ export default function BillPrint({ bill }) {
                 {`
                     @media print {
                         .bill-print-root {
-                            font-size: 13px !important;
-                            line-height: 1.35 !important;
+                            font-size: 10px !important;
                         }
                         .bill-print-root .bill-print-heading {
-                            font-size: 18px !important;
-                            line-height: 1.4 !important;
-                            letter-spacing: 0.02em;
+                            font-size: 12px !important;
                         }
                         .bill-print-root .text-xs,
                         .bill-print-root .text-sm,
@@ -34,7 +31,7 @@ export default function BillPrint({ bill }) {
                     }
                 `}
             </style>
-            <div className="bill-print-root my-5 w-full bg-gray-200 p-6 text-base print:text-xs">
+            <div className="bill-print-root w-full bg-gray-200 p-6 text-base print:text-xs">
                 {/* Header */}
                 <div className="mb-4 flex items-center justify-between">
                     <div className="h-16 w-16 object-contain">
@@ -159,7 +156,7 @@ export default function BillPrint({ bill }) {
                     </div>
                 </div>
 
-                <ul className="list-disc space-y-0.5 pl-4 text-xs text-slate-600 print:text-xs">
+                <ul className="mt- list-disc space-y-0.5 border-b-2 border-gray-600 pl-4 text-xs text-slate-600 print:text-xs">
                     <li>Make the settlement of water bills monthly within seven days to avoid disconnection and take care of your water tap</li>
                     <li>To report to Juba-Station management in case of damage or enquiry Call: +211929928736 / +211929928737</li>
                 </ul>
