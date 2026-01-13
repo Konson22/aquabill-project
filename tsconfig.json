@@ -109,8 +109,7 @@
         "skipLibCheck": true /* Skip type checking all .d.ts files. */,
         "baseUrl": ".",
         "paths": {
-            "@/*": ["./resources/js/*"],
-            "ziggy-js": ["./vendor/tightenco/ziggy"]
+            "@/*": ["./resources/js/*"]
         },
         "jsx": "react-jsx"
     },
@@ -118,21 +117,17 @@
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
         "resources/js/**/*.tsx",
-        "resources/js/pages/auth/register.jsx",
-        "resources/js/pages/auth/login.jsx",
-        "resources/js/ssr.jsx",
-        "resources/js/layouts/auth-layout.jsx",
-        "resources/js/layouts/app-layout.jsx",
+        "resources/js/pages/settings/profile.jsx",
+        "resources/js/pages/settings/password.jsx",
+        "resources/js/pages/settings/appearance.jsx",
+        "resources/js/lib/utils.js",
+        "resources/js/layouts/auth/auth-split-layout.jsx",
+        "resources/js/layouts/auth/auth-simple-layout.jsx",
+        "resources/js/layouts/app/app-header-layout.jsx",
         "resources/js/layouts/app/app-sidebar-layout.jsx",
-        "resources/js/components/app-sidebar.jsx",
-        "resources/js/components/ui/input.jsx",
-        "resources/js/components/ui/button.jsx",
-        "resources/js/components/ui/sidebar.jsx",
-        "resources/js/components/app-shell.jsx",
-        "resources/js/components/nav-main.jsx",
-        "resources/js/components/app-sidebar-header.jsx",
-        "resources/js/components/app-content.jsx",
-        "resources/js/components/nav-user.jsx",
-        "resources/js/layouts/auth/auth-split-layout.jsx"
-    ]
+        "resources/js/layouts/auth/auth-card-layout.jsx",
+        "resources/js/layouts/settings/layout.jsx",
+        "resources/js/layouts/auth-layout.jsx",
+        "resources/js/layouts/app-layout.jsx"
+, "resources/js/actions/Laravel/index.js"    ]
 }

@@ -3,227 +3,103 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
-use App\Models\Invoice;
-use App\Models\Customer;
-use App\Models\Meter;
 
 class InvoiceController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
-        $query = Invoice::with(['customer', 'meter', 'payments']);
+        $query = \App\Models\Invoice::with(['customer', 'home', 'payments'])
+            ->latest('created_at');
 
-        // Apply search filter
         if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('invoice_number', 'like', "%{$search}%")
-                  ->orWhere('reason', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function ($customerQuery) use ($search) {
-                      $customerQuery->where('first_name', 'like', "%{$search}%")
-                                   ->orWhere('last_name', 'like', "%{$search}%")
-                                   ->orWhere('email', 'like', "%{$search}%");
-                  });
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                 $q->where('invoice_number', 'like', "%{$search}%")
+                   ->orWhereHas('customer', function($q2) use ($search) {
+                       $q2->where('name', 'like', "%{$search}%");
+                   });
             });
         }
 
-        // Apply status filter
-        if ($request->filled('status')) {
-            $status = $request->get('status');
-            if ($status === 'overdue') {
-                $query->where('status', '!=', 'paid')
-                      ->where('status', '!=', 'cancelled')
-                      ->where('due_date', '<', now());
-            } else {
-                $query->where('status', $status);
-            }
+        if ($request->filled('tariff')) {
+            $query->whereHas('home', function($q) use ($request) {
+                $q->where('tariff_id', $request->tariff);
+            });
         }
 
-        // Apply date filter
-        if ($request->filled('date')) {
-            $dateFilter = $request->get('date');
-            $now = now();
-            
-            switch ($dateFilter) {
-                case 'today':
-                    $query->whereDate('issue_date', $now->toDateString());
-                    break;
-                case 'week':
-                    $query->whereBetween('issue_date', [$now->startOfWeek(), $now->endOfWeek()]);
-                    break;
-                case 'month':
-                    $query->whereMonth('issue_date', $now->month)
-                          ->whereYear('issue_date', $now->year);
-                    break;
-                case 'quarter':
-                    $query->whereBetween('issue_date', [$now->startOfQuarter(), $now->endOfQuarter()]);
-                    break;
-                case 'year':
-                    $query->whereYear('issue_date', $now->year);
-                    break;
-            }
+        if ($request->filled('month')) {
+            $query->where('due_date', 'like', "{$request->month}%");
         }
 
-        $invoices = $query->latest()->paginate(20);
-        
-        // Get customers and meters for the form
-        $customers = Customer::active()->get();
-        $meters = Meter::active()->get();
+        $invoices = $query->paginate(10)->withQueryString();
 
-        return Inertia::render('finance/invoices/index', [
+        return Inertia::render('invoices/index', [
             'invoices' => $invoices,
-            'filters' => $request->only(['search', 'status', 'date']),
-            'customers' => $customers,
-            'meters' => $meters
+            'filters' => $request->only(['search', 'tariff', 'month']),
+            'tariffs' => \App\Models\Tariff::all(),
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        $customers = Customer::active()->get();
-        $meters = Meter::active()->get();
-
-        return Inertia::render('finance/invoices/create', [
-            'customers' => $customers,
-            'meters' => $meters,
-        ]);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'invoice_number' => 'nullable|string|max:50|unique:invoices,invoice_number',
-            'customer_id' => 'required|exists:customers,id',
-            'meter_id' => 'nullable|exists:meters,id',
-            'reason' => 'nullable|string',
-            'issue_date' => 'required|date',
-            'due_date' => 'required|date|after:issue_date',
-            'amount_due' => 'required|numeric|min:0',
-            'status' => 'required|in:pending,paid,cancelled',
+            'home_id' => 'required|exists:homes,id',
+            'amount' => 'required|numeric|min:0',
+            'due_date' => 'required|date',
+            'type' => 'required|string',
+            'description' => 'nullable|string',
         ]);
 
-        $validated['invoice_number'] = $validated['invoice_number'] ?: $this->generateInvoiceNumber();
+        $home = \App\Models\Home::findOrFail($validated['home_id']);
 
-        Invoice::create($validated);
+        \App\Models\Invoice::create([
+            'invoice_number' => 'INV-' . strtoupper(\Illuminate\Support\Str::random(8)),
+            'customer_id' => $home->customer_id,
+            'home_id' => $home->id,
+            'type' => $validated['type'],
+            'description' => $validated['description'],
+            'amount' => $validated['amount'],
+            'due_date' => $validated['due_date'],
+            'status' => 'unpaid',
+        ]);
 
-        return redirect()->route('invoices.index')->with('success', 'Invoice created successfully.');
+        return redirect()->back()->with('success', 'Invoice created successfully.');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(Invoice $invoice)
+    public function show($id)
     {
-        $invoice->load(['customer', 'meter', 'payments']);
-
-        return Inertia::render('finance/invoices/show', [
+        $invoice = \App\Models\Invoice::with(['customer', 'home', 'payments'])->findOrFail($id);
+        return Inertia::render('invoices/show', [
             'invoice' => $invoice
         ]);
     }
 
-    /**
-     * Print the specified invoice.
-     */
-    public function print(Invoice $invoice)
+    public function print($id)
     {
-        $invoice->load(['customer', 'meter', 'payments']);
+        $invoice = \App\Models\Invoice::with(['customer', 'home.zone', 'home.area', 'home.tariff', 'payments'])->findOrFail($id);
 
-        return Inertia::render('finance/invoices/print', [
-            'invoice' => $invoice
-        ]);
-    }
-
-    /**
-     * Print multiple invoices.
-     */
-    public function printMultiple(Request $request)
-    {
-        $ids = $request->get('ids');
-        
-        if (!$ids) {
-            return redirect()->route('invoices.index')->with('error', 'No invoices selected for printing.');
-        }
-
-        $invoiceIds = explode(',', $ids);
-        $invoices = Invoice::with(['customer', 'meter', 'payments'])
-            ->whereIn('id', $invoiceIds)
-            ->get();
-
-        if ($invoices->isEmpty()) {
-            return redirect()->route('invoices.index')->with('error', 'No invoices found for printing.');
-        }
-
-        return Inertia::render('finance/invoices/print-multiple', [
-            'invoices' => $invoices
-        ]);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Invoice $invoice)
-    {
-        $customers = Customer::active()->get();
-        $meters = Meter::active()->get();
-
-        return Inertia::render('finance/invoices/edit', [
+        return Inertia::render('invoices/print-single', [
             'invoice' => $invoice,
-            'customers' => $customers,
-            'meters' => $meters,
         ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, Invoice $invoice)
+    public function bulkPrint(Request $request)
     {
-        $validated = $request->validate([
-            'invoice_number' => 'required|string|max:50|unique:invoices,invoice_number,' . $invoice->id,
-            'customer_id' => 'required|exists:customers,id',
-            'meter_id' => 'nullable|exists:meters,id',
-            'reason' => 'nullable|string',
-            'issue_date' => 'required|date',
-            'due_date' => 'required|date|after:issue_date',
-            'amount_due' => 'required|numeric|min:0',
-            'status' => 'required|in:pending,paid,cancelled',
+        $ids = explode(',', $request->input('ids', ''));
+        $invoices = \App\Models\Invoice::with(['customer', 'home.zone', 'home.area', 'home.tariff', 'payments'])
+            ->whereIn('id', $ids)
+            ->get();
+            
+        return Inertia::render('invoices/print-multiple', [
+            'invoices' => $invoices,
         ]);
-
-        $invoice->update($validated);
-
-        return redirect()->route('invoices.index')->with('success', 'Invoice updated successfully.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Invoice $invoice)
+    public function destroy($id)
     {
+        $invoice = \App\Models\Invoice::findOrFail($id);
         $invoice->delete();
-
-        return redirect()->route('invoices.index')->with('success', 'Invoice deleted successfully.');
-    }
-
-    /**
-     * Generate a unique invoice number.
-     */
-    protected function generateInvoiceNumber(): string
-    {
-        do {
-            $number = 'INV-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(4));
-        } while (Invoice::where('invoice_number', $number)->exists());
-
-        return $number;
+        return redirect()->route('invoices')->with('success', 'Invoice deleted successfully.');
     }
 }

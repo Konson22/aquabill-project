@@ -4,133 +4,227 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use App\Models\Meter;
-use Carbon\Carbon;
 
 class MeterController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $request)
     {
-        $meters = Meter::with(['readings', 'customer'])->orderBy('created_at', 'desc')->get();
+        $query = \App\Models\Meter::with('home.customer')->latest();
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where('meter_number', 'like', "%{$search}%")
+                  ->orWhereHas('home.customer', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  });
+        }
+
+        $meters = $query->paginate(10)->withQueryString();
+        $homes = \App\Models\Home::with('customer')->get();
 
         $stats = [
-            'total_meters' => Meter::count(),
-            'active_meters' => Meter::where('status', 'active')->count(),
-            'inactive_meters' => Meter::where('status', 'inactive')->count(),
-            'faulty_meters' => Meter::where('status', 'faulty')->count(),
-            'total_consumption' => Meter::with('readings')->get()->sum(function ($meter) {
-                return $meter->readings->sum(function ($reading) {
-                    return $reading->value - $reading->previous;
-                });
-            }),
+            'total' => \App\Models\Meter::count(),
+            'active' => \App\Models\Meter::where('status', 'active')->count(),
+            'inactive' => \App\Models\Meter::where('status', 'inactive')->count(),
+            'maintenance' => \App\Models\Meter::where('status', 'maintenance')->count(),
+            'damage' => \App\Models\Meter::where('status', 'damage')->count(),
         ];
 
-        return Inertia::render('meters/index', compact('meters', 'stats'));
+        return Inertia::render('meters/index', [
+            'meters' => $meters,
+            'homes' => $homes,
+            'filters' => $request->only(['search']),
+            'stats' => $stats,
+        ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function export(Request $request)
     {
-        return Inertia::render('meters/create');
+        $filename = 'meters-export-' . date('Y-m-d') . '.csv';
+
+        $query = \App\Models\Meter::with('home.customer')->latest();
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where('meter_number', 'like', "%{$search}%")
+                  ->orWhereHas('home.customer', function($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  });
+        }
+
+        $meters = $query->get();
+
+        $headers = [
+            "Content-type" => "text/csv",
+            "Content-Disposition" => "attachment; filename=$filename",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        ];
+
+        $columns = ['ID', 'Serial Number', 'Type', 'Status', 'Customer Name', 'Home Address'];
+
+        $callback = function () use ($meters, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($meters as $meter) {
+                $row = [
+                    $meter->id,
+                    $meter->meter_number,
+                    $meter->meter_type,
+                    $meter->status,
+                    $meter->home?->customer?->name ?? 'N/A',
+                    $meter->home?->address ?? 'N/A',
+                ];
+                fputcsv($file, $row);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        $request->validate([
-            'serial' => 'nullable|string|max:50',
-            'status' => 'nullable|string|max:50',
-            'size' => 'nullable|string|max:50',
-            'model' => 'nullable|string|max:50',
-            'manufactory' => 'nullable|string|max:50',
+        $validated = $request->validate([
+            'meter_number' => 'required|unique:meters',
+            'meter_type' => 'required|string',
+            'home_id' => 'nullable|exists:homes,id',
+            'installation_date' => 'nullable|date',
+            'status' => 'required|in:active,inactive,maintenance,damage',
         ]);
 
-        $meter = Meter::create([
-            'serial' => $request->serial,
-            'status' => $request->status,
-            'size' => $request->size,
-            'model' => $request->model,
-            'manufactory' => $request->manufactory,
+        $validated['home_id'] = $validated['home_id'] ?? null;
+        $validated['installation_date'] = $validated['installation_date'] ?? null;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $request) {
+            // Unassign old meter if exists
+            if (!empty($validated['home_id'])) {
+                $oldMeter = \App\Models\Meter::where('home_id', $validated['home_id'])->first();
+                if ($oldMeter) {
+                    $lastReading = \App\Models\MeterReading::where('meter_id', $oldMeter->id)
+                        ->latest('reading_date')
+                        ->first();
+
+                    \App\Models\MeterHistory::create([
+                        'home_id' => $oldMeter->home_id,
+                        'meter_id' => $oldMeter->id,
+                        'customer_id' => $oldMeter->home ? $oldMeter->home->customer_id : null,
+                        'final_reading' => $lastReading ? $lastReading->current_reading : 0,
+                        'assigned_at' => $oldMeter->installation_date,
+                        'unassigned_at' => now(),
+                        'replaced_by' => auth()->id(),
+                        'reason' => 'replacement',
+                    ]);
+
+                    $oldMeter->update([
+                        'home_id' => null,
+                        'status' => 'inactive'
+                    ]);
+                }
+            }
+
+            $meter = \App\Models\Meter::create($validated);
+
+            if ($request->filled('initial_reading') && $validated['home_id']) {
+                \App\Models\MeterReading::create([
+                    'meter_id' => $meter->id,
+                    'home_id' => $validated['home_id'],
+                    'reading_date' => now(),
+                    'current_reading' => $request->initial_reading,
+                    'previous_reading' => 0,
+                    'read_by' => auth()->id(),
+                ]);
+            }
+        });
+
+        return redirect()->back();
+    }
+
+    public function update(Request $request, $id)
+    {
+        $meter = \App\Models\Meter::findOrFail($id);
+
+        $validated = $request->validate([
+            'home_id' => 'sometimes|nullable|exists:homes,id',
+            'initial_reading' => 'nullable|numeric|min:0',
+            'status' => 'sometimes|in:active,inactive,maintenance,damage',
         ]);
 
-        return redirect()->route('meters.index')
-            ->with('success', 'Meter created successfully.');
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $request, $meter) {
+            
+            // Handle Assignment
+            if ($request->has('home_id')) {
+                 if ($validated['home_id']) {
+                    $oldMeter = \App\Models\Meter::where('home_id', $validated['home_id'])
+                        ->where('id', '!=', $meter->id)
+                        ->first();
+                    
+                    if ($oldMeter) {
+                        $lastReading = \App\Models\MeterReading::where('meter_id', $oldMeter->id)
+                            ->latest('reading_date')
+                            ->first();
+
+                        \App\Models\MeterHistory::create([
+                            'home_id' => $oldMeter->home_id,
+                            'meter_id' => $oldMeter->id,
+                            'customer_id' => $oldMeter->home ? $oldMeter->home->customer_id : null,
+                            'final_reading' => $lastReading ? $lastReading->current_reading : 0,
+                            'assigned_at' => $oldMeter->installation_date,
+                            'unassigned_at' => now(),
+                            'replaced_by' => auth()->id(),
+                            'reason' => 'replacement',
+                        ]);
+
+                        $oldMeter->update([
+                            'home_id' => null,
+                            'status' => 'inactive',
+                        ]);
+                    }
+                }
+                
+                $meter->update([
+                    'home_id' => $validated['home_id'],
+                    'status' => 'active', // Default to active on assignment
+                    'installation_date' => now(),
+                ]);
+
+                 if ($request->filled('initial_reading') && $validated['home_id']) {
+                    \App\Models\MeterReading::create([
+                        'meter_id' => $meter->id,
+                        'home_id' => $validated['home_id'],
+                        'reading_date' => now(),
+                        'current_reading' => $request->initial_reading,
+                        'previous_reading' => 0,
+                        'read_by' => auth()->id(),
+                    ]);
+                }
+            }
+
+            // Handle Status Update Only
+            if ($request->has('status')) {
+                $meter->update(['status' => $validated['status']]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Meter updated successfully.');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function show($id)
     {
-        $meter = Meter::with([
-            'readings',
-            'customer'
-        ])->findOrFail($id);
-        
-        // Order readings by date descending (latest first)
-        $meter->readings = $meter->readings->sortByDesc('date');
-        
-        return Inertia::render('meters/show', compact('meter'));
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        $meter = Meter::findOrFail($id);
-        return Inertia::render('meters/edit', compact('meter'));
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        $meter = Meter::findOrFail($id);
-
-        $request->validate([
-            'serial' => 'nullable|string|max:50',
-            'status' => 'nullable|string|max:50',
-            'size' => 'nullable|string|max:50',
-            'model' => 'nullable|string|max:50',
-            'manufactory' => 'nullable|string|max:50',
+        $meter = \App\Models\Meter::with('home.customer')->findOrFail($id);
+        return Inertia::render('meters/show', [
+            'meter' => $meter
         ]);
-
-        $meter->update([
-            'serial' => $request->serial,
-            'status' => $request->status,
-            'size' => $request->size,
-            'model' => $request->model,
-            'manufactory' => $request->manufactory,
-        ]);
-
-        return redirect()->route('meters.show', $meter->id)
-            ->with('success', 'Meter updated successfully.');
     }
 
-    /**
-     * Remove the specified resource in storage.
-     */
-    public function destroy(string $id)
+    public function destroy($id)
     {
-        $meter = Meter::findOrFail($id);
-        
-        // Check if meter has readings before deleting
-        if ($meter->readings()->count() > 0) {
-            return back()->with('error', 'Cannot delete meter with existing readings. Please remove all readings first.');
-        }
-        
+        $meter = \App\Models\Meter::findOrFail($id);
         $meter->delete();
 
-        return redirect()->route('meters.index')
-            ->with('success', 'Meter deleted successfully.');
+        return redirect()->back()->with('success', 'Meter deleted successfully.');
     }
 }

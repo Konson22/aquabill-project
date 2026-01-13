@@ -4,41 +4,43 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invoice extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
         'invoice_number',
         'customer_id',
-        'reason',
-        'issue_date',
+        'home_id',
+        'type',
+        'description',
+        'amount',
         'due_date',
-        'amount_due',
-        'status'
+        'status',
     ];
 
-    protected $casts = [
-        'issue_date' => 'date',
-        'due_date' => 'date',
-        'amount_due' => 'decimal:2'
-    ];
+    protected function casts(): array
+    {
+        return [
+            'due_date' => 'date',
+            'amount' => 'decimal:2',
+        ];
+    }
 
-    // Relationships
     public function customer()
     {
         return $this->belongsTo(Customer::class);
     }
 
-    public function meter()
+    public function home()
     {
-        return $this->belongsTo(Meter::class);
+        return $this->belongsTo(Home::class);
     }
 
     public function payments()
     {
-        return $this->hasMany(Payment::class);
+        return $this->morphMany(Payment::class, 'payable');
     }
 }
+

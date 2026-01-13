@@ -4,60 +4,40 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Payment extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
-        'customer_id',
-        'bill_id',
-        'invoice_id',
+        'payable_type',
+        'payable_id',
+        'amount',
+        'balance',
         'payment_date',
-        'amount_paid',
         'payment_method',
         'reference_number',
-        'received_by'
+        'received_by',
+        'notes',
     ];
 
-    protected $casts = [
-        'payment_date' => 'date',
-        'amount_paid' => 'decimal:2'
-    ];
-
-    // Accessors
-    public function getStatusAttribute()
+    protected function casts(): array
     {
-        // Since we don't have a status column, we'll assume all payments are completed
-        // You can modify this logic based on your business requirements
-        return 'completed';
+        return [
+            'payment_date' => 'date',
+            'amount' => 'decimal:2',
+            'balance' => 'decimal:2',
+        ];
     }
 
-    public function getAmountAttribute()
+    public function payable()
     {
-        // Alias for amount_paid to maintain compatibility
-        return $this->amount_paid;
+        return $this->morphTo();
     }
 
-    // Relationships
-    public function customer()
-    {
-        return $this->belongsTo(Customer::class);
-    }
-
-    public function bill()
-    {
-        return $this->belongsTo(Bill::class);
-    }
-
-    public function invoice()
-    {
-        return $this->belongsTo(Invoice::class);
-    }
-
-    public function receivedBy()
+    public function receiver()
     {
         return $this->belongsTo(User::class, 'received_by');
     }
 }
+

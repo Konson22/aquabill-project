@@ -1,41 +1,44 @@
+import AppLogo from '@/components/app-logo';
 import { Breadcrumbs } from '@/components/breadcrumbs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { UserInfo } from '@/components/user-info';
 import { UserMenuContent } from '@/components/user-menu-content';
-import { useInitials } from '@/hooks/use-initials';
-import { usePage } from '@inertiajs/react';
-import { ChevronsUpDown } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { ChevronDown } from 'lucide-react';
 
 export function AppSidebarHeader({ breadcrumbs = [] }) {
     const { auth } = usePage().props;
-    const getInitials = useInitials();
+    const user = auth.user;
 
     return (
-        <header className="sticky top-0 right-0 left-0 z-50 flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm">
+        <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border bg-white px-4 text-black transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
             <div className="flex items-center gap-2">
-                <Breadcrumbs breadcrumbs={breadcrumbs} />
+                <Link
+                    href={route('dashboard')}
+                    className="flex items-center gap-2"
+                    prefetch
+                >
+                    <AppLogo />
+                </Link>
+                <div className="ml-2 flex items-center gap-2 border-l pl-2">
+                    <SidebarTrigger className="-ml-1" />
+                    <Breadcrumbs breadcrumbs={breadcrumbs} />
+                </div>
             </div>
 
-            <div className="flex items-center">
+            <div className="ml-auto flex items-center gap-2">
                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="flex h-10 items-center space-x-3 rounded-xl px-3 py-2 hover:bg-[#f1f9ff]">
-                            <Avatar className="size-8 overflow-hidden rounded-full">
-                                <AvatarImage src={auth.user.avatar} alt={auth.user.name} />
-                                <AvatarFallback className="rounded-lg bg-gradient-to-r from-[#2975a1] to-[#1e3a5f] font-semibold text-white">
-                                    {getInitials(auth.user.name)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="hidden flex-col items-start md:flex">
-                                <span className="text-sm font-semibold text-gray-900">{auth.user.name}</span>
-                                <span className="text-xs text-gray-600">{auth.user.department?.name || 'No Department'}</span>
-                            </div>
-                            <ChevronsUpDown className="h-4 w-4 text-gray-500" />
-                        </Button>
+                    <DropdownMenuTrigger className="flex items-center gap-2 focus:outline-none">
+                        <UserInfo user={user} />
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="z-[70] w-64 rounded-xl border border-gray-200 bg-white shadow-xl" align="end">
-                        <UserMenuContent user={auth.user} />
+                    <DropdownMenuContent align="end" className="w-56">
+                        <UserMenuContent user={user} />
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>

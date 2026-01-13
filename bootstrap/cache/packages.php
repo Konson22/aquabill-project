@@ -6,6 +6,13 @@
       0 => 'Inertia\\ServiceProvider',
     ),
   ),
+  'laravel/fortify' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Laravel\\Fortify\\FortifyServiceProvider',
+    ),
+  ),
   'laravel/pail' => 
   array (
     'providers' => 
@@ -32,6 +39,13 @@
     'providers' => 
     array (
       0 => 'Laravel\\Tinker\\TinkerServiceProvider',
+    ),
+  ),
+  'laravel/wayfinder' => 
+  array (
+    'providers' => 
+    array (
+      0 => 'Laravel\\Wayfinder\\WayfinderServiceProvider',
     ),
   ),
   'nesbot/carbon' => 

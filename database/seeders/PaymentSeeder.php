@@ -2,153 +2,75 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\Payment;
-use App\Models\Customer;
 use App\Models\Bill;
 use App\Models\Invoice;
-use App\Models\User;
+use App\Models\Payment;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Seeder;
 
 class PaymentSeeder extends Seeder
 {
+    /**
+     * Run the database seeds.
+     */
     public function run(): void
     {
-        // Get customers, bills, invoices, and users for relationships
-        $customers = Customer::all();
-        $bills = Bill::all();
-        $invoices = Invoice::all();
-        $users = User::all();
+        $bills = Bill::where('status', 'paid')->get();
+        $invoices = Invoice::where('status', 'paid')->get();
 
-        if ($customers->isEmpty() || $users->isEmpty()) {
-            $this->command->warn('Please run CustomerSeeder and UserSeeder first.');
+        if ($bills->isEmpty() && $invoices->isEmpty()) {
+            $this->command->warn('No paid bills or invoices found. Please run BillSeeder and InvoiceSeeder first.');
             return;
         }
 
-        $payments = [];
-        $currentDate = now();
+        $paymentMethods = ['cash', 'card', 'bank_transfer', 'mobile_money', 'check'];
+        $paymentCounter = 1;
 
-        // Generate payments for bills
+        // Create payments for paid bills
         foreach ($bills as $bill) {
-            // Only generate payments for paid or partially paid bills
-            if (in_array($bill->status, ['paid', 'partially_paid'])) {
-                $paymentDate = $bill->billing_period_end->copy()->addDays(rand(1, 30));
-                
-                // For partially paid bills, generate partial payment
-                if ($bill->status === 'partially_paid') {
-                    $amountPaid = $bill->total_amount * (rand(30, 80) / 100); // 30-80% of total
-                } else {
-                    $amountPaid = $bill->total_amount;
-                }
-
-                $payments[] = [
-                    'customer_id' => $bill->customer_id,
-                    'bill_id' => $bill->id,
-                    'invoice_id' => null,
-                    'payment_date' => $paymentDate->format('Y-m-d'),
-                    'amount_paid' => $amountPaid,
-                    'payment_method' => $this->getRandomPaymentMethod(),
-                    'reference_number' => $this->generateReferenceNumber(),
-                    'received_by' => $users->random()->id,
-                    'created_at' => $paymentDate,
-                    'updated_at' => $paymentDate,
-                ];
-            }
+            $this->createPayment($bill, $bill->total_amount, $paymentMethods, $paymentCounter);
+            $paymentCounter++;
         }
 
-        // Generate payments for invoices
+        // Create payments for paid invoices
         foreach ($invoices as $invoice) {
-            // Only generate payments for paid invoices
-            if ($invoice->status === 'paid') {
-                $paymentDate = $invoice->issue_date->copy()->addDays(rand(1, 15));
-                
-                $payments[] = [
-                    'customer_id' => $invoice->customer_id,
-                    'bill_id' => null,
-                    'invoice_id' => $invoice->id,
-                    'payment_date' => $paymentDate->format('Y-m-d'),
-                    'amount_paid' => $invoice->amount_due,
-                    'payment_method' => $this->getRandomPaymentMethod(),
-                    'reference_number' => $this->generateReferenceNumber(),
-                    'received_by' => $users->random()->id,
-                    'created_at' => $paymentDate,
-                    'updated_at' => $paymentDate,
-                ];
-            }
+            $this->createPayment($invoice, $invoice->amount, $paymentMethods, $paymentCounter);
+            $paymentCounter++;
         }
 
-        // Generate some additional payments for unpaid bills (to make them partially paid)
-        foreach ($bills as $bill) {
-            if ($bill->status === 'unpaid' && rand(1, 3) === 1) { // 1 in 3 chance
-                $paymentDate = $bill->billing_period_end->copy()->addDays(rand(1, 15));
-                $amountPaid = $bill->total_amount * (rand(20, 60) / 100); // 20-60% of total
-                
-                $payments[] = [
-                    'customer_id' => $bill->customer_id,
-                    'bill_id' => $bill->id,
-                    'invoice_id' => null,
-                    'payment_date' => $paymentDate->format('Y-m-d'),
-                    'amount_paid' => $amountPaid,
-                    'payment_method' => $this->getRandomPaymentMethod(),
-                    'reference_number' => $this->generateReferenceNumber(),
-                    'received_by' => $users->random()->id,
-                    'created_at' => $paymentDate,
-                    'updated_at' => $paymentDate,
-                ];
-            }
+        // Create partial payments for some pending/overdue bills and invoices
+        $pendingBills = Bill::whereIn('status', ['pending', 'overdue'])->limit(5)->get();
+        foreach ($pendingBills as $bill) {
+            $partialAmount = $bill->total_amount * (rand(30, 70) / 100);
+            $this->createPayment($bill, $partialAmount, $paymentMethods, $paymentCounter);
+            $paymentCounter++;
         }
 
-        // Generate some additional payments for pending invoices
-        foreach ($invoices as $invoice) {
-            if ($invoice->status === 'pending' && rand(1, 2) === 1) { // 1 in 2 chance
-                $paymentDate = $invoice->issue_date->copy()->addDays(rand(1, 10));
-                
-                $payments[] = [
-                    'customer_id' => $invoice->customer_id,
-                    'bill_id' => null,
-                    'invoice_id' => $invoice->id,
-                    'payment_date' => $paymentDate->format('Y-m-d'),
-                    'amount_paid' => $invoice->amount_due,
-                    'payment_method' => $this->getRandomPaymentMethod(),
-                    'reference_number' => $this->generateReferenceNumber(),
-                    'received_by' => $users->random()->id,
-                    'created_at' => $paymentDate,
-                    'updated_at' => $paymentDate,
-                ];
-            }
-        }
-
-        // Insert payments in batches
-        foreach (array_chunk($payments, 100) as $chunk) {
-            Payment::insert($chunk);
+        $pendingInvoices = Invoice::whereIn('status', ['pending', 'overdue'])->limit(5)->get();
+        foreach ($pendingInvoices as $invoice) {
+            $partialAmount = $invoice->amount * (rand(30, 70) / 100);
+            $this->createPayment($invoice, $partialAmount, $paymentMethods, $paymentCounter);
+            $paymentCounter++;
         }
     }
 
-    private function getRandomPaymentMethod(): string
+    /**
+     * Create a payment for a bill or invoice
+     */
+    private function createPayment($payable, float $amount, array $paymentMethods, int $counter): void
     {
-        $methods = ['cash', 'mobile_money', 'bank_transfer'];
-        $weights = [40, 35, 25]; // 40% cash, 35% mobile money, 25% bank transfer
-
-        $totalWeight = array_sum($weights);
-        $random = mt_rand(1, $totalWeight);
+        $paymentDate = $payable->due_date->copy()->subDays(rand(0, 30));
         
-        $currentWeight = 0;
-        foreach ($methods as $index => $method) {
-            $currentWeight += $weights[$index];
-            if ($random <= $currentWeight) {
-                return $method;
-            }
-        }
-        
-        return 'cash'; // Fallback
+        Payment::create([
+            'payment_number' => 'PAY-' . str_pad($counter, 8, '0', STR_PAD_LEFT),
+            'payable_type' => get_class($payable),
+            'payable_id' => $payable->id,
+            'amount' => $amount,
+            'payment_date' => $paymentDate,
+            'payment_method' => $paymentMethods[array_rand($paymentMethods)],
+            'reference_number' => 'REF-' . strtoupper(substr(md5(rand()), 0, 8)),
+            'notes' => rand(0, 1) ? 'Payment processed successfully' : null,
+        ]);
     }
-
-    private function generateReferenceNumber(): string
-    {
-        $prefixes = ['PAY', 'TXN', 'REF', 'PMT'];
-        $prefix = $prefixes[array_rand($prefixes)];
-        $number = str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
-        
-        return $prefix . '-' . $number;
-    }
-
 }
+

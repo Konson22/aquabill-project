@@ -15,10 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->enum('department', ['admin', 'finance', 'meters'])->default('admin');
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('status', ['active', 'inactive'])->default('active');
-            $table->foreignId('department_id')->nullable()->constrained('departments')->onDelete('set null');
             $table->rememberToken();
             $table->timestamps();
         });
@@ -49,5 +48,3 @@ return new class extends Migration
         Schema::dropIfExists('sessions');
     }
 };
-
-

@@ -10,27 +10,34 @@ class TariffHistory extends Model
     use HasFactory;
 
     protected $fillable = [
-        'category_id',
-        'unit_price',
+        'tariff_id',
+        'name',
+        'price',
         'fixed_charge',
-        'consumption',
-        'changed_by',
+        'description',
+        'effective_from',
+        'effective_to',
+        'created_by',
     ];
 
-    protected $casts = [
-        'unit_price' => 'decimal:2',
-        'fixed_charge' => 'decimal:2',
-        'consumption' => 'integer',
-    ];
-
-    public function category()
+    protected function casts(): array
     {
-        return $this->belongsTo(Category::class);
+        return [
+            'price' => 'decimal:2',
+            'fixed_charge' => 'decimal:2',
+            'effective_from' => 'date',
+            'effective_to' => 'date',
+        ];
     }
 
-    public function changedBy()
+    public function tariff()
     {
-        return $this->belongsTo(User::class, 'changed_by');
+        return $this->belongsTo(Tariff::class);
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }
 

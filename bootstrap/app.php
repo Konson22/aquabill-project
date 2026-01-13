@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\CheckDepartment;
+use App\Http\Middleware\CheckRole;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -14,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware) {
+    ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [
@@ -23,18 +25,11 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
-        // Apply debug middleware to all API routes for troubleshooting
-        $middleware->api(append: [
-            \App\Http\Middleware\DebugApiRequests::class,
-        ]);
-
-        // Register custom middleware
         $middleware->alias([
-            'department.access' => \App\Http\Middleware\DepartmentAccess::class,
-            'department.restriction' => \App\Http\Middleware\DepartmentRestriction::class,
-            'api.activity' => \App\Http\Middleware\ApiActivityLogger::class,
+            'department' => CheckDepartment::class,
+            'role' => CheckRole::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions) {
+    ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

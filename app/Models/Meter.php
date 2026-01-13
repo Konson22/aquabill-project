@@ -10,36 +10,27 @@ class Meter extends Model
     use HasFactory;
 
     protected $fillable = [
-        'serial',
+        'home_id',
+        'meter_number',
+        'meter_type',
+        'installation_date',
         'status',
-        'size',
-        'model',
-        'manufactory',
     ];
 
-    // Scopes
-    public function scopeActive($query)
+    protected function casts(): array
     {
-        return $query->where('status', 'active');
+        return [
+            'installation_date' => 'date',
+        ];
     }
 
-    public function customer()
+    public function home()
     {
-        return $this->hasOne(Customer::class);
+        return $this->belongsTo(Home::class);
     }
 
     public function readings()
     {
         return $this->hasMany(MeterReading::class);
-    }
-
-    public function bills()
-    {
-        return $this->hasMany(Bill::class);
-    }
-
-    public function invoices()
-    {
-        return $this->hasMany(Invoice::class);
     }
 }
