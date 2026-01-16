@@ -1,4 +1,3 @@
-import AssignMeterModal from '@/components/app/assign-meter-modal';
 import UpdateMeterStatusModal from '@/components/app/update-meter-status-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,10 +31,9 @@ import {
     User,
     Zap,
 } from 'lucide-react';
-import { useState } from 'react';
 
-export default function CustomerHome({ home, overview, availableMeters = [] }) {
-    const [replaceMeterOpen, setReplaceMeterOpen] = useState(false);
+export default function CustomerHome({ home, overview }) {
+    // Removal of replaceMeterOpen state as we now use a dedicated page
     const formatDate = (dateString, options = {}) => {
         if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString('en-GB', {
@@ -807,13 +805,7 @@ export default function CustomerHome({ home, overview, availableMeters = [] }) {
                                 value="meter"
                                 className="mt-0 animate-in fade-in-50"
                             >
-                                <AssignMeterModal
-                                    show={replaceMeterOpen}
-                                    onClose={() => setReplaceMeterOpen(false)}
-                                    homeId={home.id}
-                                    availableMeters={availableMeters}
-                                    onSuccess={() => setReplaceMeterOpen(false)}
-                                />
+                                {/* Removal of AssignMeterModal component */}
                                 <div className="grid gap-6 md:grid-cols-2">
                                     <div className="rounded-xl border bg-card text-card-foreground shadow-sm">
                                         <div className="flex flex-col space-y-1.5 p-6">
@@ -839,14 +831,17 @@ export default function CustomerHome({ home, overview, availableMeters = [] }) {
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            onClick={() =>
-                                                                setReplaceMeterOpen(
-                                                                    true,
-                                                                )
-                                                            }
+                                                            asChild
                                                         >
-                                                            <RefreshCw className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
-                                                            Replace
+                                                            <Link
+                                                                href={route(
+                                                                    'meters.assign',
+                                                                    home.id,
+                                                                )}
+                                                            >
+                                                                <RefreshCw className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                                                                Replace
+                                                            </Link>
                                                         </Button>
                                                     </div>
                                                 )}
@@ -950,14 +945,17 @@ export default function CustomerHome({ home, overview, availableMeters = [] }) {
                                                     </p>
                                                     <Button
                                                         className="mt-4"
-                                                        onClick={() =>
-                                                            setReplaceMeterOpen(
-                                                                true,
-                                                            )
-                                                        }
+                                                        asChild
                                                     >
-                                                        <Zap className="mr-2 h-4 w-4" />
-                                                        Assign Meter
+                                                        <Link
+                                                            href={route(
+                                                                'meters.assign',
+                                                                home.id,
+                                                            )}
+                                                        >
+                                                            <Zap className="mr-2 h-4 w-4" />
+                                                            Assign Meter
+                                                        </Link>
                                                     </Button>
                                                 </div>
                                             )}

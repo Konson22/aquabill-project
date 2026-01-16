@@ -22,4 +22,5 @@ Route::middleware('auth:sanctum')->name('api.')->group(function () {
     Route::apiResource('customers', HomesController::class);
     Route::apiResource('readings', ReadingController::class)->only(['store']);
 });
-Route::apiResource('test', HomesController::class);
+    Route::apiResource('test', MeterController::class);
+// Route::apiResource('test', HomesController::class);

@@ -8,6 +8,8 @@ use App\Models\MeterReading;
 use App\Models\Meter;
 use App\Models\Bill;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ReadingController extends Controller
 {
@@ -22,6 +24,7 @@ class ReadingController extends Controller
             '*.reading_date' => 'required|date',
             '*.current_reading' => 'required|numeric|min:0',
             '*.previous_reading' => 'nullable|numeric|min:0',
+            '*.image' => 'nullable',
         ]);
 
         $results = [];
@@ -29,7 +32,16 @@ class ReadingController extends Controller
         try {
             DB::beginTransaction();
 
-            foreach ($request->all() as $validated) {
+            foreach ($request->all() as $index => $validated) {
+                // Check if reading is valid against last DB reading
+                $lastDbReading = MeterReading::where('meter_id', $validated['meter_id'])
+                    ->latest('reading_date')
+                    ->first();
+
+                if ($lastDbReading && $validated['current_reading'] <= $lastDbReading->current_reading) {
+                    continue;
+                }
+
                 $meter = \App\Models\Meter::with('home.customer', 'home.tariff')->findOrFail($validated['meter_id']);
 
                 // Get previous reading if not provided
@@ -62,6 +74,27 @@ class ReadingController extends Controller
 
                 $totalAmount = $consumptionAmount + $fixedCharge + $previousBalance;
 
+                // Handle image upload if present
+                $imagePath = null;
+                if (isset($validated['image']) && $validated['image']) {
+                    if (is_string($validated['image']) && str_starts_with($validated['image'], 'data:image')) {
+                        // Handle base64
+                        $format = explode('/', explode(':', substr($validated['image'], 0, strpos($validated['image'], ';')))[1])[1];
+                        $image = str_replace(' ', '+', $validated['image']);
+                        $image = substr($image, strpos($image, ',') + 1);
+                        $imageName = 'reading_' . time() . '_' . Str::random(10) . '.' . $format;
+                        Storage::disk('public')->put('readings/' . $imageName, base64_decode($image));
+                        $imagePath = 'readings/' . $imageName;
+                    } elseif ($request->hasFile("readings.{$index}.image")) {
+                        // Handle direct file upload (if key is readings.0.image)
+                        // Note: $request->all() loop index needed
+                        $imagePath = $request->file("readings.{$index}.image")->store('readings', 'public');
+                    } else if (is_string($validated['image']) && !str_starts_with($validated['image'], 'data:image')) {
+                         // Assume it's already a path or filename if sent as string (rare but possible)
+                         $imagePath = $validated['image'];
+                    }
+                }
+
                 $reading = MeterReading::create([
                     'meter_id' => $validated['meter_id'],
                     'home_id' => $validated['home_id'],
@@ -70,6 +103,7 @@ class ReadingController extends Controller
                     'previous_reading' => $validated['previous_reading'],
                     'read_by' => auth()->id(),
                     'status' => 'billed',
+                    'image' => $imagePath,
                 ]);
 
                 // Generate unique bill number

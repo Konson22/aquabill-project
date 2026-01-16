@@ -8,14 +8,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -37,7 +29,6 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Eye,
     Home,
-    MoreHorizontal,
     Pencil,
     Plus,
     Search,
@@ -298,74 +289,68 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Button
                                                         asChild
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                        title="View Profile"
                                                     >
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8"
+                                                        <Link
+                                                            href={route(
+                                                                'customers.show',
+                                                                customer.id,
+                                                            )}
                                                         >
-                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <Eye className="h-4 w-4" />
                                                             <span className="sr-only">
-                                                                Open menu
-                                                            </span>
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent
-                                                        align="end"
-                                                        className="w-[160px]"
-                                                    >
-                                                        <DropdownMenuLabel>
-                                                            Actions
-                                                        </DropdownMenuLabel>
-                                                        <DropdownMenuItem
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={route(
-                                                                    'customers.show',
-                                                                    customer.id,
-                                                                )}
-                                                            >
-                                                                <Eye className="mr-2 h-4 w-4" />
                                                                 View Profile
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        {department ===
-                                                            'admin' && (
-                                                            <>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem
-                                                                    asChild
+                                                            </span>
+                                                        </Link>
+                                                    </Button>
+
+                                                    {department === 'admin' && (
+                                                        <>
+                                                            <Button
+                                                                asChild
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                                                title="Edit Details"
+                                                            >
+                                                                <Link
+                                                                    href={route(
+                                                                        'customers.edit',
+                                                                        customer.id,
+                                                                    )}
                                                                 >
-                                                                    <Link
-                                                                        href={route(
-                                                                            'customers.edit',
-                                                                            customer.id,
-                                                                        )}
-                                                                    >
-                                                                        <Pencil className="mr-2 h-4 w-4" />
+                                                                    <Pencil className="h-4 w-4" />
+                                                                    <span className="sr-only">
                                                                         Edit
                                                                         Details
-                                                                    </Link>
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem
-                                                                    onClick={() =>
-                                                                        handleDelete(
-                                                                            customer.id,
-                                                                        )
-                                                                    }
-                                                                    className="text-red-600 focus:text-red-600"
-                                                                >
-                                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                                    </span>
+                                                                </Link>
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() =>
+                                                                    handleDelete(
+                                                                        customer.id,
+                                                                    )
+                                                                }
+                                                                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                                <span className="sr-only">
                                                                     Delete
-                                                                </DropdownMenuItem>
-                                                            </>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                                </span>
+                                                            </Button>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))

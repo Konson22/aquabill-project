@@ -6,6 +6,7 @@ use App\Models\Home;
 use App\Models\Meter;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 
 class MeterSeeder extends Seeder
 {
@@ -14,23 +15,27 @@ class MeterSeeder extends Seeder
      */
     public function run(): void
     {
-        $homes = Home::all();
+        Schema::disableForeignKeyConstraints();
+        Meter::truncate();
+        Schema::enableForeignKeyConstraints();
 
-        if ($homes->isEmpty()) {
-            $this->command->warn('No homes found. Please run HomeSeeder first.');
-            return;
-        }
+        // $homes = Home::all();
 
-        $meterTypes = ['Digital', 'Analog', 'Smart'];
-        $meterCounter = 1000;
+        // if ($homes->isEmpty()) {
+        //     $this->command->warn('No homes found. Please run HomeSeeder first.');
+        //     return;
+        // }
 
-        foreach ($homes as $home) {
+        $meterTypes = ['Digital', 'Analog'];
+        $meterCounter = 230000000;
+
+        for ($i = 0; $i < 8000; $i++) {
             Meter::create([
-                'home_id' => $home->id,
-                'meter_number' => 'MTR-' . str_pad($meterCounter++, 6, '0', STR_PAD_LEFT),
+                'home_id' => null,
+                'meter_number' => 'SSUWC/ZH/JB/' . $meterCounter++,
                 'meter_type' => $meterTypes[array_rand($meterTypes)],
                 'installation_date' => now()->subDays(rand(30, 365)),
-                'status' => 'active',
+                'status' => 'inactive',
             ]);
         }
     }
