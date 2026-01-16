@@ -46,7 +46,6 @@ class CustomerController extends Controller
             'zones' => \App\Models\Zone::select('id', 'name')->get(),
             'tariffs' => \App\Models\Tariff::select('id', 'name')->get(),
             'areas' => \App\Models\Area::select('id', 'name')->get(),
-            'meters' => \App\Models\Meter::whereNull('home_id')->select('id', 'meter_number', 'meter_type')->get(),
         ]);
     }
 
@@ -64,6 +63,7 @@ class CustomerController extends Controller
             'tariff_id' => 'nullable|exists:tariffs,id',
             // Meter fields
             'meter_id' => 'nullable|exists:meters,id',
+            'initial_reading' => 'nullable|numeric|min:0',
             // Invoice fields
             'installation_fee' => 'nullable|numeric|min:0',
         ]);
@@ -92,6 +92,17 @@ class CustomerController extends Controller
                         'installation_date' => now(),
                         'status' => 'active',
                     ]);
+
+                    // Add initial reading if provided
+                    if (isset($validated['initial_reading'])) {
+                        $home->readings()->create([
+                            'meter_id' => $meter->id,
+                            'current_reading' => $validated['initial_reading'],
+                            'previous_reading' => 0, // Assuming 0 for initial
+                            'reading_date' => now(),
+                            'reading_type' => 'Initial',
+                        ]);
+                    }
                 }
             }
 
@@ -127,10 +138,6 @@ class CustomerController extends Controller
             'customer' => $customer,
             'zones' => \App\Models\Zone::with('areas')->get(),
             'tariffs' => \App\Models\Tariff::select('id', 'name')->get(),
-            'availableMeters' => \App\Models\Meter::where(function($query) {
-                $query->where('status', 'inactive')
-                      ->orWhereNull('home_id');
-            })->select('id', 'meter_number', 'meter_type')->get(),
         ]);
     }
 
@@ -168,10 +175,6 @@ class CustomerController extends Controller
                 'unpaid_bills_amount' => $unpaidBillsAmount,
                 'unpaid_invoices_count' => $unpaidInvoicesCount,
             ],
-            'availableMeters' => \App\Models\Meter::where(function($query) {
-                $query->where('status', 'inactive')
-                      ->orWhereNull('home_id');
-            })->select('id', 'meter_number', 'meter_type')->get(),
         ]);
     }
 
@@ -183,7 +186,6 @@ class CustomerController extends Controller
             'zones' => \App\Models\Zone::select('id', 'name')->get(),
             'tariffs' => \App\Models\Tariff::select('id', 'name')->get(),
             'areas' => \App\Models\Area::select('id', 'name')->get(),
-            'meters' => \App\Models\Meter::whereNull('home_id')->select('id', 'meter_number', 'meter_type')->get(),
         ]);
     }
 

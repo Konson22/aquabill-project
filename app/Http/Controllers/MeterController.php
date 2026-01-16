@@ -7,6 +7,13 @@ use Inertia\Inertia;
 
 class MeterController extends Controller
 {
+    public function assign(\App\Models\Home $home)
+    {
+        return Inertia::render('meters/assign', [
+            'home' => $home->load(['customer', 'meter', 'zone', 'area']),
+        ]);
+    }
+
     public function index(Request $request)
     {
         $query = \App\Models\Meter::with('home.customer')->latest();
@@ -36,6 +43,26 @@ class MeterController extends Controller
             'filters' => $request->only(['search']),
             'stats' => $stats,
         ]);
+    }
+
+    public function search(Request $request)
+    {
+        $search = trim($request->get('q'));
+        
+        if (empty($search)) {
+            return response()->json([]);
+        }
+
+        \Log::debug('METER SEARCH: Start with query [' . $search . ']');
+        
+        $meters = \App\Models\Meter::whereNull('home_id')
+            ->where('meter_number', 'LIKE', "%{$search}%")
+            ->limit(15)
+            ->get(['id', 'meter_number', 'meter_type']);
+
+        \Log::debug('METER SEARCH: found ' . $meters->count() . ' results');
+
+        return response()->json($meters);
     }
 
     public function export(Request $request)
@@ -140,7 +167,11 @@ class MeterController extends Controller
             }
         });
 
-        return redirect()->back();
+        if ($request->filled('home_id')) {
+        return redirect()->route('customers.home', $request->home_id)->with('success', 'Meter created and assigned successfully.');
+    }
+
+    return redirect()->back();
     }
 
     public function update(Request $request, $id)
@@ -209,7 +240,11 @@ class MeterController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Meter updated successfully.');
+        if ($request->filled('home_id')) {
+        return redirect()->route('customers.home', $request->home_id)->with('success', 'Meter assigned successfully.');
+    }
+
+    return redirect()->back()->with('success', 'Meter updated successfully.');
     }
 
     public function show($id)

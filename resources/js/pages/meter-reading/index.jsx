@@ -28,7 +28,14 @@ import {
     ComboboxOptions,
 } from '@headlessui/react';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Activity, ChevronsUpDown, Eye, Pencil, Trash2 } from 'lucide-react';
+import {
+    Activity,
+    Camera,
+    ChevronsUpDown,
+    Eye,
+    Pencil,
+    Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 
 export default function MeterReadings({ meterReadings, meters }) {
@@ -427,9 +434,14 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                {formatDate(
-                                                    reading.reading_date,
-                                                )}
+                                                <div className="flex items-center gap-2">
+                                                    {formatDate(
+                                                        reading.reading_date,
+                                                    )}
+                                                    {reading.image && (
+                                                        <Camera className="h-3.5 w-3.5 text-muted-foreground" />
+                                                    )}
+                                                </div>
                                             </TableCell>
                                             <TableCell>
                                                 {reading.bill ? (

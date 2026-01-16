@@ -17,6 +17,7 @@ class MeterReading extends Model
         'previous_reading',
         'read_by',
         'status',
+        'image',
     ];
 
     protected function casts(): array
@@ -46,6 +47,13 @@ class MeterReading extends Model
     public function bill()
     {
         return $this->hasOne(\App\Models\Bill::class);
+    }
+
+    protected $appends = ['image_url'];
+
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->image ? asset('storage/' . $this->image) : null;
     }
 }
 

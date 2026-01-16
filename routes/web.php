@@ -35,7 +35,8 @@ Route::middleware(['auth'])->group(function () {
     })->name('docs.system');
 
     // Dashboards
-    Route::get('/api/homes/search', [HomeController::class, 'search'])->name('homes.search');
+    Route::get('/api/h/search', [HomeController::class, 'search'])->name('homes.search');
+    Route::get('/api/m/search', [MeterController::class, 'search'])->name('meters.search');
     // Admin Routes
     Route::middleware(['department:admin'])->group(function () {
         // Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
@@ -137,6 +138,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('homes/{home}/edit', [HomeController::class, 'edit'])->name('homes.edit');
         Route::put('homes/{home}', [HomeController::class, 'update'])->name('homes.update');
         Route::delete('homes/{home}', [HomeController::class, 'destroy'])->name('homes.destroy');
+        Route::get('homes/{home}/meter/assign', [MeterController::class, 'assign'])->name('meters.assign');
     });
 
 });

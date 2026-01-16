@@ -1,4 +1,3 @@
-import AssignMeterModal from '@/components/app/assign-meter-modal';
 import CreateInvoiceModal from '@/components/invoices/create-invoice-modal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -45,14 +44,8 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-export default function CustomerShow({
-    customer,
-    zones = [],
-    tariffs = [],
-    availableMeters = [],
-}) {
+export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
     const [createHomeOpen, setCreateHomeOpen] = useState(false);
-    const [assignMeterOpen, setAssignMeterOpen] = useState(false);
     const [selectedHomeId, setSelectedHomeId] = useState(null);
     const {
         data: homeData,
@@ -671,18 +664,18 @@ export default function CustomerShow({
                                                                     <Button
                                                                         variant="outline"
                                                                         size="sm"
-                                                                        onClick={() => {
-                                                                            setSelectedHomeId(
-                                                                                home.id,
-                                                                            );
-                                                                            setAssignMeterOpen(
-                                                                                true,
-                                                                            );
-                                                                        }}
+                                                                        asChild
                                                                     >
-                                                                        <Gauge className="mr-2 h-3 w-3" />
-                                                                        Assign
-                                                                        Meter
+                                                                        <Link
+                                                                            href={route(
+                                                                                'meters.assign',
+                                                                                home.id,
+                                                                            )}
+                                                                        >
+                                                                            <Gauge className="mr-2 h-3 w-3" />
+                                                                            Assign
+                                                                            Meter
+                                                                        </Link>
                                                                     </Button>
                                                                 )}
                                                             </div>
@@ -949,12 +942,7 @@ export default function CustomerShow({
                 </Card>
             </div>
 
-            <AssignMeterModal
-                show={assignMeterOpen}
-                onClose={() => setAssignMeterOpen(false)}
-                homeId={selectedHomeId}
-                availableMeters={availableMeters}
-            />
+            {/* Removed AssignMeterModal */}
         </AppLayout>
     );
 }
