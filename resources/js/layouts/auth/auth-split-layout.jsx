@@ -1,26 +1,42 @@
-import { usePage } from '@inertiajs/react';
+import { home } from '@/routes';
+import { Link, usePage } from '@inertiajs/react';
 
-export default function AuthSplitLayout({ children }) {
+export default function AuthSplitLayout({ children, title, description }) {
     const { name, quote } = usePage().props;
-    const appName = name || 'GoFinance';
-    const tagline = quote || 'Business popular sem to come handligue this.';
+    const appName = name || 'Water Billing System';
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-blue-50">
-            <div className="flex min-h-screen w-full flex-col lg:flex-row">
-                {/* Left Panel - Blue Gradient (2/3 width) */}
-                <div
-                    style={{
-                        backgroundImage: 'linear-gradient(rgba(15, 78, 214,0.5), rgba(15, 78, 214,0.5)), url(/images/water-bg.png)',
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                    }}
-                    className="relative hidden overflow-hidden bg-gradient-to-b from-blue-500 to-blue-700 lg:flex lg:w-2/3"
-                ></div>
+        <div className="relative flex h-screen justify-center">
+            {/* Left Side - Branding Panel */}
+            <div className="relative hidden flex-1 lg:block">
+                <img
+                    src="/images/water-background2.jpg"
+                    alt="Background"
+                    className="absolute inset-0 h-full w-full object-cover"
+                />
+            </div>
 
-                {/* Right Panel - White Background (1/3 width on desktop, full width on mobile) */}
-                <div className="flex w-full items-center justify-center bg-white p-8 lg:w-1/3">
-                    <div className="w-full max-w-md">{children}</div>
+            {/* Right Side - Login Form */}
+            <div className="w-full lg:w-[40%] lg:p-8">
+                <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[400px]">
+                    <Link
+                        href={home()}
+                        className="relative z-20 mb-8 flex items-center justify-center gap-3 text-xl font-semibold"
+                    >
+                        <div className="flex h-12 w-16 items-center justify-center rounded-xl">
+                            <img
+                                className="h-full w-full"
+                                src="/logo.png"
+                                alt="App Logo"
+                            />
+                        </div>
+                    </Link>
+                    <div className="flex flex-col items-start gap-2 text-left sm:items-center sm:text-center">
+                        <p className="text-sm text-balance text-muted-foreground">
+                            {description}
+                        </p>
+                    </div>
+                    {children}
                 </div>
             </div>
         </div>

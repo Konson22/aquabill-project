@@ -10,77 +10,14 @@ class Customer extends Model
     use HasFactory;
 
     protected $fillable = [
-        'first_name',
-        'last_name',
+        'name',
         'phone',
-        'plot_number',
-        'address',
-        'credit',
         'email',
-        'contract',
-        'date',
-        'latitude',
-        'longitude',
-        'neighborhood_id',
-        'category_id',
-        'meter_id',
-        'account_number',
-        'is_active',
     ];
 
-    protected $casts = [
-        'date' => 'date',
-        'credit' => 'decimal:2',
-        'latitude' => 'decimal:8',
-        'longitude' => 'decimal:8',
-        'is_active' => 'boolean'
-    ];
-
-    // Scopes
-    public function scopeActive($query)
+    public function homes()
     {
-        return $query->where('is_active', true);
-    }
-
-    // Accessor for full name
-    public function getFullNameAttribute()
-    {
-        return trim($this->first_name . ' ' . $this->last_name);
-    }
-
-    // Alias for name to maintain compatibility
-    public function getNameAttribute()
-    {
-        return $this->full_name;
-    }
-
-    // Relationships
-    public function neighborhood()
-    {
-        return $this->belongsTo(Neighborhood::class);
-    }
-
-    /**
-     * Alias relationship for neighborhood to maintain compatibility with existing UI references.
-     */
-    public function location()
-    {
-        return $this->belongsTo(Neighborhood::class, 'neighborhood_id');
-    }
-
-    public function category()
-    {
-        return $this->belongsTo(Category::class);
-    }
-
-    public function meter()
-    {
-        return $this->belongsTo(Meter::class, 'meter_id');
-    }
-
-    public function readings()
-    {
-        return $this->hasMany(MeterReading::class);
+        return $this->hasMany(Home::class);
     }
 
     public function bills()
@@ -91,53 +28,5 @@ class Customer extends Model
     public function invoices()
     {
         return $this->hasMany(Invoice::class);
-    }
-
-    public function payments()
-    {
-        return $this->hasMany(Payment::class);
-    }
-
-    public function meterLogs()
-    {
-        return $this->hasMany(MeterLog::class);
-    }
-
-    /**
-     * Check if customer has any related records that would prevent deletion
-     */
-    public function hasRelatedRecords(): bool
-    {
-        return $this->invoices()->exists() || 
-               $this->bills()->exists() || 
-               $this->payments()->exists() || 
-               $this->readings()->exists() || 
-               $this->meterLogs()->exists();
-    }
-
-    /**
-     * Get a list of related record types that prevent deletion
-     */
-    public function getRelatedRecordTypes(): array
-    {
-        $relatedTypes = [];
-        
-        if ($this->invoices()->exists()) {
-            $relatedTypes[] = 'invoices';
-        }
-        if ($this->bills()->exists()) {
-            $relatedTypes[] = 'bills';
-        }
-        if ($this->payments()->exists()) {
-            $relatedTypes[] = 'payments';
-        }
-        if ($this->readings()->exists()) {
-            $relatedTypes[] = 'meter readings';
-        }
-        if ($this->meterLogs()->exists()) {
-            $relatedTypes[] = 'meter logs';
-        }
-        
-        return $relatedTypes;
     }
 }

@@ -1,420 +1,542 @@
+import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+    Card,
+    CardContent,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Activity, AlertTriangle, CheckCircle, Edit, Eye, Plus, Search, Trash2, Users, Zap } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import MeterForm from '../forms/meter-form';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import {
+    Activity,
+    FileDown,
+    Gauge,
+    Pencil,
+    Plus,
+    Power,
+    Search,
+    ShieldAlert,
+    Trash2,
+    Wrench,
+} from 'lucide-react';
+import { useState } from 'react';
 
-const breadcrumbs = [
-    {
-        title: 'Meters',
-        href: '/meters',
+export default function Meters({
+    meters,
+    homes,
+    filters = {},
+    stats = {
+        total: 0,
+        active: 0,
+        inactive: 0,
+        maintenance: 0,
+        damage: 0,
     },
-];
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editId, setEditId] = useState(null);
+    const department = usePage().props.auth?.user?.department;
 
-export default function MetersPage({ meters, customers, types, stats }) {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filteredMeters, setFilteredMeters] = useState(meters);
-    const [filteredStats, setFilteredStats] = useState(stats);
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [deleteDialog, setDeleteDialog] = useState({ open: false, meterId: null, meterInfo: null });
+    const { data, setData, post, processing, errors, reset } = useForm({
+        meter_number: '',
+        meter_type: 'Analog',
+        status: 'inactive',
+    });
 
-    const { delete: deleteMeter, processing: deleting } = useForm();
-
-    // Delete meter function
-    const handleDeleteMeter = () => {
-        if (deleteDialog.meterId) {
-            deleteMeter(route('meters.destroy', deleteDialog.meterId), {
+    const submit = (e) => {
+        e.preventDefault();
+        if (isEditMode) {
+            put(route('meters.update', editId), {
                 onSuccess: () => {
-                    setDeleteDialog({ open: false, meterId: null, meterInfo: null });
-                },
-                onError: (errors) => {
-                    console.error('Error deleting meter:', errors);
+                    setIsOpen(false);
+                    reset();
+                    setIsEditMode(false);
+                    setEditId(null);
                 },
             });
-        }
-    };
-
-    // Filter meters based on search query
-    useEffect(() => {
-        if (searchQuery.trim() === '') {
-            setFilteredMeters(meters);
-            setFilteredStats(stats);
         } else {
-            const filtered = meters.filter((meter) => {
-                const searchLower = searchQuery.toLowerCase();
-
-                // Search in meter number
-                const meterNumber = meter.meter_number?.toLowerCase() || '';
-                if (meterNumber.includes(searchLower)) return true;
-
-                // Search in serial number
-                const serial = meter.serial?.toLowerCase() || '';
-                if (serial.includes(searchLower)) return true;
-
-                // Search in customer name
-                const customerName = `${meter.customer?.first_name || ''} ${meter.customer?.last_name || ''}`.toLowerCase();
-                if (customerName.includes(searchLower)) return true;
-
-                // Search in location
-                const location = meter.location?.toLowerCase() || '';
-                if (location.includes(searchLower)) return true;
-
-                // Search in status
-                const status = meter.status?.toLowerCase() || '';
-                if (status.includes(searchLower)) return true;
-
-                // Search in size
-                const size = meter.size?.toLowerCase() || '';
-                if (size.includes(searchLower)) return true;
-
-                // Search in model
-                const model = meter.model?.toLowerCase() || '';
-                if (model.includes(searchLower)) return true;
-
-                // Search in manufactory
-                const manufactory = meter.manufactory?.toLowerCase() || '';
-                if (manufactory.includes(searchLower)) return true;
-
-                return false;
+            post(route('meters.store'), {
+                onSuccess: () => {
+                    setIsOpen(false);
+                    reset();
+                },
             });
-
-            setFilteredMeters(filtered);
-
-            // Update stats based on filtered results
-            const filteredStats = {
-                total_meters: filtered.length,
-                active_meters: filtered.filter((m) => m.status === 'active').length,
-                inactive_meters: filtered.filter((m) => m.status === 'inactive').length,
-                faulty_meters: filtered.filter((m) => m.status === 'faulty').length,
-                total_consumption: filtered.reduce(
-                    (sum, meter) => sum + (meter.readings?.reduce((rSum, reading) => rSum + (reading.consumption || 0), 0) || 0),
-                    0,
-                ),
-            };
-            setFilteredStats(filteredStats);
         }
-    }, [searchQuery, meters, stats]);
+    };
 
-    const formatDate = (date) => {
-        if (!date) return 'Not specified';
-        return new Date(date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
+    const handleEdit = (meter) => {
+        setEditId(meter.id);
+        setIsEditMode(true);
+        setData({
+            meter_number: meter.meter_number,
+            meter_type: meter.meter_type,
+            status: meter.status,
         });
+        setIsOpen(true);
     };
 
-    const formatNumber = (number) => {
-        return new Intl.NumberFormat('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }).format(number || 0);
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'active':
-                return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-            case 'inactive':
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-            case 'faulty':
-                return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-            default:
-                return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    const handleDelete = (id) => {
+        if (confirm('Are you sure you want to delete this meter?')) {
+            router.delete(route('meters.destroy', id), {
+                preserveScroll: true,
+            });
         }
     };
-
-    const getStatusIcon = (status) => {
-        switch (status) {
-            case 'active':
-                return <CheckCircle className="h-4 w-4" />;
-            case 'inactive':
-                return <Users className="h-4 w-4" />;
-            case 'faulty':
-                return <AlertTriangle className="h-4 w-4" />;
-            default:
-                return <Zap className="h-4 w-4" />;
-        }
+    const handleSearch = (term) => {
+        router.get(
+            route('meters'),
+            { search: term },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
     };
+
+    const breadcrumbs = [
+        {
+            title: 'Dashboard',
+            href: route('dashboard'),
+        },
+        {
+            title: 'Meters',
+            href: route('meters'),
+        },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Meters Management" />
-
-            {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Meters Management</h1>
-                    <p className="mt-1 text-slate-600 dark:text-slate-400">Manage and monitor all meters in the system</p>
+            <Head title="Meters" />
+            <div className="flex items-center justify-between pb-4">
+                <div className="space-y-1">
+                    <h3 className="text-2xl font-bold tracking-tight">
+                        Available Meters List
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                        Manage utility meters and installations.
+                    </p>
                 </div>
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Meter
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle>Add New Meter</DialogTitle>
-                            <DialogDescription>Fill in the meter details below to add a new meter to the system.</DialogDescription>
-                        </DialogHeader>
-                        <MeterForm customers={customers} types={types} closeDialog={() => setDialogOpen(false)} />
-                    </DialogContent>
-                </Dialog>
-            </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" asChild>
+                        <a href={route('meters.export', filters)}>
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Export CSV
+                        </a>
+                    </Button>
 
-            {/* Stats Cards */}
-            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Meters</CardTitle>
-                        <Zap className="h-4 w-4 text-blue-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.total_meters}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">All meters</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Meters</CardTitle>
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.active_meters}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Currently active</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Inactive Meters</CardTitle>
-                        <Users className="h-4 w-4 text-gray-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.inactive_meters}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Not in use</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Faulty Meters</CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-red-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{filteredStats.faulty_meters}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Need attention</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Consumption</CardTitle>
-                        <Activity className="h-4 w-4 text-purple-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatNumber(filteredStats.total_consumption)}</div>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">Units consumed</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Meters Table */}
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                        <div>
-                            <CardTitle>All Meters</CardTitle>
-                            <CardDescription>Manage meter information and assignments</CardDescription>
-                        </div>
-                        <div className="flex w-full items-center sm:w-80">
-                            <Search className="mr-4 text-gray-400" />
-                            <Input
-                                type="text"
-                                placeholder="Search by number, serial, customer, location, status, size, model, or manufactory..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[800px]">
-                            <thead>
-                                <tr className="border-b border-slate-200 dark:border-slate-800">
-                                    <th className="w-32 px-3 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Meter</th>
-                                    <th className="w-40 px-3 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Customer</th>
-                                    <th className="w-32 px-3 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Details</th>
-                                    <th className="w-24 px-3 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Status</th>
-                                    <th className="w-32 px-3 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredMeters.length > 0 ? (
-                                    filteredMeters.map((meter) => (
-                                        <tr
-                                            key={meter.id}
-                                            className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                                        >
-                                            <td className="px-3 py-3">
-                                                <div className="flex items-center">
-                                                    <div className="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600 sm:mr-3 sm:h-8 sm:w-8">
-                                                        <Zap className="h-3 w-3 sm:h-4 sm:w-4" />
-                                                    </div>
-                                                    <div className="min-w-0 flex-1">
-                                                        <span className="block truncate font-medium">{meter.meter_number}</span>
-                                                        <p className="text-xs text-slate-500">{meter.serial && `S/N: ${meter.serial}`}</p>
-                                                        {meter.readings && meter.readings.length > 0 && (
-                                                            <p className="text-xs text-slate-500">Last: {formatDate(meter.readings[0].date)}</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-3">
-                                                {meter.customer ? (
-                                                    <Link href={`/customers/${meter.customer.id}`} className="flex items-center">
-                                                        <Users className="mr-1 h-3 w-3 text-slate-400 sm:mr-2 sm:h-4 sm:w-4" />
-                                                        <span className="truncate font-medium">
-                                                            {meter.customer.first_name} {meter.customer.last_name}
-                                                        </span>
-                                                    </Link>
-                                                ) : (
-                                                    <span className="text-slate-400">Unassigned</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                                <div className="space-y-1 text-sm">
-                                                    {meter.size && <div className="text-slate-600 dark:text-slate-400">Size: {meter.size}</div>}
-                                                    {meter.model && <div className="text-slate-600 dark:text-slate-400">Model: {meter.model}</div>}
-                                                    {meter.location && (
-                                                        <div className="text-slate-600 dark:text-slate-400">Location: {meter.location}</div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-3">
-                                                <Badge className={`${getStatusColor(meter.status)} text-xs`}>
-                                                    <div className="flex items-center space-x-1">
-                                                        {getStatusIcon(meter.status)}
-                                                        <span className="capitalize">{meter.status}</span>
-                                                    </div>
-                                                </Badge>
-                                            </td>
-                                            <td className="px-3 py-3">
-                                                <div className="flex flex-col space-y-1 sm:flex-row sm:space-y-0 sm:space-x-1">
-                                                    <Link href={`/meters/${meter.id}`}>
-                                                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-                                                            <Eye className="mr-1 h-3 w-3" />
-                                                            View
-                                                        </Button>
-                                                    </Link>
-                                                    <Link href={`/meters/${meter.id}/edit`}>
-                                                        <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-                                                            <Edit className="mr-1 h-3 w-3" />
-                                                            Edit
-                                                        </Button>
-                                                    </Link>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-7 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
-                                                        onClick={() =>
-                                                            setDeleteDialog({
-                                                                open: true,
-                                                                meterId: meter.id,
-                                                                meterInfo: {
-                                                                    serial: meter.serial || meter.meter_number,
-                                                                    customer: meter.customer
-                                                                        ? `${meter.customer.first_name} ${meter.customer.last_name}`
-                                                                        : 'Unassigned',
-                                                                },
-                                                            })
-                                                        }
-                                                    >
-                                                        <Trash2 className="mr-1 h-3 w-3" />
-                                                        Delete
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan="5" className="px-3 py-8 text-center text-slate-500">
-                                            <div className="flex flex-col items-center">
-                                                <Zap className="mb-2 h-8 w-8 text-slate-300" />
-                                                <p className="text-sm">No meters found matching your search.</p>
-                                                {searchQuery && (
-                                                    <p className="mt-1 text-xs text-slate-400">
-                                                        Try adjusting your search terms or clear the search to see all meters.
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Results Count */}
-                    <div className="mt-6 flex items-center justify-between">
-                        <div className="text-sm text-slate-600 dark:text-slate-400">
-                            Showing {filteredMeters.length} of {meters.length} meters
-                            {searchQuery && <span className="ml-2 text-slate-500">(filtered by "{searchQuery}")</span>}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Delete Confirmation Dialog */}
-            <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center">
-                            <Trash2 className="mr-2 h-5 w-5 text-red-600" />
-                            Delete Meter
-                        </DialogTitle>
-                        <DialogDescription>Are you sure you want to delete this meter? This action cannot be undone.</DialogDescription>
-                    </DialogHeader>
-                    <div className="mt-4">
-                        {deleteDialog.meterInfo && (
-                            <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
-                                <div className="space-y-2">
-                                    <div>
-                                        <span className="font-medium text-slate-700 dark:text-slate-300">Serial Number:</span>
-                                        <span className="ml-2 text-slate-600 dark:text-slate-400">{deleteDialog.meterInfo.serial || 'N/A'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="font-medium text-slate-700 dark:text-slate-300">Customer:</span>
-                                        <span className="ml-2 text-slate-600 dark:text-slate-400">{deleteDialog.meterInfo.customer}</span>
+                    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                        <DialogTrigger asChild>
+                            <Button
+                                onClick={() => {
+                                    setIsEditMode(false);
+                                    reset();
+                                }}
+                            >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add Meter
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>
+                                    {isEditMode
+                                        ? 'Edit Meter'
+                                        : 'Add New Meter'}
+                                </DialogTitle>
+                                <DialogDescription>
+                                    {isEditMode
+                                        ? "Update the details of the meter. Click save when you're done."
+                                        : "Enter the details of the new meter. Click save when you're done."}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={submit} className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label
+                                        htmlFor="meter_number"
+                                        className="text-right"
+                                    >
+                                        Serial #
+                                    </Label>
+                                    <div className="col-span-3">
+                                        <Input
+                                            id="meter_number"
+                                            value={data.meter_number}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'meter_number',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="col-span-3"
+                                            disabled={isEditMode}
+                                        />
+                                        <InputError
+                                            message={errors.meter_number}
+                                            className="mt-2"
+                                        />
                                     </div>
                                 </div>
-                            </div>
-                        )}
-                        <div className="mt-6 flex justify-end space-x-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setDeleteDialog({ open: false, meterId: null, meterInfo: null })}
-                                disabled={deleting}
-                            >
-                                Cancel
-                            </Button>
-                            <Button variant="destructive" onClick={handleDeleteMeter} disabled={deleting} className="bg-red-600 hover:bg-red-700">
-                                {deleting ? 'Deleting...' : 'Delete Meter'}
-                            </Button>
-                        </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label
+                                        htmlFor="meter_type"
+                                        className="text-right"
+                                    >
+                                        Type
+                                    </Label>
+                                    <div className="col-span-3">
+                                        <Select
+                                            value={data.meter_type}
+                                            onValueChange={(value) =>
+                                                setData('meter_type', value)
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Digital">
+                                                    Digital
+                                                </SelectItem>
+                                                <SelectItem value="Analog">
+                                                    Analog
+                                                </SelectItem>
+                                                <SelectItem value="Smart">
+                                                    Smart
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError
+                                            message={errors.meter_type}
+                                            className="mt-2"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label
+                                        htmlFor="status"
+                                        className="text-right"
+                                    >
+                                        Status
+                                    </Label>
+                                    <div className="col-span-3">
+                                        <Select
+                                            value={data.status}
+                                            onValueChange={(value) =>
+                                                setData('status', value)
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select status" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="active">
+                                                    Active
+                                                </SelectItem>
+                                                <SelectItem value="inactive">
+                                                    Inactive
+                                                </SelectItem>
+                                                <SelectItem value="maintenance">
+                                                    Maintenance
+                                                </SelectItem>
+                                                <SelectItem value="damage">
+                                                    Damaged
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError
+                                            message={errors.status}
+                                            className="mt-2"
+                                        />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit" disabled={processing}>
+                                        Save changes
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+            </div>
+            {/* Summary cards */}
+            <div className="mb-6 grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+                <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+                    <div className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">
+                            Total Meters
+                        </span>
+                        <Gauge className="h-4 w-4 text-muted-foreground" />
                     </div>
-                </DialogContent>
-            </Dialog>
+                    <div className="space-y-1">
+                        <div className="text-2xl font-bold">{stats.total}</div>
+                        <p className="text-xs text-muted-foreground">
+                            All registered meters
+                        </p>
+                    </div>
+                </div>
+                <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+                    <div className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">
+                            Active Meters
+                        </span>
+                        <Activity className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div className="space-y-1">
+                        <div className="text-2xl font-bold text-emerald-600">
+                            {stats.active}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Currently operational
+                        </p>
+                    </div>
+                </div>
+                <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+                    <div className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">
+                            Inactive Meters
+                        </span>
+                        <Power className="h-4 w-4 text-gray-500" />
+                    </div>
+                    <div className="space-y-1">
+                        <div className="text-2xl font-bold text-gray-500">
+                            {stats.inactive}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Disconnected or new
+                        </p>
+                    </div>
+                </div>
+                <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+                    <div className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">
+                            Maintenance
+                        </span>
+                        <Wrench className="h-4 w-4 text-orange-600" />
+                    </div>
+                    <div className="space-y-1">
+                        <div className="text-2xl font-bold text-orange-600">
+                            {stats.maintenance}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Under repair/service
+                        </p>
+                    </div>
+                </div>
+                <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+                    <div className="flex flex-row items-center justify-between pb-2">
+                        <span className="text-sm font-medium text-muted-foreground">
+                            Damaged
+                        </span>
+                        <ShieldAlert className="h-4 w-4 text-red-600" />
+                    </div>
+                    <div className="space-y-1">
+                        <div className="text-2xl font-bold text-red-600">
+                            {stats.damage}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Broken or faulty
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {/* page content */}
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                    <div className="space-y-1">
+                        <CardTitle className="text-2xl font-bold tracking-tight">
+                            Available Meters List
+                        </CardTitle>
+                    </div>
+
+                    <div className="relative flex w-1/2 items-center">
+                        <div className="absolute top-0 bottom-0 left-0 flex items-center px-2 text-muted-foreground">
+                            <Search className="" />
+                        </div>
+                        <Input
+                            placeholder="Search meters..."
+                            className="border-gray-300 bg-gray-50 pl-10"
+                            defaultValue={filters.search || ''}
+                            onChange={(e) => handleSearch(e.target.value)}
+                        />
+                    </div>
+                </CardHeader>
+
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Serial Number</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Customer Name</TableHead>
+                                <TableHead>Home Address</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">
+                                    Actions
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {meters.data.length > 0 ? (
+                                meters.data.map((meter) => (
+                                    <TableRow key={meter.id}>
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center">
+                                                <Gauge className="mr-2 h-4 w-4 text-muted-foreground" />
+                                                {meter.meter_number}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {meter.meter_type}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                {meter.home?.customer?.name ||
+                                                    '---------'}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {meter.home?.address ||
+                                                '----------'}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                variant={
+                                                    meter.status === 'active'
+                                                        ? 'default'
+                                                        : 'secondary'
+                                                }
+                                            >
+                                                {meter.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={route(
+                                                            'meters.show',
+                                                            meter.id,
+                                                        )}
+                                                    >
+                                                        View
+                                                    </Link>
+                                                </Button>
+                                                {department === 'admin' && (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            className="bg-green-600 text-white hover:bg-green-700 hover:text-white"
+                                                            onClick={() =>
+                                                                handleEdit(
+                                                                    meter,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            onClick={() =>
+                                                                handleDelete(
+                                                                    meter.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={6}
+                                        className="h-24 text-center"
+                                    >
+                                        No meters found.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+
+                <CardFooter className="flex items-center justify-between border-t p-4">
+                    <div className="text-sm text-muted-foreground">
+                        Showing {meters.from || 0} to {meters.to || 0} of{' '}
+                        {meters.total} results
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        {meters.links &&
+                            meters.links.map((link, index) => (
+                                <Button
+                                    key={index}
+                                    variant={
+                                        link.active ? 'default' : 'outline'
+                                    }
+                                    size="sm"
+                                    disabled={!link.url}
+                                    asChild={!!link.url}
+                                >
+                                    {link.url ? (
+                                        <Link
+                                            href={link.url}
+                                            dangerouslySetInnerHTML={{
+                                                __html: link.label,
+                                            }}
+                                        />
+                                    ) : (
+                                        <span
+                                            dangerouslySetInnerHTML={{
+                                                __html: link.label,
+                                            }}
+                                        />
+                                    )}
+                                </Button>
+                            ))}
+                    </div>
+                </CardFooter>
+            </Card>
         </AppLayout>
     );
 }

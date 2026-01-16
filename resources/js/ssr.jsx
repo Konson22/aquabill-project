@@ -3,26 +3,19 @@ import createServer from '@inertiajs/react/server';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import ReactDOMServer from 'react-dom/server';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Aquabill';
+const appName = import.meta.env.VITE_APP_NAME || 'SSUWC billing system';
+
+const pages = import.meta.glob('./pages/**/*.jsx');
 
 createServer((page) =>
     createInertiaApp({
         page,
         render: ReactDOMServer.renderToString,
-        title: (title) => `${title} - ${appName}`,
-        resolve: (name) => resolvePageComponent(`./pages/${name}.jsx`, import.meta.glob('./pages/**/*.jsx')),
+        title: (title) => (title ? `${title} - ${appName}` : appName),
+        resolve: (name) => {
+            return resolvePageComponent(`./pages/${name}.jsx`, pages);
+        },
         setup: ({ App, props }) => {
-            /* eslint-disable */
-            // @ts-expect-error
-            global.route = (name, params, absolute) =>
-                route(name, params, absolute, {
-                    // @ts-expect-error
-                    ...page.props.ziggy,
-                    // @ts-expect-error
-                    location: new URL(page.props.ziggy.location),
-                });
-            /* eslint-enable */
-
             return <App {...props} />;
         },
     }),

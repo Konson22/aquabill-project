@@ -1,499 +1,466 @@
-import InvoiceModal from '@/components/modals/invoice-modal';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Activity, Calendar, DollarSign, Download, Droplets, FileText, Plus, Search, Users } from 'lucide-react';
+import {
+    Eye,
+    Home,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    Users,
+    X,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-const breadcrumbs = [
-    {
-        title: 'Customers',
-        href: '/customers',
-    },
-];
+export default function Customers({ customers, filters, zones, tariffs }) {
+    const [search, setSearch] = useState(filters.search || '');
+    const [zoneId, setZoneId] = useState(filters.zone_id || 'all');
+    const [tariffId, setTariffId] = useState(filters.tariff_id || 'all');
+    const { auth } = usePage().props;
+    const department = auth?.user?.department;
 
-export default function Customers({ areas, categories, customers, meters = [] }) {
-    const page = usePage();
-    const { auth, errors = {} } = page.props;
-    const userDepartment = auth.user?.department?.name;
-    const isBillingDepartment = userDepartment === 'Billing';
-    const isFinanceDepartment = userDepartment === 'Finance';
-
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filteredCustomers, setFilteredCustomers] = useState(customers);
-    const [filteredStats, setFilteredStats] = useState({
-        total_customers: customers.length,
-        active_customers: customers.filter((c) => c.is_active).length,
-        inactive_customers: customers.filter((c) => !c.is_active).length,
-        customers_with_meters: customers.filter((c) => !!c.meter).length,
-    });
-
-    // Invoice modal state
-    const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
-    const [selectedCustomerForInvoice, setSelectedCustomerForInvoice] = useState(null);
-
-    // Initial reading modal state
-    const [isInitialReadingModalOpen, setIsInitialReadingModalOpen] = useState(false);
-    const [selectedCustomerForInitialReading, setSelectedCustomerForInitialReading] = useState(null);
-    const [initialReadingValue, setInitialReadingValue] = useState('');
-    const [initialReadingDate, setInitialReadingDate] = useState(() => new Date().toISOString().split('T')[0]);
-    const [initialReadingNote, setInitialReadingNote] = useState('');
-    const [isSavingInitialReading, setIsSavingInitialReading] = useState(false);
-
-    const getToday = () => new Date().toISOString().split('T')[0];
-
-    // Handle invoice modal
-    const handleCreateInvoice = (customer) => {
-        setSelectedCustomerForInvoice(customer);
-        setIsInvoiceModalOpen(true);
-    };
-
-    const handleCloseInvoiceModal = () => {
-        setIsInvoiceModalOpen(false);
-        setSelectedCustomerForInvoice(null);
-    };
-
-    const handleInvoiceSuccess = () => {
-        // Optionally refresh the page or show a success message
-        window.location.reload();
-    };
-
-    const canCaptureInitialReading = (customer) => {
-        if (!customer?.meter) {
-            return false;
-        }
-
-        if (typeof customer.meter.readings_count === 'number') {
-            return customer.meter.readings_count === 0;
-        }
-
-        if (Array.isArray(customer.meter.readings)) {
-            return customer.meter.readings.length === 0;
-        }
-
-        if (typeof customer.readings_count === 'number') {
-            return customer.readings_count === 0;
-        }
-
-        if (Array.isArray(customer.readings)) {
-            return customer.readings.length === 0;
-        }
-
-        return false;
-    };
-
-    const openInitialReadingModal = (customer) => {
-        if (!customer?.meter) return;
-        setSelectedCustomerForInitialReading(customer);
-        setInitialReadingValue('');
-        setInitialReadingNote('');
-        setInitialReadingDate(getToday());
-        setIsInitialReadingModalOpen(true);
-    };
-
-    const closeInitialReadingModal = () => {
-        setIsInitialReadingModalOpen(false);
-        setSelectedCustomerForInitialReading(null);
-        setInitialReadingValue('');
-        setInitialReadingNote('');
-        setInitialReadingDate(getToday());
-        setIsSavingInitialReading(false);
-    };
-
-    const handleInitialReadingSubmit = () => {
-        if (initialReadingValue === '' || Number(initialReadingValue) < 0 || !selectedCustomerForInitialReading?.meter) {
-            return;
-        }
-
-        setIsSavingInitialReading(true);
-        router.post(
-            `/customers/${selectedCustomerForInitialReading.id}/initial-reading`,
-            {
-                value: Number(initialReadingValue),
-                date: initialReadingDate,
-                note: initialReadingNote,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    closeInitialReadingModal();
-                    router.reload();
-                },
-                onError: () => {
-                    setIsSavingInitialReading(false);
-                },
-                onFinish: () => {
-                    setIsSavingInitialReading(false);
-                },
-            },
-        );
-    };
-
-    // Filter customers based on search query
     useEffect(() => {
-        if (searchQuery.trim() === '') {
-            setFilteredCustomers(customers);
-            setFilteredStats({
-                total_customers: customers.length,
-                active_customers: customers.filter((c) => c.is_active).length,
-                inactive_customers: customers.filter((c) => !c.is_active).length,
-                customers_with_meters: customers.filter((c) => !!c.meter).length,
+        const timer = setTimeout(() => {
+            const query = {};
+            if (search) query.search = search;
+            if (zoneId && zoneId !== 'all') query.zone_id = zoneId;
+            if (tariffId && tariffId !== 'all') query.tariff_id = tariffId;
+
+            router.get(route('customers.index'), query, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
             });
-        } else {
-            const filtered = customers.filter((customer) => {
-                const searchLower = searchQuery.toLowerCase();
+        }, 300);
 
-                // Search in customer name
-                const customerName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
-                if (customerName.includes(searchLower)) return true;
+        return () => clearTimeout(timer);
+    }, [search, zoneId, tariffId]);
 
-                // Search in phone
-                const phone = customer.phone?.toLowerCase() || '';
-                if (phone.includes(searchLower)) return true;
+    const clearFilters = () => {
+        setSearch('');
+        setZoneId('all');
+        setTariffId('all');
+    };
 
-                // Search in email
-                const email = customer.email?.toLowerCase() || '';
-                if (email.includes(searchLower)) return true;
-
-                // Search in address
-                const address = customer.address?.toLowerCase() || '';
-                if (address.includes(searchLower)) return true;
-
-                // Search in contract
-                const contract = customer.contract?.toLowerCase() || '';
-                if (contract.includes(searchLower)) return true;
-
-                // Search in location name
-                const locationName = customer.location?.name?.toLowerCase() || '';
-                if (locationName.includes(searchLower)) return true;
-
-                // Search in meter serial
-                const meterSerial = customer.meter?.serial?.toLowerCase() || '';
-                if (meterSerial.includes(searchLower)) return true;
-
-                return false;
-            });
-
-            setFilteredCustomers(filtered);
-            setFilteredStats({
-                total_customers: filtered.length,
-                active_customers: filtered.filter((c) => c.is_active).length,
-                inactive_customers: filtered.filter((c) => !c.is_active).length,
-                customers_with_meters: filtered.filter((c) => !!c.meter).length,
+    const handleDelete = (id) => {
+        if (confirm('Are you sure you want to delete this customer?')) {
+            router.delete(route('customers.destroy', id), {
+                preserveScroll: true,
             });
         }
-    }, [searchQuery, customers]);
-
-    const formatDate = (date) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
     };
+
+    const getInitials = (name) => {
+        return name
+            .split(' ')
+            .map((n) => n[0])
+            .slice(0, 2)
+            .join('')
+            .toUpperCase();
+    };
+
+    const breadcrumbs = [
+        {
+            title: 'Dashboard',
+            href: route('dashboard'),
+        },
+        {
+            title: 'Customers',
+            href: route('customers.index'),
+        },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Customers" />
 
-            {/* Header */}
-            <div className="mb-8 flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Customers</h1>
-                </div>
-                <div className="flex items-center gap-2">
-                    <a href="/customers/export">
-                        <Button variant="outline" className="gap-2">
-                            <Download className="h-4 w-4" />
-                            Export All
+            <div className="flex flex-col gap-6 p-4 md:p-6">
+                {/* Header Section */}
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                            Customers
+                        </h1>
+                        <p className="text-muted-foreground">
+                            Manage your customer base, verify details, and track
+                            connections.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button asChild variant="outline" className="gap-2">
+                            <Link href={route('homes.index')}>
+                                <Home className="h-4 w-4" />
+                                <span className="hidden sm:inline">
+                                    All Connections
+                                </span>
+                                <span className="sm:hidden">Homes</span>
+                            </Link>
                         </Button>
-                    </a>
-                    {!isBillingDepartment && !isFinanceDepartment && (
-                        <Link href="/customers/create">
-                            <Button className="gap-2">
-                                <Plus className="h-4 w-4" />
-                                Add Customer
+                        {department === 'admin' && (
+                            <Button asChild className="gap-2 shadow-sm">
+                                <Link href={route('customers.create')}>
+                                    <Plus className="h-4 w-4" />
+                                    Add Customer
+                                </Link>
                             </Button>
-                        </Link>
-                    )}
+                        )}
+                    </div>
                 </div>
-            </div>
 
-            {/* Stats Cards */}
-            <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="p-4">
-                    <div className="flex flex-row items-center justify-between">
-                        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400">Total Customers</h3>
-                        <Users className="h-3.5 w-3.5 text-blue-600" />
-                    </div>
-                    <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{filteredStats.total_customers}</div>
-                </Card>
+                {/* Filters Section */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-lg font-medium">
+                            Filters & Search
+                        </CardTitle>
+                        <CardDescription>
+                            Find customers by name, phone, zone, or tariff plan.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                            <div className="relative flex-1">
+                                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search by name, email, or phone..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+                                <Select
+                                    value={tariffId}
+                                    onValueChange={setTariffId}
+                                >
+                                    <SelectTrigger className="w-full sm:w-[180px]">
+                                        <SelectValue placeholder="Tariff" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All Tariffs
+                                        </SelectItem>
+                                        {tariffs.map((tariff) => (
+                                            <SelectItem
+                                                key={tariff.id}
+                                                value={tariff.id.toString()}
+                                            >
+                                                {tariff.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
 
-                <Card className="p-4">
-                    <div className="flex flex-row items-center justify-between">
-                        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400">Active Customers</h3>
-                        <Activity className="h-3.5 w-3.5 text-green-600" />
-                    </div>
-                    <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{filteredStats.active_customers}</div>
-                </Card>
+                                <Select
+                                    value={zoneId}
+                                    onValueChange={setZoneId}
+                                >
+                                    <SelectTrigger className="w-full sm:w-[180px]">
+                                        <SelectValue placeholder="Zone" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All Zones
+                                        </SelectItem>
+                                        {zones.map((zone) => (
+                                            <SelectItem
+                                                key={zone.id}
+                                                value={zone.id.toString()}
+                                            >
+                                                {zone.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
 
-                <Card className="p-4">
-                    <div className="flex flex-row items-center justify-between">
-                        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400">With Meters</h3>
-                        <Calendar className="h-3.5 w-3.5 text-purple-600" />
-                    </div>
-                    <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{filteredStats.customers_with_meters}</div>
-                </Card>
-
-                <Card className="p-4">
-                    <div className="flex flex-row items-center justify-between">
-                        <h3 className="text-xs font-medium text-slate-600 dark:text-slate-400">Inactive</h3>
-                        <DollarSign className="h-3.5 w-3.5 text-red-600" />
-                    </div>
-                    <div className="text-xl font-bold text-slate-900 dark:text-slate-100">{filteredStats.inactive_customers}</div>
-                </Card>
-            </div>
-
-            {/* Customers Table */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>All Customers</CardTitle>
-                            <CardDescription>Manage customer information and accounts</CardDescription>
+                                {(search ||
+                                    zoneId !== 'all' ||
+                                    tariffId !== 'all') && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={clearFilters}
+                                        title="Clear filters"
+                                        className="shrink-0"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex w-[35%] items-center">
-                            <Input
-                                type="text"
-                                placeholder="Search customers..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+                    </CardContent>
+                </Card>
+
+                {/* Results Table */}
+                <Card className="overflow-hidden">
+                    <div className="flex items-center justify-between border-b px-6 py-4">
+                        <div className="flex items-center gap-2">
+                            <Users className="h-5 w-5 text-muted-foreground" />
+                            <h2 className="text-lg font-semibold">
+                                Total Customers{' '}
+                                <Badge variant="secondary" className="ml-2">
+                                    {customers.total}
+                                </Badge>
+                            </h2>
                         </div>
                     </div>
-                </CardHeader>
-                <CardContent>
                     <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead>
-                                <tr className="border-b border-slate-200 dark:border-slate-800">
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Customer</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Contact</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Area</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Status</th>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-900 dark:text-slate-100">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredCustomers.length > 0 ? (
-                                    filteredCustomers.map((customer) => (
-                                        <tr
+                        <Table>
+                            <TableHeader className="bg-muted/50">
+                                <TableRow>
+                                    <TableHead className="w-[300px]">
+                                        Customer
+                                    </TableHead>
+                                    <TableHead>Contact</TableHead>
+                                    <TableHead className="text-center">
+                                        Homes
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                        Actions
+                                    </TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {customers.data.length > 0 ? (
+                                    customers.data.map((customer) => (
+                                        <TableRow
                                             key={customer.id}
-                                            className="border-b border-slate-100 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                                            className="hover:bg-muted/5"
                                         >
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center">
-                                                    <Users className="mr-2 h-4 w-4 text-slate-400" />
-                                                    <div>
+                                            <TableCell>
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="h-9 w-9 border">
+                                                        <AvatarFallback className="bg-primary/10 text-primary">
+                                                            {getInitials(
+                                                                customer.name,
+                                                            )}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex flex-col">
                                                         <span className="font-medium">
-                                                            {customer.first_name} {customer.last_name}
+                                                            {customer.name}
                                                         </span>
-                                                        {customer.contract && <p className="text-xs text-slate-500">#{customer.account_number}</p>}
-                                                        {customer.meter?.serial && (
-                                                            <p className="text-xs text-slate-500">Meter: {customer.meter.serial}</p>
-                                                        )}
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {customer.email ||
+                                                                'No email'}
+                                                        </span>
                                                     </div>
                                                 </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="text-sm">
-                                                    {customer.phone && <div>{customer.phone}</div>}
-                                                    {customer.email && <div className="text-slate-500">{customer.email}</div>}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-sm font-medium">
+                                                        {customer.phone}
+                                                    </span>
                                                 </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                {customer.address ? (
-                                                    <Badge variant="outline">{customer.address}</Badge>
-                                                ) : (
-                                                    <span className="text-slate-400">No location</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3">
+                                            </TableCell>
+                                            <TableCell className="text-center">
                                                 <Badge
-                                                    className={
-                                                        customer.is_active
-                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                                    }
+                                                    variant="outline"
+                                                    className="font-mono"
                                                 >
-                                                    {customer.is_active ? 'Active' : 'Inactive'}
+                                                    {customer.homes_count}
                                                 </Badge>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex space-x-2">
-                                                    <Link href={`/customers/${customer.id}`}>
-                                                        <Button variant="outline" size="sm">
-                                                            View
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger
+                                                        asChild
+                                                    >
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8"
+                                                        >
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <span className="sr-only">
+                                                                Open menu
+                                                            </span>
                                                         </Button>
-                                                    </Link>
-                                                    {!isBillingDepartment && (
-                                                        <>
-                                                            {!isFinanceDepartment && (
-                                                                <Link href={`/customers/${customer.id}/edit`}>
-                                                                    <Button variant="outline" size="sm">
-                                                                        Edit
-                                                                    </Button>
-                                                                </Link>
-                                                            )}
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => handleCreateInvoice(customer)}
-                                                                className="gap-1"
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent
+                                                        align="end"
+                                                        className="w-[160px]"
+                                                    >
+                                                        <DropdownMenuLabel>
+                                                            Actions
+                                                        </DropdownMenuLabel>
+                                                        <DropdownMenuItem
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={route(
+                                                                    'customers.show',
+                                                                    customer.id,
+                                                                )}
                                                             >
-                                                                <FileText className="h-3 w-3" />
-                                                                Invoice
-                                                            </Button>
-                                                            {canCaptureInitialReading(customer) && (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    onClick={() => openInitialReadingModal(customer)}
-                                                                    className="gap-1"
+                                                                <Eye className="mr-2 h-4 w-4" />
+                                                                View Profile
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        {department ===
+                                                            'admin' && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    asChild
                                                                 >
-                                                                    <Droplets className="h-3 w-3" />
-                                                                    Initial
-                                                                </Button>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                                    <Link
+                                                                        href={route(
+                                                                            'customers.edit',
+                                                                            customer.id,
+                                                                        )}
+                                                                    >
+                                                                        <Pencil className="mr-2 h-4 w-4" />
+                                                                        Edit
+                                                                        Details
+                                                                    </Link>
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem
+                                                                    onClick={() =>
+                                                                        handleDelete(
+                                                                            customer.id,
+                                                                        )
+                                                                    }
+                                                                    className="text-red-600 focus:text-red-600"
+                                                                >
+                                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                                    Delete
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
                                     ))
                                 ) : (
-                                    <tr>
-                                        <td colSpan="7" className="px-4 py-8 text-center text-slate-500">
-                                            <div className="flex flex-col items-center">
-                                                <Search className="mb-2 h-8 w-8 text-slate-300" />
-                                                <p className="text-sm">No customers found matching your search.</p>
-                                                {searchQuery && (
-                                                    <p className="mt-1 text-xs text-slate-400">
-                                                        Try adjusting your search terms or clear the search to see all customers.
-                                                    </p>
-                                                )}
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={4}
+                                            className="h-32 text-center text-muted-foreground"
+                                        >
+                                            <div className="flex flex-col items-center justify-center gap-2">
+                                                <Users className="h-8 w-8 opacity-20" />
+                                                <p>
+                                                    No customers found matching
+                                                    your criteria.
+                                                </p>
+                                                <Button
+                                                    variant="link"
+                                                    onClick={clearFilters}
+                                                    className="px-0"
+                                                >
+                                                    Clear filters
+                                                </Button>
                                             </div>
-                                        </td>
-                                    </tr>
+                                        </TableCell>
+                                    </TableRow>
                                 )}
-                            </tbody>
-                        </table>
+                            </TableBody>
+                        </Table>
                     </div>
 
-                    {/* Results Count */}
-                    <div className="mt-6 flex items-center justify-between">
-                        <div className="text-sm text-slate-600 dark:text-slate-400">
-                            Showing {filteredCustomers.length} of {customers.length} customers
-                            {searchQuery && <span className="ml-2 text-slate-500">(filtered by "{searchQuery}")</span>}
+                    {/* Pagination */}
+                    <div className="border-t p-4">
+                        <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="text-sm text-muted-foreground">
+                                Showing{' '}
+                                <span className="font-medium">
+                                    {customers.from || 0}
+                                </span>{' '}
+                                to{' '}
+                                <span className="font-medium">
+                                    {customers.to || 0}
+                                </span>{' '}
+                                of{' '}
+                                <span className="font-medium">
+                                    {customers.total}
+                                </span>{' '}
+                                results
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {customers.links &&
+                                    customers.links.map((link, index) => {
+                                        // Clean up HTML entities in labels like &laquo;
+                                        const label = link.label
+                                            .replace('&laquo; Previous', 'Prev')
+                                            .replace('Next &raquo;', 'Next');
+
+                                        return (
+                                            <Button
+                                                key={index}
+                                                variant={
+                                                    link.active
+                                                        ? 'default'
+                                                        : 'outline'
+                                                }
+                                                size="sm"
+                                                disabled={!link.url}
+                                                asChild={!!link.url}
+                                                className={
+                                                    !link.url
+                                                        ? 'cursor-default opacity-50'
+                                                        : ''
+                                                }
+                                            >
+                                                {link.url ? (
+                                                    <Link
+                                                        href={link.url}
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: label,
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span
+                                                        dangerouslySetInnerHTML={{
+                                                            __html: label,
+                                                        }}
+                                                    />
+                                                )}
+                                            </Button>
+                                        );
+                                    })}
+                            </div>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
-
-            {/* Invoice Modal */}
-            <InvoiceModal
-                isOpen={isInvoiceModalOpen}
-                onClose={handleCloseInvoiceModal}
-                customers={customers}
-                meters={meters}
-                selectedCustomer={selectedCustomerForInvoice}
-                onSuccess={handleInvoiceSuccess}
-            />
-
-            {/* Initial Reading Modal */}
-            <Dialog open={isInitialReadingModalOpen} onOpenChange={(open) => (open ? null : closeInitialReadingModal())}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Droplets className="h-5 w-5 text-blue-600" />
-                            Record Initial Reading
-                        </DialogTitle>
-                        <DialogDescription>
-                            {selectedCustomerForInitialReading
-                                ? `Capture the initial meter reading for ${selectedCustomerForInitialReading.first_name} ${selectedCustomerForInitialReading.last_name}.`
-                                : 'Capture the initial meter reading.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-5">
-                        {selectedCustomerForInitialReading && (
-                            <div className="rounded-lg border bg-slate-50 p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
-                                <p className="text-xs text-slate-500 uppercase dark:text-slate-400">Meter</p>
-                                <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                                    {selectedCustomerForInitialReading.meter?.serial || `Meter #${selectedCustomerForInitialReading.meter?.id}`}
-                                </p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                    This value sets the baseline for future consumption calculations.
-                                </p>
-                            </div>
-                        )}
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="initial-reading-value">Initial Reading (m³)</Label>
-                                <Input
-                                    id="initial-reading-value"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={initialReadingValue}
-                                    onChange={(e) => setInitialReadingValue(e.target.value)}
-                                    placeholder="Enter reading value"
-                                />
-                                {errors.value && <p className="text-xs text-red-600">{errors.value}</p>}
-                                <p className="text-xs text-slate-500">Use the latest display from the meter.</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="initial-reading-date">Reading Date</Label>
-                                <Input
-                                    id="initial-reading-date"
-                                    type="date"
-                                    value={initialReadingDate}
-                                    max={getToday()}
-                                    onChange={(e) => setInitialReadingDate(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="initial-reading-note">Notes (optional)</Label>
-                            <Textarea
-                                id="initial-reading-note"
-                                rows={3}
-                                placeholder="Describe how this reading was captured"
-                                value={initialReadingNote}
-                                onChange={(e) => setInitialReadingNote(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex justify-end space-x-2">
-                            <Button type="button" variant="outline" onClick={closeInitialReadingModal} disabled={isSavingInitialReading}>
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                className="bg-blue-600 hover:bg-blue-700"
-                                onClick={handleInitialReadingSubmit}
-                                disabled={initialReadingValue === '' || Number(initialReadingValue) < 0 || isSavingInitialReading}
-                            >
-                                {isSavingInitialReading ? 'Saving...' : 'Save Initial Reading'}
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+                </Card>
+            </div>
         </AppLayout>
     );
 }

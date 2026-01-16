@@ -2,102 +2,73 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\MeterReading;
-use App\Models\Customer;
 use App\Models\Meter;
+use App\Models\MeterReading;
 use App\Models\User;
+use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Seeder;
 
 class MeterReadingSeeder extends Seeder
 {
+    /**
+     * Run the database seeds.
+     */
     public function run(): void
     {
-        // Get customers, meters, and users for relationships
-        $customers = Customer::all();
         $meters = Meter::all();
-        $users = User::all();
+        $users = User::where('department', 'meters')->get();
 
-        if ($customers->isEmpty() || $meters->isEmpty() || $users->isEmpty()) {
-            $this->command->warn('Please run CustomerSeeder, MeterSeeder, and UserSeeder first.');
+        if ($meters->isEmpty()) {
+            $this->command->warn('No meters found. Please run MeterSeeder first.');
             return;
         }
 
-        $readings = [];
-        $currentDate = now();
+        if ($users->isEmpty()) {
+            $this->command->warn('No meter department users found. Please run UserSeeder first.');
+            return;
+        }
 
-        // Generate readings for the last 12 months for each customer
-        foreach ($customers as $customer) {
-            $customerMeter = $customer->meter;
-            if (!$customerMeter) continue;
+        foreach ($meters as $meter) {
+            // Get tariff information from the meter's home
+            $tariff = $meter->home?->tariff;
+            $tariffPrice = $tariff?->price ?? 3.00; // Default to 3.00 if no tariff
+            $fixCharges = $tariff?->fixed_charge ?? 15.00; // Default to 15.00 if no tariff
 
+            // Create 3-5 readings per meter with different dates
+            $numReadings = rand(3, 5);
             $previousReading = 0;
-            
-            // Generate 12 months of readings
-            for ($i = 11; $i >= 0; $i--) {
-                $readingDate = $currentDate->copy()->subMonths($i);
+            $previousBalance = 0;
+
+            for ($i = 0; $i < $numReadings; $i++) {
+                $readingDate = now()->subMonths($numReadings - $i)->startOfMonth()->addDays(rand(1, 10));
+                $currentReading = $previousReading + rand(50, 500);
+                $consumption = $i > 0 ? $currentReading - $previousReading : 0;
                 
-                // Generate consumption between 5-50 cubic meters per month
-                $consumption = rand(5, 50);
-                $currentReading = $previousReading + $consumption;
-                
-                $readings[] = [
-                    'customer_id' => $customer->id,
-                    'meter_id' => $customerMeter->id,
-                    'billing_officer' => $users->random()->id,
-                    'value' => $currentReading,
-                    'previous' => $previousReading,
-                    'illigal_connection' => rand(0, 1), // Random 0 or 1
-                    'note' => $this->getRandomNote(),
-                    'source' => $this->getRandomSource(),
-                    'date' => $readingDate->format('Y-m-d'),
-                    'created_at' => $readingDate,
-                    'updated_at' => $readingDate,
-                ];
-                
+                $status = $i === $numReadings - 1 ? 'pending' : 'billed';
+
+                MeterReading::create([
+                    'meter_id' => $meter->id,
+                    'home_id' => $meter->home_id,
+                    'reading_date' => $readingDate,
+                    'current_reading' => $currentReading,
+                    'previous_reading' => $i > 0 ? $previousReading : null,
+                    'consumption' => $consumption > 0 ? $consumption : null,
+                    'read_by' => $users->random()->id,
+                    'status' => $status,
+                    'tariff' => $tariffPrice,
+                    'fix_charges' => $fixCharges,
+                    'previous_balance' => $i > 0 ? $previousBalance : 0,
+                ]);
+
+                // Update previous balance for next reading (simulate bill payment)
+                // For billed readings, previous balance could be 0 (paid) or carry forward
+                if ($status === 'billed') {
+                    $previousBalance = rand(0, 1) === 0 ? 0 : rand(100, 1000); // 50% chance of having balance
+                }
+
                 $previousReading = $currentReading;
             }
         }
-
-        // Insert readings in batches
-        foreach (array_chunk($readings, 100) as $chunk) {
-            MeterReading::insert($chunk);
-        }
-    }
-
-    private function getRandomNote(): ?string
-    {
-        $notes = [
-            'Regular reading',
-            'Customer present during reading',
-            'Meter in good condition',
-            'No issues observed',
-            'Customer requested reading',
-            'Routine monthly reading',
-            'Follow-up reading',
-            'Meter replaced last month',
-            'Customer complaint resolved',
-            'Special reading requested',
-            null, // Some readings may not have notes
-        ];
-
-        return $notes[array_rand($notes)];
-    }
-
-    private function getRandomSource(): ?string
-    {
-        $sources = [
-            'Mobile App',
-            'Field Officer',
-            'Customer Self-Reading',
-            'Automated System',
-            'Manual Entry',
-            'Phone Call',
-            'Email',
-            'SMS',
-            'Web Portal',
-            null, // Some readings may not have source
-        ];
-
-        return $sources[array_rand($sources)];
     }
 }
+

@@ -4,52 +4,48 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MeterReading extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $fillable = [
-        'value',
-        'previous',
         'meter_id',
-        'customer_id',
-        'illigal_connection',
-        'source',
-        'note',
-        'billing_officer',
-        'date'
+        'home_id',
+        'reading_date',
+        'current_reading',
+        'previous_reading',
+        'read_by',
+        'status',
     ];
 
-    protected $casts = [
-        'date' => 'date'
-    ];
-
-    // Accessor for consumption
-    public function getConsumptionAttribute()
+    protected function casts(): array
     {
-        return $this->value - $this->previous;
+        return [
+            'reading_date' => 'date',
+            'current_reading' => 'decimal:2',
+            'previous_reading' => 'decimal:2',
+        ];
     }
 
-    // Relationships
+    public function home()
+    {
+        return $this->belongsTo(Home::class);
+    }
+
     public function meter()
     {
         return $this->belongsTo(Meter::class);
     }
 
-    public function customer()
+    public function reader()
     {
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(User::class, 'read_by');
     }
 
-    public function bills()
+    public function bill()
     {
-        return $this->hasMany(Bill::class, 'reading_id');
-    }
-
-    public function recordedBy()
-    {
-        return $this->belongsTo(User::class, 'billing_officer');
+        return $this->hasOne(\App\Models\Bill::class);
     }
 }
+
