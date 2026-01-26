@@ -14,9 +14,10 @@ export default function PrintBillCard({ bill }) {
     const tariff = home?.tariff || {};
     const meterReading = bill?.meter_reading;
     const grandTotal = Number(bill?.total_amount || 0);
-
     // Calculate consumption
-    const consumption = bill?.consumption || 0;
+    const consumption =
+        meterReading?.current_reading - meterReading?.previous_reading || 0;
+    console.log(consumption * tariff.price, tariff.price);
 
     const VOLUM_CHARGES = consumption * tariff.price;
 

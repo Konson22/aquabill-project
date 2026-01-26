@@ -21,6 +21,10 @@ return new class extends Migration
             $table->string('plot_number')->nullable();
             $table->string('phone')->nullable();
             $table->string('property_type')->nullable();
+            $table->date('contract_date')->nullable();
+            $table->date('meter_install_date')->nullable();
+            $table->enum('supply_status', ['active', 'suspended', 'disconnect'])->default('active');
+            $table->date('meter_disconnect_date')->nullable();
             $table->timestamps();
             
             $table->index('customer_id');

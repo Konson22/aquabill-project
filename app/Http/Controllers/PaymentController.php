@@ -52,9 +52,9 @@ class PaymentController extends Controller
 
         $stats = [
             'total_payments' => \App\Models\Payment::count(),
-            'paid' => \App\Models\Bill::where('status', 'paid')->count() + \App\Models\Invoice::where('status', 'paid')->count(),
-            'unpaid' => \App\Models\Bill::whereIn('status', ['pending', 'partial_paid'])->count() + \App\Models\Invoice::where('status', 'pending')->count(),
-            'overdue' => \App\Models\Bill::where('status', 'overdue')->count() + \App\Models\Invoice::where('status', 'overdue')->count(),
+            'paid' => \App\Models\Bill::where('status', 'fully paid')->count() + \App\Models\Invoice::where('status', 'paid')->count(),
+            'unpaid' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])->count() + \App\Models\Invoice::where('status', 'pending')->count(),
+            'overdue' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])->where('due_date', '<', now())->count() + \App\Models\Invoice::where('status', 'overdue')->count(),
         ];
 
         return Inertia::render('payments/index', [
@@ -186,7 +186,7 @@ class PaymentController extends Controller
         // 1. Bills KPIs
         $billsKpisRaw = \App\Models\Bill::query()
             ->selectRaw('COUNT(*) as total_count')
-            ->selectRaw("SUM(CASE WHEN status IN ('paid', 'forwarded', 'partial_paid', 'balance_forwarded') THEN 1 ELSE 0 END) as paid_count")
+            ->selectRaw("SUM(CASE WHEN status IN ('fully paid', 'forwarded', 'partial paid', 'balance forwarded') THEN 1 ELSE 0 END) as paid_count")
             ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as unpaid_count")
             // Total Billed is the sum of all fresh charges (excluding carried forward balances)
             ->selectRaw('SUM(total_amount - previous_balance) as total_billed')
@@ -374,10 +374,10 @@ class PaymentController extends Controller
                 $payable->current_balance -= $validated['amount'];
                 
                 if ($payable->current_balance <= 0) {
-                    $payable->status = 'paid';
+                    $payable->status = 'fully paid';
                     $payable->current_balance = 0;
                 } else {
-                    $payable->status = 'partial_paid';
+                    $payable->status = 'partial paid';
                 }
                 $payable->save();
             } elseif ($payable instanceof \App\Models\Invoice) {
@@ -395,5 +395,47 @@ class PaymentController extends Controller
         });
 
         return redirect()->back()->with('success', 'Payment recorded successfully.');
+    }
+
+    public function destroy($id)
+    {
+        $payment = \App\Models\Payment::findOrFail($id);
+        
+        \Illuminate\Support\Facades\DB::transaction(function () use ($payment) {
+            $payable = $payment->payable;
+
+            if ($payable instanceof \App\Models\Bill) {
+                // Revert bill balance
+                $payable->current_balance += $payment->amount;
+                
+                // Revert status based on balance
+                if ($payable->current_balance >= $payable->total_amount) {
+                    $payable->status = 'pending';
+                } else if ($payable->current_balance > 0) {
+                    $payable->status = 'partial paid';
+                }
+                
+                $payable->save();
+            } elseif ($payable instanceof \App\Models\Invoice) {
+                // Revert invoice status if necessary
+                // Check remaining balance if we were to delete this payment
+                // Total paid so far
+                $totalPaid = $payable->payments()->where('id', '!=', $payment->id)->sum('amount');
+                
+                if ($totalPaid < $payable->amount) {
+                    // Update status if it was 'paid'
+                    if ($payable->due_date < now()) {
+                        $payable->status = 'overdue';
+                    } else {
+                        $payable->status = 'pending';
+                    }
+                    $payable->save();
+                }
+            }
+            
+            $payment->delete();
+        });
+
+        return redirect()->back()->with('success', 'Payment deleted successfully.');
     }
 }

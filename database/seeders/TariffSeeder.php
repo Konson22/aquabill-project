@@ -13,54 +13,49 @@ class TariffSeeder extends Seeder
      */
     public function run(): void
     {
+        // Tariffs mapped to customer types: C1, C2, C3, C4, DOMESTIC, HTL, OFFICE
         $tariffs = [
             [
-                'name' => 'Residential - Basic',
+                'name' => 'C1',
                 'price' => 2.50,
                 'fixed_charge' => 10.00,
-                'description' => 'Basic residential water tariff for standard consumption',
+                'description' => 'Basic residential water tariff',
             ],
             [
-                'name' => 'Residential - Standard',
+                'name' => 'C2',
                 'price' => 3.00,
                 'fixed_charge' => 15.00,
-                'description' => 'Standard residential water tariff with moderate consumption allowance',
+                'description' => 'Standard residential water tariff',
             ],
             [
-                'name' => 'Residential - Premium',
+                'name' => 'C3',
                 'price' => 3.50,
                 'fixed_charge' => 20.00,
-                'description' => 'Premium residential water tariff for higher consumption',
+                'description' => 'Premium residential water tariff',
             ],
             [
-                'name' => 'Commercial - Small',
+                'name' => 'C4',
                 'price' => 4.00,
                 'fixed_charge' => 25.00,
-                'description' => 'Commercial tariff for small businesses and shops',
+                'description' => 'Commercial tariff for small businesses',
             ],
             [
-                'name' => 'Commercial - Medium',
+                'name' => 'DOMESTIC',
+                'price' => 2.50,
+                'fixed_charge' => 10.00,
+                'description' => 'Domestic residential water tariff',
+            ],
+            [
+                'name' => 'HOTEL',
                 'price' => 4.50,
                 'fixed_charge' => 35.00,
-                'description' => 'Commercial tariff for medium-sized businesses',
+                'description' => 'Hotel and hospitality tariff',
             ],
             [
-                'name' => 'Commercial - Large',
-                'price' => 5.00,
-                'fixed_charge' => 50.00,
-                'description' => 'Commercial tariff for large commercial establishments',
-            ],
-            [
-                'name' => 'Industrial',
-                'price' => 6.00,
-                'fixed_charge' => 75.00,
-                'description' => 'Industrial water tariff for manufacturing and production facilities',
-            ],
-            [
-                'name' => 'Institutional',
-                'price' => 3.75,
-                'fixed_charge' => 30.00,
-                'description' => 'Tariff for schools, hospitals, and other institutional buildings',
+                'name' => 'OFFICE',
+                'price' => 4.00,
+                'fixed_charge' => 25.00,
+                'description' => 'Office and commercial space tariff',
             ],
         ];
 

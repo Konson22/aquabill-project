@@ -8,7 +8,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -52,7 +51,6 @@ export default function Zones({
     const { delete: destroy } = useForm();
     const { data, setData, post, put, processing, errors, reset } = useForm({
         name: '',
-        code: '',
         description: '',
     });
 
@@ -74,7 +72,6 @@ export default function Zones({
         setEditingZone(zone);
         setData({
             name: zone.name,
-            code: zone.code,
             description: zone.description || '',
         });
         setOpen(true);
@@ -218,22 +215,7 @@ export default function Zones({
                                         </span>
                                     )}
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="code">Code</Label>
-                                    <Input
-                                        id="code"
-                                        placeholder="e.g. Z1"
-                                        value={data.code}
-                                        onChange={(e) =>
-                                            setData('code', e.target.value)
-                                        }
-                                    />
-                                    {errors.code && (
-                                        <span className="text-xs text-red-500">
-                                            {errors.code}
-                                        </span>
-                                    )}
-                                </div>
+
                                 <div className="grid gap-2">
                                     <Label htmlFor="description">
                                         Description
@@ -271,7 +253,6 @@ export default function Zones({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Zone Name</TableHead>
-                                <TableHead>Code</TableHead>
                                 <TableHead>Areas</TableHead>
                                 <TableHead>Customers (Est.)</TableHead>
                                 <TableHead>Description</TableHead>
@@ -287,11 +268,7 @@ export default function Zones({
                                         <TableCell className="font-medium">
                                             {zone.name}
                                         </TableCell>
-                                        <TableCell>
-                                            <Badge variant="outline">
-                                                {zone.code}
-                                            </Badge>
-                                        </TableCell>
+
                                         <TableCell>
                                             {zone.areas_count} Areas
                                         </TableCell>

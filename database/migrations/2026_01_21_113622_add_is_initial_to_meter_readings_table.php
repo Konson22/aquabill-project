@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('meter_readings', function (Blueprint $table) {
-            $table->string('image')->nullable()->after('status');
+            $table->boolean('is_initial')->default(false)->after('status');
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('meter_readings', function (Blueprint $table) {
-            $table->dropColumn('image');
+            $table->dropColumn('is_initial');
         });
     }
 };

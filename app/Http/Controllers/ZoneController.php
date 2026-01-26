@@ -27,7 +27,6 @@ class ZoneController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:zones,code',
             'description' => 'nullable|string',
         ]);
 
@@ -43,7 +42,8 @@ class ZoneController extends Controller
         }])->withCount(['areas', 'homes'])->findOrFail($id);
         
         return Inertia::render('zones/show', [
-            'zone' => $zone
+            'zone' => $zone,
+            'all_zones' => \App\Models\Zone::all()
         ]);
     }
 
@@ -53,7 +53,6 @@ class ZoneController extends Controller
         
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'code' => 'sometimes|string|max:50|unique:zones,code,' . $id,
             'description' => 'nullable|string',
         ]);
 

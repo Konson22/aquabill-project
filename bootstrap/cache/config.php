@@ -115,7 +115,7 @@
   ),
   'app' => 
   array (
-    'name' => 'SSWUC',
+    'name' => 'SSUWC',
     'env' => 'local',
     'debug' => true,
     'url' => 'http://localhost',
@@ -126,7 +126,7 @@
     'fallback_locale' => 'en',
     'faker_locale' => 'en_US',
     'cipher' => 'AES-256-CBC',
-    'key' => 'base64:Rqo+Vb3qlHqIOkWte5mgtlGsec7K+/oQlYHtkfxTSqo=',
+    'key' => 'base64:q1DJoJ5QrQUbvHDucVgqFWzavZeo9VHAEnsN1Z6e53w=',
     'previous_keys' => 
     array (
     ),
@@ -255,7 +255,7 @@
   ),
   'cache' => 
   array (
-    'default' => 'database',
+    'default' => 'file',
     'stores' => 
     array (
       'array' => 
@@ -333,7 +333,7 @@
         ),
       ),
     ),
-    'prefix' => 'sswuc-cache-',
+    'prefix' => 'ssuwc-cache-',
   ),
   'database' => 
   array (
@@ -432,7 +432,7 @@
       'options' => 
       array (
         'cluster' => 'redis',
-        'prefix' => 'sswuc-database-',
+        'prefix' => 'ssuwc-database-',
         'persistent' => false,
       ),
       'default' => 
@@ -796,7 +796,7 @@
     'from' => 
     array (
       'address' => 'hello@example.com',
-      'name' => 'SSWUC',
+      'name' => 'SSUWC',
     ),
     'markdown' => 
     array (
@@ -809,7 +809,7 @@
   ),
   'queue' => 
   array (
-    'default' => 'database',
+    'default' => 'sync',
     'connections' => 
     array (
       'sync' => 
@@ -935,7 +935,7 @@
   ),
   'session' => 
   array (
-    'driver' => 'database',
+    'driver' => 'file',
     'lifetime' => 120,
     'expire_on_close' => false,
     'encrypt' => false,
@@ -948,7 +948,7 @@
       0 => 2,
       1 => 100,
     ),
-    'cookie' => 'sswuc-session',
+    'cookie' => 'ssuwc-session',
     'path' => '/',
     'domain' => NULL,
     'secure' => NULL,

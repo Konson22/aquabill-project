@@ -26,6 +26,9 @@ class HomeController extends Controller
                   ->orWhere('plot_number', 'like', "%{$search}%")
                   ->orWhereHas('customer', function ($q2) use ($search) {
                       $q2->where('name', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('meter', function ($q) use ($search) {
+                      $q->where('meter_number', 'like', "%{$search}%");
                   });
             })
             ->limit(10)
@@ -48,7 +51,7 @@ class HomeController extends Controller
     public function index(Request $request)
     {
         $homes = Home::query()
-            ->with(['customer', 'meter', 'zone', 'area', 'tariff'])
+            ->with(['customer', 'meter', 'zone', 'area', 'tariff', 'latestReading'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('address', 'like', "%{$search}%")
@@ -57,7 +60,7 @@ class HomeController extends Controller
                             $q->where('name', 'like', "%{$search}%");
                         })
                         ->orWhereHas('meter', function ($q) use ($search) {
-                            $q->where('serial_number', 'like', "%{$search}%");
+                            $q->where('meter_number', 'like', "%{$search}%");
                         });
                 });
             })
@@ -92,7 +95,7 @@ class HomeController extends Controller
         $filename = 'homes-export-' . date('Y-m-d') . '.csv';
 
         $homes = Home::query()
-            ->with(['customer', 'meter', 'zone', 'area', 'tariff'])
+            ->with(['customer', 'meter', 'zone', 'area', 'tariff', 'latestReading'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('address', 'like', "%{$search}%")
@@ -101,7 +104,7 @@ class HomeController extends Controller
                             $q->where('name', 'like', "%{$search}%");
                         })
                         ->orWhereHas('meter', function ($q) use ($search) {
-                            $q->where('serial_number', 'like', "%{$search}%");
+                            $q->where('meter_number', 'like', "%{$search}%");
                         });
                 });
             })

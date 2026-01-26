@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 export default function PrintSingle({ bill }) {
     useEffect(() => {
         // Auto-print when component loads
-        // window.print();
+        window.print();
     }, []);
 
     return (

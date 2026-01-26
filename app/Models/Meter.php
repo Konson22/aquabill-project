@@ -12,15 +12,12 @@ class Meter extends Model
     protected $fillable = [
         'home_id',
         'meter_number',
-        'meter_type',
-        'installation_date',
         'status',
     ];
 
     protected function casts(): array
     {
         return [
-            'installation_date' => 'date',
         ];
     }
 

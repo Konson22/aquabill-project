@@ -18,6 +18,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Table,
     TableBody,
     TableCell,
@@ -31,12 +38,11 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { MapPin, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useState } from 'react';
 
-export default function ZoneShow({ zone }) {
+export default function ZoneShow({ zone, all_zones = [] }) {
     const [open, setOpen] = useState(false);
     const [editingArea, setEditingArea] = useState(null);
     const { data, setData, post, put, processing, errors, reset } = useForm({
         name: '',
-        code: '',
         description: '',
         zone_id: zone.id,
     });
@@ -86,9 +92,8 @@ export default function ZoneShow({ zone }) {
         setEditingArea(area);
         setData({
             name: area.name,
-            code: area.code,
             description: area.description || '',
-            zone_id: zone.id,
+            zone_id: area.zone_id || zone.id,
         });
         setOpen(true);
     };
@@ -156,22 +161,7 @@ export default function ZoneShow({ zone }) {
                                         </span>
                                     )}
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="code">Code</Label>
-                                    <Input
-                                        id="code"
-                                        placeholder="e.g. Z1-A1"
-                                        value={data.code}
-                                        onChange={(e) =>
-                                            setData('code', e.target.value)
-                                        }
-                                    />
-                                    {errors.code && (
-                                        <span className="text-xs text-red-500">
-                                            {errors.code}
-                                        </span>
-                                    )}
-                                </div>
+
                                 <div className="grid gap-2">
                                     <Label htmlFor="description">
                                         Description
@@ -190,6 +180,34 @@ export default function ZoneShow({ zone }) {
                                     {errors.description && (
                                         <span className="text-xs text-red-500">
                                             {errors.description}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="zone_id">Zone</Label>
+                                    <Select
+                                        value={data.zone_id?.toString()}
+                                        onValueChange={(value) =>
+                                            setData('zone_id', value)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a zone" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {all_zones.map((z) => (
+                                                <SelectItem
+                                                    key={z.id}
+                                                    value={z.id.toString()}
+                                                >
+                                                    {z.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.zone_id && (
+                                        <span className="text-xs text-red-500">
+                                            {errors.zone_id}
                                         </span>
                                     )}
                                 </div>
@@ -240,8 +258,7 @@ export default function ZoneShow({ zone }) {
                     <CardHeader>
                         <CardTitle>Areas Overview</CardTitle>
                         <CardDescription>
-                            A list of all areas assigned to this zone (
-                            {zone.code}).
+                            A list of all areas assigned to this zone.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -249,7 +266,6 @@ export default function ZoneShow({ zone }) {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Name</TableHead>
-                                    <TableHead>Code</TableHead>
                                     <TableHead>Customers</TableHead>
                                     <TableHead className="text-right">
                                         Actions
@@ -266,7 +282,7 @@ export default function ZoneShow({ zone }) {
                                                     {area.name}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{area.code}</TableCell>
+
                                             <TableCell>
                                                 {area.homes_count || 0}
                                             </TableCell>

@@ -38,6 +38,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
+    Activity,
     Eye,
     FileSpreadsheet,
     Home as HomeIcon,
@@ -46,6 +47,7 @@ import {
     Pencil,
     Receipt,
     Trash2,
+    X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -65,9 +67,10 @@ export default function Homes({
     const department = auth?.user?.department;
 
     const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+    const [readingModalOpen, setReadingModalOpen] = useState(false);
     const [selectedHome, setSelectedHome] = useState(null);
 
-    const { data, setData, post, processing, reset, errors } = useForm({
+    const invoiceForm = useForm({
         home_id: '',
         amount: '',
         due_date: new Date().toISOString().split('T')[0],
@@ -75,18 +78,50 @@ export default function Homes({
         description: '',
     });
 
+    const readingForm = useForm({
+        meter_id: '',
+        reading_date: new Date().toISOString().split('T')[0],
+        current_reading: '',
+        previous_reading: 0,
+        status: 'pending',
+    });
+
+    const openReadingModal = (home) => {
+        if (!home.meter) return;
+        setSelectedHome(home);
+        readingForm.setData({
+            meter_id: home.meter.id,
+            previous_reading: home.latest_reading?.current_reading || 0,
+            reading_date: new Date().toISOString().split('T')[0],
+            current_reading: '',
+            status: 'pending',
+        });
+        setReadingModalOpen(true);
+    };
+
+    const handleReadingSubmit = (e) => {
+        e.preventDefault();
+        readingForm.post(route('meter-readings.store'), {
+            onSuccess: () => {
+                setReadingModalOpen(false);
+                readingForm.reset();
+                setSelectedHome(null);
+            },
+        });
+    };
+
     const openInvoiceModal = (home) => {
         setSelectedHome(home);
-        setData('home_id', home.id);
+        invoiceForm.setData('home_id', home.id);
         setInvoiceModalOpen(true);
     };
 
     const handleInvoiceSubmit = (e) => {
         e.preventDefault();
-        post(route('invoices.store'), {
+        invoiceForm.post(route('invoices.store'), {
             onSuccess: () => {
                 setInvoiceModalOpen(false);
-                reset();
+                invoiceForm.reset();
                 setSelectedHome(null);
             },
         });
@@ -394,24 +429,34 @@ export default function Homes({
                                                                 View Details
                                                             </Link>
                                                         </DropdownMenuItem>
-                                                        {(department ===
-                                                            'admin' ||
-                                                            department ===
-                                                                'finance') && (
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    openInvoiceModal(
-                                                                        home,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Receipt className="mr-2 h-4 w-4" />
-                                                                Create Invoice
-                                                            </DropdownMenuItem>
-                                                        )}
+
                                                         {department ===
                                                             'admin' && (
                                                             <>
+                                                                {home.meter && (
+                                                                    <DropdownMenuItem
+                                                                        onClick={() =>
+                                                                            openReadingModal(
+                                                                                home,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        <Activity className="mr-2 h-4 w-4" />
+                                                                        Add
+                                                                        Reading
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                                <DropdownMenuItem
+                                                                    onClick={() =>
+                                                                        openInvoiceModal(
+                                                                            home,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Receipt className="mr-2 h-4 w-4" />
+                                                                    Create
+                                                                    Invoice
+                                                                </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
                                                                 <DropdownMenuItem
                                                                     asChild
@@ -585,9 +630,9 @@ export default function Homes({
                             <div className="space-y-2">
                                 <Label>Invoice Type</Label>
                                 <Select
-                                    value={data.type}
+                                    value={invoiceForm.data.type}
                                     onValueChange={(val) =>
-                                        setData('type', val)
+                                        invoiceForm.setData('type', val)
                                     }
                                 >
                                     <SelectTrigger>
@@ -623,16 +668,19 @@ export default function Homes({
                                         id="amount"
                                         type="number"
                                         step="0.01"
-                                        value={data.amount}
+                                        value={invoiceForm.data.amount}
                                         onChange={(e) =>
-                                            setData('amount', e.target.value)
+                                            invoiceForm.setData(
+                                                'amount',
+                                                e.target.value,
+                                            )
                                         }
                                         placeholder="0.00"
                                         required
                                     />
-                                    {errors.amount && (
+                                    {invoiceForm.errors.amount && (
                                         <p className="text-xs text-destructive">
-                                            {errors.amount}
+                                            {invoiceForm.errors.amount}
                                         </p>
                                     )}
                                 </div>
@@ -641,15 +689,18 @@ export default function Homes({
                                     <Input
                                         id="due_date"
                                         type="date"
-                                        value={data.due_date}
+                                        value={invoiceForm.data.due_date}
                                         onChange={(e) =>
-                                            setData('due_date', e.target.value)
+                                            invoiceForm.setData(
+                                                'due_date',
+                                                e.target.value,
+                                            )
                                         }
                                         required
                                     />
-                                    {errors.due_date && (
+                                    {invoiceForm.errors.due_date && (
                                         <p className="text-xs text-destructive">
-                                            {errors.due_date}
+                                            {invoiceForm.errors.due_date}
                                         </p>
                                     )}
                                 </div>
@@ -662,15 +713,18 @@ export default function Homes({
                                 <Textarea
                                     id="description"
                                     placeholder="Enter reason or additional details..."
-                                    value={data.description}
+                                    value={invoiceForm.data.description}
                                     onChange={(e) =>
-                                        setData('description', e.target.value)
+                                        invoiceForm.setData(
+                                            'description',
+                                            e.target.value,
+                                        )
                                     }
                                     className="resize-none"
                                 />
-                                {errors.description && (
+                                {invoiceForm.errors.description && (
                                     <p className="text-xs text-destructive">
-                                        {errors.description}
+                                        {invoiceForm.errors.description}
                                     </p>
                                 )}
                             </div>
@@ -684,8 +738,164 @@ export default function Homes({
                             >
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={processing}>
-                                {processing ? 'Creating...' : 'Create Invoice'}
+                            <Button
+                                type="submit"
+                                disabled={invoiceForm.processing}
+                            >
+                                {invoiceForm.processing
+                                    ? 'Creating...'
+                                    : 'Create Invoice'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Reading Modal */}
+            <Dialog open={readingModalOpen} onOpenChange={setReadingModalOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>Add Meter Reading</DialogTitle>
+                        <DialogDescription>
+                            Enter current consumption for{' '}
+                            <span className="font-medium text-foreground">
+                                {selectedHome?.customer?.name || 'this home'}
+                            </span>
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleReadingSubmit} className="space-y-4">
+                        <div className="space-y-4 py-4">
+                            <div className="grid grid-cols-2 gap-4 border-b pb-4">
+                                <div>
+                                    <Label className="text-xs tracking-wider text-muted-foreground uppercase">
+                                        Meter Number
+                                    </Label>
+                                    <div className="font-mono font-medium">
+                                        {selectedHome?.meter?.meter_number ||
+                                            'N/A'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label className="text-xs tracking-wider text-muted-foreground uppercase">
+                                        Previous Reading
+                                    </Label>
+                                    <div className="font-mono font-medium">
+                                        {readingForm.data.previous_reading}{' '}
+                                        Units
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="reading_date">
+                                    Reading Date
+                                </Label>
+                                <Input
+                                    id="reading_date"
+                                    type="date"
+                                    value={readingForm.data.reading_date}
+                                    onChange={(e) =>
+                                        readingForm.setData(
+                                            'reading_date',
+                                            e.target.value,
+                                        )
+                                    }
+                                    required
+                                />
+                                {readingForm.errors.reading_date && (
+                                    <p className="text-xs text-destructive">
+                                        {readingForm.errors.reading_date}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="current_reading">
+                                    Current Reading
+                                </Label>
+                                <Input
+                                    id="current_reading"
+                                    type="number"
+                                    step="0.01"
+                                    value={readingForm.data.current_reading}
+                                    onChange={(e) =>
+                                        readingForm.setData(
+                                            'current_reading',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="Enter numeric value"
+                                    required
+                                />
+                                {readingForm.errors.current_reading && (
+                                    <p className="text-xs text-destructive">
+                                        {readingForm.errors.current_reading}
+                                    </p>
+                                )}
+                                {readingForm.data.current_reading &&
+                                    parseFloat(
+                                        readingForm.data.current_reading,
+                                    ) <=
+                                        parseFloat(
+                                            readingForm.data.previous_reading,
+                                        ) && (
+                                        <p className="animate-in text-xs font-semibold text-destructive fade-in slide-in-from-top-1">
+                                            Current reading must be strictly
+                                            greater than previous (
+                                            {readingForm.data.previous_reading})
+                                        </p>
+                                    )}
+                            </div>
+
+                            {readingForm.data.current_reading &&
+                                parseFloat(readingForm.data.current_reading) >
+                                    parseFloat(
+                                        readingForm.data.previous_reading,
+                                    ) && (
+                                    <div className="animate-in rounded-lg border border-primary/10 bg-primary/5 p-4 duration-200 zoom-in-95">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium">
+                                                Calculated Consumption:
+                                            </span>
+                                            <span className="text-lg font-bold text-primary">
+                                                {(
+                                                    readingForm.data
+                                                        .current_reading -
+                                                    readingForm.data
+                                                        .previous_reading
+                                                ).toFixed(2)}{' '}
+                                                Units
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setReadingModalOpen(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={
+                                    readingForm.processing ||
+                                    !readingForm.data.current_reading ||
+                                    parseFloat(
+                                        readingForm.data.current_reading,
+                                    ) <=
+                                        parseFloat(
+                                            readingForm.data.previous_reading,
+                                        )
+                                }
+                            >
+                                {readingForm.processing
+                                    ? 'Saving...'
+                                    : 'Save Reading'}
                             </Button>
                         </DialogFooter>
                     </form>

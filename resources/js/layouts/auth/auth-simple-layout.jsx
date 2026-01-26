@@ -1,32 +1,28 @@
-import AppLogoIcon from '@/components/app-logo-icon';
-import { home } from '@/routes';
-import { Link } from '@inertiajs/react';
-
 export default function AuthSimpleLayout({ children, title, description }) {
     return (
-        <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-blue-400 p-6 md:p-10">
-            <div className="w-full max-w-sm">
-                <div className="flex flex-col gap-8 bg-white">
-                    <div className="flex flex-col items-center gap-4">
-                        <Link
-                            href={home()}
-                            className="flex flex-col items-center gap-2 font-medium"
-                        >
-                            <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                                <AppLogoIcon className="size-9 fill-current text-[var(--foreground)] dark:text-white" />
-                            </div>
-                            <span className="sr-only">{title}</span>
-                        </Link>
+        <div
+            className="relative flex max-h-screen min-h-screen flex-col items-center justify-center overflow-hidden bg-cover bg-center p-6 md:p-10"
+            style={{
+                backgroundImage: "url('/images/water-background.jpg')",
+            }}
+        >
+            {/* Overlay for better text processing if needed, though card is white now */}
+            <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px]" />
 
-                        <div className="space-y-2 text-center">
-                            <h1 className="text-xl font-medium">{title}</h1>
-                            <p className="text-center text-sm text-muted-foreground">
-                                {description}
-                            </p>
-                        </div>
+            {/* Premium Glass Card Container */}
+            <div className="relative z-10 w-full max-w-[520px] overflow-hidden rounded-3xl border border-white/30 bg-white/20 p-8 shadow-2xl backdrop-blur-2xl sm:p-12">
+                <div className="mb-8 flex flex-col items-center justify-center gap-4 text-center">
+                    <div className="space-y-2">
+                        <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-sm">
+                            {title}
+                        </h1>
+                        <p className="text-sm font-semibold text-white/80">
+                            {description}
+                        </p>
                     </div>
-                    {children}
                 </div>
+
+                <div className="w-full">{children}</div>
             </div>
         </div>
     );

@@ -92,11 +92,11 @@ export default function MeterShow({ meter }) {
                                     </div>
                                 </div>
                             </div>
-                            <div className="grid gap-1">
-                                <Label className="text-muted-foreground">
-                                    Installation Date
-                                </Label>
-                                <div>{formatDate(meter.installation_date)}</div>
+                            <Label className="text-muted-foreground">
+                                Installation Date
+                            </Label>
+                            <div>
+                                {formatDate(meter.home?.meter_install_date)}
                             </div>
                         </CardContent>
                     </Card>

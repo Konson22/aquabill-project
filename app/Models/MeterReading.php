@@ -17,7 +17,9 @@ class MeterReading extends Model
         'previous_reading',
         'read_by',
         'status',
+        'is_initial',
         'image',
+        'notes',
     ];
 
     protected function casts(): array
@@ -26,6 +28,8 @@ class MeterReading extends Model
             'reading_date' => 'date',
             'current_reading' => 'decimal:2',
             'previous_reading' => 'decimal:2',
+            'consumption' => 'decimal:2',
+            'is_initial' => 'boolean',
         ];
     }
 

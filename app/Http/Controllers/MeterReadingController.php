@@ -15,12 +15,13 @@ class MeterReadingController extends Controller
     public function index()
     {
         $meterReadings = \App\Models\MeterReading::with(['meter', 'home.customer', 'reader', 'bill'])
-            ->has('bill')
+            ->where(function ($query) {
+                $query->has('bill')->orWhere('is_initial', true);
+            })
             ->latest('reading_date')
             ->paginate(10);
         $meters = \App\Models\Meter::with(['home.customer'])
             ->whereNotNull('home_id')
-            ->where('status', 'active')
             ->get()
             ->map(function ($meter) {
                 $lastReading = $meter->readings()->latest('reading_date')->first();
@@ -62,7 +63,6 @@ class MeterReadingController extends Controller
         // Get previous reading if not provided
         if (empty($validated['previous_reading']) || $validated['previous_reading'] === null) {
             $previousReading = MeterReading::where('meter_id', $validated['meter_id'])
-                ->where('status', 'billed')
                 ->latest('reading_date')
                 ->first();
             
@@ -94,7 +94,7 @@ class MeterReadingController extends Controller
             
             $previousBalance = 0;
             if ($lastBill) {
-                if ($lastBill->status == 'paid') {
+                if ($lastBill->status == 'fully paid') {
                      $previousBalance = 0;
                 } else {
                      $previousBalance = $lastBill->current_balance;
@@ -122,13 +122,13 @@ class MeterReadingController extends Controller
             } while (Bill::where('bill_number', $billNumber)->exists());
 
             // Check for previous pending or overdue bills for the same home and update their status to forwarded
-             if ($lastBill && $lastBill->status != 'paid') {
+             if ($lastBill && $lastBill->status != 'fully paid') {
                  $lastBill->update(['status' => 'forwarded']);
              }
              
              // Ensure any other lingering unpaid bills are also forwarded
              Bill::where('home_id', $meter->home_id)
-                ->whereIn('status', ['pending', 'overdue', 'partial_paid'])
+                ->whereIn('status', ['pending', 'overdue', 'partial paid'])
                 ->where('id', '!=', $lastBill ? $lastBill->id : 0)
                 ->update(['status' => 'forwarded']);
 
@@ -201,7 +201,7 @@ class MeterReadingController extends Controller
             $reading->update(['consumption' => $newConsumption]);
 
             // 3. Update Bill if exists
-            if ($reading->bill && $reading->bill->status !== 'paid') {
+            if ($reading->bill && $reading->bill->status !== 'fully paid') {
                  $tariffRate = $reading->meter->home->tariff->price ?? 0;
                  $fixedCharge = $reading->meter->home->tariff->fixed_charge ?? 0;
                  $consumptionAmount = $newConsumption * $tariffRate;
@@ -235,8 +235,8 @@ class MeterReadingController extends Controller
         try {
             DB::beginTransaction();
             if ($reading->bill) {
-                if ($reading->bill->status === 'paid') {
-                    throw new \Exception("Cannot delete a reading with a paid bill.");
+                if ($reading->bill->status === 'fully paid') {
+                    throw new \Exception("Cannot delete a reading with a fully paid bill.");
                 }
                 $reading->bill->delete();
             }

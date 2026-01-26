@@ -4,8 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Area;
 use App\Models\Zone;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class AreaSeeder extends Seeder
 {
@@ -14,43 +14,31 @@ class AreaSeeder extends Seeder
      */
     public function run(): void
     {
-        $zones = Zone::all();
-
-        if ($zones->isEmpty()) {
-            $this->command->warn('No zones found. Please run ZoneSeeder first.');
-            return;
-        }
-
-        $areas = [
-            'North Zone' => [
-                ['name' => 'North Area 1', 'code' => 'NA1', 'description' => 'North Area 1'],
-                ['name' => 'North Area 2', 'code' => 'NA2', 'description' => 'North Area 2'],
-                ['name' => 'North Area 3', 'code' => 'NA3', 'description' => 'North Area 3'],
-            ],
-            'South Zone' => [
-                ['name' => 'South Area 1', 'code' => 'SA1', 'description' => 'South Area 1'],
-                ['name' => 'South Area 2', 'code' => 'SA2', 'description' => 'South Area 2'],
-                ['name' => 'South Area 3', 'code' => 'SA3', 'description' => 'South Area 3'],
-            ],
-            'East Zone' => [
-                ['name' => 'East Area 1', 'code' => 'EA1', 'description' => 'East Area 1'],
-                ['name' => 'East Area 2', 'code' => 'EA2', 'description' => 'East Area 2'],
-            ],
-            'West Zone' => [
-                ['name' => 'West Area 1', 'code' => 'WA1', 'description' => 'West Area 1'],
-                ['name' => 'West Area 2', 'code' => 'WA2', 'description' => 'West Area 2'],
-            ],
+        $zonesData = [
+            'ATLABARA' => ['HAI ATLABARA', 'HAI ATLABARA A', 'HAI ATLABARA A KATOR', 'HAI ATLABARA B', 'HAI ATLABARA C', 'HAI ATLABARA/KELI BALA'],
+            'HOSPITAL ZONE' => ['HAI CINEMA', 'HAI GABAT', 'HAI JALABA', 'HAI JERUSALEM', 'HAI JUBA NA BARI', 'HAI POLICE', 'HAI PRISON'],
+            'JEBEL ZONE' => ['HAI GWONGOROKI', 'HAI JEBEL MARKET', 'HAI JEBEL MIJIKI', 'HAI KHOR WILLIANG', 'HAI KUWAIT', 'HAI MALAKIA MIJIKI', 'HAI MIJIKI', 'HAI MIJIKI-JEBEL', 'HAI MUNUKI BLK', 'HAI NIMIRA TALATA'],
+            'NYAKURON' => ['HAI NIMIRA TALATA', 'HAI NYAKURON', 'HAI NYAKURON EAST', 'HAI NYAKURON NORTH', 'HAI NYAKURON SOUTH EAST', 'HAI NYAKURON WEST', 'HAI NYAKURON-MIJIKI'],
+            'JUBA UNIVERSITY ZONE' => ['HAI KOSTI', 'HAI MALAKA MIJIKI', 'HAI MALAKAL', 'HAI MALAKIA', 'HAI MALAKIA ZUHUR FATI', 'HAI MAYO', 'HAI MUNUKI BLK A', 'HAI NEEM', 'HAI THOURA EAST', 'HAI THOURA WEST'],
+            'KATOR' => ['HAI KASTOR WEST', 'HAI KATOR CENTRE', 'HAI KATOR EAST', 'HAI KATOR MALAKIA', 'HAI KATOR NORTH', 'HAI KATOR SOUTH', 'HAI KATOR WEST', 'HAI MALAKIA KATOR'],
+            'PARLIAMENT ZONE' => ['FADIA MATI', 'HAI AMARAT', 'HAI BULUK', 'HAI COMMERCIAL', 'HAI GAME', 'HAI JUBA NA BARI 3K SOUTH', 'HAI MALAKIA KOSTI', 'HAI MATAR', 'HAI MUNUKI BLK B', 'HAI MUNUKI BLK C', 'HAI NEGLI', 'HAI THOURA', 'HAI ZENDIA', 'JUBA TOWN'],
+            'OTHER' => ['4145', 'HAI CINEMA SOUTH', 'HAI GUDELE BLK 5', 'HAI MALALAL', 'HAI MAYO WEST', 'HAI MOUZIFIN', 'HAI NYAK WEST', 'HAI TONGPING', 'HANA SELMAN', 'JUBA JUBA', 'MIN-OF PARLIMARTORY', 'MINA', 'MINISTRY OF AGRICULTURE FOOD', 'HAI KONYONYO', 'JEBEL NYOKA'],
         ];
 
-        foreach ($zones as $zone) {
-            if (isset($areas[$zone->name])) {
-                foreach ($areas[$zone->name] as $areaData) {
-                    Area::create([
-                        'zone_id' => $zone->id,
-                        'name' => $areaData['name'],
-                        'code' => $areaData['code'],
-                        'description' => $areaData['description'],
-                    ]);
+        foreach ($zonesData as $zoneName => $areas) {
+            $zone = Zone::where('name', $zoneName)->first();
+
+            if ($zone) {
+                foreach ($areas as $areaName) {
+                    Area::updateOrCreate(
+                        [
+                            'zone_id' => $zone->id,
+                            'name' => $areaName,
+                        ],
+                        [
+                            'description' => "Location: $areaName in $zoneName",
+                        ]
+                    );
                 }
             }
         }

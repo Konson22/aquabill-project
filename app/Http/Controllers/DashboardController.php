@@ -4,6 +4,18 @@ namespace App\Http\Controllers;
 
 use Inertia\Inertia;
 
+use App\Models\Bill;
+use App\Models\Customer;
+use App\Models\Home;
+use App\Models\Invoice;
+use App\Models\Meter;
+use App\Models\MeterReading;
+use App\Models\Payment;
+use App\Models\Tariff;
+use App\Models\User;
+use App\Models\Zone;
+use Illuminate\Support\Facades\DB;
+
 class DashboardController extends Controller
 {
     public function index()
@@ -12,74 +24,69 @@ class DashboardController extends Controller
 
         if ($user->department === 'finance') {
             // 1. Core Financial KPIs
-            $totalCollected = \App\Models\Payment::sum('amount');
-            $collectedToday = \App\Models\Payment::whereDate('payment_date', now())->sum('amount');
+            $totalCollected = Payment::sum('amount');
+            $collectedToday = Payment::whereDate('payment_date', now())->sum('amount');
             
-            $pendingBillAmount = \App\Models\Bill::whereIn('status', ['pending', 'overdue', 'partial_paid'])->sum('current_balance');
-            $pendingInvoiceAmount = \App\Models\Invoice::where('status', 'pending')->sum('amount');
+            $pendingBillAmount = Bill::whereIn('status', ['pending', 'partial paid'])->sum('current_balance');
+            $pendingInvoiceAmount = Invoice::where('status', 'pending')->sum('amount');
             $totalPending = $pendingBillAmount + $pendingInvoiceAmount;
 
             // 2. Bills Breakdown
             $billStats = [
-                'total' => \App\Models\Bill::count(),
-                'paid' => \App\Models\Bill::where('status', 'paid')->count(),
-                'unpaid' => \App\Models\Bill::whereIn('status', ['pending', 'partial_paid'])->count(),
-                'overdue' => \App\Models\Bill::where('status', 'overdue')->orWhere(function($q) {
-                    $q->where('due_date', '<', now())->whereIn('status', ['pending', 'partial_paid']);
-                })->count(),
+                'total' => Bill::count(),
+                'pending' => Bill::where('status', 'pending')->count(),
+                'fully_paid' => Bill::where('status', 'fully paid')->count(),
+                'partial_paid' => Bill::where('status', 'partial paid')->count(),
+                'forwarded' => Bill::where('status', 'forwarded')->count(),
+                'balance_forwarded' => Bill::where('status', 'balance forwarded')->count(),
+                'overdue' => Bill::whereIn('status', ['pending', 'partial paid'])
+                    ->where('due_date', '<', now())
+                    ->count(),
                 'amount' => $pendingBillAmount
             ];
+            
+            // Calculate Performance
+            $billingPerformance = $billStats['total'] > 0 
+            ? ($billStats['fully_paid'] / $billStats['total']) * 100 
+            : 0;
 
             // 3. Invoices Breakdown
             $invoiceStats = [
-                'total' => \App\Models\Invoice::count(),
-                'paid' => \App\Models\Invoice::where('status', 'paid')->count(),
-                'unpaid' => \App\Models\Invoice::where('status', 'pending')->count(),
-                'overdue' => \App\Models\Invoice::where('status', 'pending')->where('due_date', '<', now())->count(),
+                'total' => Invoice::count(),
+                'paid' => Invoice::where('status', 'paid')->count(),
+                'unpaid' => Invoice::where('status', 'pending')->count(),
+                'overdue' => Invoice::where('status', 'pending')->where('due_date', '<', now())->count(),
                 'amount' => $pendingInvoiceAmount
             ];
 
-            // 4. Revenue Trend (Last 6 Months)
+            // 4. Revenue Trend (January to December)
             $revenueTrend = [];
-            for ($i = 5; $i >= 0; $i--) {
-                $month = now()->subMonths($i);
-                $sum = \App\Models\Payment::whereMonth('payment_date', $month->month)
-                    ->whereYear('payment_date', $month->year)
+            $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            
+            foreach ($months as $index => $monthName) {
+                $sum = Payment::whereMonth('payment_date', $index + 1)
+                    ->whereYear('payment_date', now()->year)
                     ->sum('amount');
                 $revenueTrend[] = [
-                    'name' => $month->format('M'),
+                    'name' => $monthName,
                     'total' => round($sum, 2)
                 ];
             }
 
-            // 5. Recent Payments
-            $recentPayments = \App\Models\Payment::with(['payable'])
-                ->latest()
+            // 5. Overdue Bills (Older than 30 days)
+            $overdueBills = Bill::whereIn('status', ['pending', 'partial paid'])
+                ->where('due_date', '<', now()->subDays(30))
+                ->with('customer')
+                ->latest('due_date')
                 ->take(6)
                 ->get()
-                ->map(function ($payment) {
-                    $name = 'System User';
-                    $type = 'Unknown';
-                    
-                    if ($payment->payable_type === 'App\Models\Bill') {
-                        $type = 'Bill Payment';
-                        if ($payment->payable && $payment->payable->customer) {
-                            $name = $payment->payable->customer->name;
-                        }
-                    } elseif ($payment->payable_type === 'App\Models\Invoice') {
-                        $type = 'Invoice Payment';
-                        if ($payment->payable && $payment->payable->customer) {
-                            $name = $payment->payable->customer->name;
-                        }
-                    }
-
+                ->map(function ($bill) {
                     return [
-                        'id' => $payment->id,
-                        'customer' => $name,
-                        'type' => $type,
-                        'amount' => $payment->amount,
-                        'date' => $payment->payment_date->format('M d, Y'),
-                        'method' => $payment->payment_method ?? 'Cash'
+                        'id' => $bill->id,
+                        'customer' => $bill->customer ? $bill->customer->name : 'N/A',
+                        'amount' => $bill->current_balance,
+                        'due_date' => $bill->due_date->format('M d, Y'),
+                        'days_overdue' => now()->diffInDays($bill->due_date),
                     ];
                 });
 
@@ -88,11 +95,12 @@ class DashboardController extends Controller
                     'totalCollected' => $totalCollected,
                     'collectedToday' => $collectedToday,
                     'totalPending' => $totalPending,
-                    'billStats' => $billStats,
+                    'billStats' => $billStats, // Now includes detailed breakdown
                     'invoiceStats' => $invoiceStats,
+                    'billingPerformance' => round($billingPerformance, 1),
                 ],
                 'revenueTrend' => $revenueTrend,
-                'recentPayments' => $recentPayments
+                'overdueBills' => $overdueBills
             ]);
         } elseif ($user->department === 'meters') {
             return Inertia::render('dashboard-meter-department/index');
@@ -100,12 +108,14 @@ class DashboardController extends Controller
 
         // Admin Dashboard Data
         
+        // Admin Dashboard Data
+        
         // 1. Total Revenue
-        $totalRevenue = \App\Models\Payment::sum('amount');
-        $revenueLastMonth = \App\Models\Payment::whereMonth('payment_date', now()->subMonth()->month)
+        $totalRevenue = Payment::sum('amount');
+        $revenueLastMonth = Payment::whereMonth('payment_date', now()->subMonth()->month)
             ->whereYear('payment_date', now()->subMonth()->year)
             ->sum('amount');
-        $revenueThisMonth = \App\Models\Payment::whereMonth('payment_date', now()->month)
+        $revenueThisMonth = Payment::whereMonth('payment_date', now()->month)
             ->whereYear('payment_date', now()->year)
             ->sum('amount');
             
@@ -115,26 +125,28 @@ class DashboardController extends Controller
         }
 
         // 2. Meters Stats
-        $activeMetersCount = \App\Models\Meter::where('status', 'active')->count();
-        $inactiveMetersCount = \App\Models\Meter::where('status', 'inactive')->count();
-        $damageMetersCount = \App\Models\Meter::where('status', 'damage')->count();
-        $maintenanceMetersCount = \App\Models\Meter::where('status', 'maintenance')->count();
-        $totalMeters = \App\Models\Meter::count();
+        $metersStats = [
+            'total' => Meter::count(),
+            'active' => Meter::where('status', 'active')->count(),
+            'inactive' => Meter::where('status', 'inactive')->count(),
+            'maintenance' => Meter::where('status', 'maintenance')->count(),
+            'disconnected' => Meter::where('status', 'disconnected')->orWhere('status', 'disconnect')->count(),
+            'damage' => Meter::where('status', 'damage')->count(),
+        ];
         
-        $metersLastMonth = \App\Models\Meter::whereDate('created_at', '<', now()->startOfMonth())->count();
-        $newMetersThisMonth = \App\Models\Meter::whereMonth('created_at', now()->month)
+        $metersLastMonth = Meter::whereDate('created_at', '<', now()->startOfMonth())->count();
+        $newMetersThisMonth = Meter::whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->count();
         $metersTrend = $metersLastMonth > 0 ? ($newMetersThisMonth / $metersLastMonth) * 100 : 0; 
 
-        // Meter Status Distribution removed as requested
         // 3. Water Usage Breakdown by Category (Current Year)
-        $tariffs = \App\Models\Tariff::all();
+        $tariffs = Tariff::all();
         $usageByCategory = $tariffs->map(function($tariff, $index) {
-            $totalUsage = \App\Models\MeterReading::join('homes', 'meter_readings.home_id', '=', 'homes.id')
+            $totalUsage = MeterReading::join('homes', 'meter_readings.home_id', '=', 'homes.id')
                 ->where('homes.tariff_id', $tariff->id)
                 ->whereYear('reading_date', now()->year)
-                ->sum(\Illuminate\Support\Facades\DB::raw('current_reading - previous_reading'));
+                ->sum(DB::raw('current_reading - previous_reading'));
 
             $colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
             
@@ -144,45 +156,66 @@ class DashboardController extends Controller
                 'fill' => $colors[$index % count($colors)]
             ];
         });
+
+        // 3.1 Water Usage by Zone (Current Year)
+        $zones = Zone::all();
+        $usageByZone = $zones->map(function($zone, $index) {
+            $totalUsage = MeterReading::join('homes', 'meter_readings.home_id', '=', 'homes.id')
+                ->where('homes.zone_id', $zone->id)
+                ->whereYear('reading_date', now()->year)
+                ->sum(DB::raw('current_reading - previous_reading'));
+
+            $colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+            
+            return [
+                'name' => $zone->name,
+                'value' => round((float) $totalUsage, 2),
+                'fill' => $colors[$index % count($colors)]
+            ];
+        });
        
-        // 3. Total Customers
-        $totalCustomers = \App\Models\Customer::count();
-        $customersLastMonth = \App\Models\Customer::whereDate('created_at', '<', now()->startOfMonth())->count();
-        $newCustomersThisMonth = \App\Models\Customer::whereMonth('created_at', now()->month)
+        // 4. Homes Stats
+        $homesStats = [
+            'total' => Home::count(),
+            'active' => Home::where('supply_status', 'active')->count(),
+            'suspended' => Home::where('supply_status', 'suspended')->count(),
+            'disconnected' => Home::where('supply_status', 'disconnect')->count(),
+        ];
+
+        $homesLastMonth = Home::whereDate('created_at', '<', now()->startOfMonth())->count();
+        $newHomesThisMonth = Home::whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->count();
-        $customersTrend = $customersLastMonth > 0 ? ($newCustomersThisMonth / $customersLastMonth) * 100 : 0;
+        $homesTrend = $homesLastMonth > 0 ? ($newHomesThisMonth / $homesLastMonth) * 100 : 0;
 
         // 4. Active Now
-        $activeNow = \App\Models\User::where('updated_at', '>=', now()->subMinutes(60))->count();
+        $activeNow = User::where('updated_at', '>=', now()->subMinutes(60))->count();
 
         // 5. Invoices & Bills Stats
-        $totalInvoicesCount = \App\Models\Invoice::count();
-        $paidInvoicesCount = \App\Models\Invoice::where('status', 'paid')->count();
-        $unpaidInvoicesCount = \App\Models\Invoice::where('status', 'pending')->count();
-        $overdueInvoicesCount = \App\Models\Invoice::where('status', 'pending')
-            ->where('due_date', '<', now())
-            ->count();
-
-        $totalBillsCount = \App\Models\Bill::count();
-        $paidBillsCount = \App\Models\Bill::where('status', 'paid')->count();
-        $unpaidBillsCount = \App\Models\Bill::whereIn('status', ['pending', 'partial_paid'])->count();
+        $billsStats = [
+            'total' => Bill::count(),
+            'pending' => Bill::where('status', 'pending')->count(),
+            'fully_paid' => Bill::where('status', 'fully paid')->count(),
+            'partial_paid' => Bill::where('status', 'partial paid')->count(),
+            'forwarded' => Bill::where('status', 'forwarded')->count(),
+            'balance_forwarded' => Bill::where('status', 'balance forwarded')->count(),
+        ];
         
-        $pendingBillsAmount = \App\Models\Bill::whereIn('status', ['pending', 'partial_paid'])->sum('current_balance'); 
+        $pendingBillsAmount = Bill::whereIn('status', ['pending', 'partial paid'])->sum('current_balance'); 
         
-        $overdueBillsCount = \App\Models\Bill::where('status', 'overdue')->orWhere(function($q) {
-             $q->where('due_date', '<', now())->whereIn('status', ['pending', 'partial_paid']);
-        })->count();
+        $overdueBillsCount = Bill::whereIn('status', ['pending', 'partial paid'])
+             ->where('due_date', '<', now())
+             ->count();
         
         // 6. Tariffs
-        $activeTariffsCount = \App\Models\Tariff::count(); // Assuming all are relevant, or check generic active flag if exists
+        $activeTariffsCount = Tariff::count(); 
 
         // 7. Readings & Consumption
-        $totalReadingsThisMonth = \App\Models\MeterReading::whereMonth('reading_date', now()->month)
+        $totalReadingsThisMonth = MeterReading::whereMonth('reading_date', now()->month)
             ->whereYear('reading_date', now()->year)
             ->count();
 
-        $totalConsumptionThisYear = \App\Models\MeterReading::whereYear('reading_date', now()->year)
+        $totalConsumptionThisYear = MeterReading::whereYear('reading_date', now()->year)
             ->selectRaw('SUM(current_reading - previous_reading) as total')
             ->value('total') ?? 0;
 
@@ -191,60 +224,69 @@ class DashboardController extends Controller
         $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         
         foreach ($months as $index => $month) {
-            $sum = \App\Models\MeterReading::whereMonth('reading_date', $index + 1)
+            $sum = MeterReading::whereMonth('reading_date', $index + 1)
                 ->whereYear('reading_date', now()->year)
                 ->selectRaw('SUM(current_reading - previous_reading) as total')
                 ->value('total') ?? 0;
             $usageChartData[] = ['name' => $month, 'total' => round($sum, 2)];
         }
 
-        // 9. Recent Sales/Activity
-        $recentPayments = \App\Models\Payment::with(['payable' => function($query) {
-                // Try to eager load if possible
-            }])
-            ->latest()
+        // 9. Overdue Readings (No reading in > 30 days) - simplified logic
+        // Assuming we want meters that have NOT had a reading in the last 30 days but are active
+        $overdueReadings = Meter::where('status', 'active')
+            ->whereDoesntHave('readings', function($query) {
+                $query->where('reading_date', '>=', now()->subDays(30));
+            })
+            ->with('home.customer')
             ->take(5)
             ->get()
-            ->map(function ($payment) {
-                $name = 'Unknown';
-                $email = 'N/A';
-                
-                if ($payment->payable && method_exists($payment->payable, 'customer') && $payment->payable->customer) {
-                     if ($payment->payable->customer) {
-                         $name = $payment->payable->customer->name;
-                         $email = $payment->payable->customer->email;
-                     }
-                }
+            ->map(function($meter) {
+                 return [
+                    'serial_number' => $meter->meter_number, // Updated to correct column name if needed, assuming 'meter_number' based on model fillable
+                    'customer' => $meter->home && $meter->home->customer ? $meter->home->customer->name : 'N/A',
+                    'last_reading_date' => $meter->last_reading_date ?? 'Never',
+                    'location' => $meter->home ? $meter->home->address : 'N/A'
+                 ];
+            });
 
+        // 10. Overdue Bills List
+        $overdueBillsList = Bill::whereIn('status', ['pending', 'partial paid'])
+            ->where('due_date', '<', now())
+            ->with('customer')
+            ->oldest('due_date')
+            ->take(5)
+            ->get()
+            ->map(function($bill) {
                 return [
-                    'name' => $name,
-                    'email' => $email,
-                    'amount' => $payment->amount,
-                    'avatar' => '/avatars/01.png', 
-                    'fallback' => strtoupper(substr($name, 0, 2)),
+                    'id' => $bill->id,
+                    'bill_number' => $bill->bill_number,
+                    'customer' => $bill->customer ? $bill->customer->name : 'N/A',
+                    'amount' => $bill->current_balance,
+                    'due_date' => $bill->due_date,
+                    'status' => $bill->status
                 ];
             });
+
+        $billingPerformance = $billsStats['total'] > 0 
+            ? ($billsStats['fully_paid'] / $billsStats['total']) * 100 
+            : 0;
 
         return Inertia::render('dashboard-admin/index', [
             'stats' => [
                 'totalRevenue' => $totalRevenue,
                 'revenueTrend' => round($revenueTrend, 1),
-                'activeMeters' => $activeMetersCount,
-                'inactiveMeters' => $inactiveMetersCount,
-                'damageMeters' => $damageMetersCount,
-                'maintenanceMeters' => $maintenanceMetersCount,
-                'metersTrend' => $newMetersThisMonth,
-                'totalMeters' => $totalMeters,
-                'totalCustomers' => $totalCustomers,
-                'customersTrend' => round($customersTrend, 1),
+                'meters' => $metersStats, // Grouped
+                'metersTrend' => $metersTrend,
+                'homes' => $homesStats, // Grouped
+                'homesTrend' => round($homesTrend, 1),
                 'activeNow' => $activeNow,
-                'totalInvoices' => $totalInvoicesCount,
-                'paidInvoices' => $paidInvoicesCount,
-                'unpaidInvoices' => $unpaidInvoicesCount,
-                'overdueInvoices' => $overdueInvoicesCount,
-                'totalBills' => $totalBillsCount,
-                'paidBills' => $paidBillsCount,
-                'unpaidBills' => $unpaidBillsCount,
+                'bills' => $billsStats, // Grouped
+                'invoices' => [
+                    'total' => Invoice::count(),
+                    'paid' => Invoice::where('status', 'paid')->count(),
+                    'unpaid' => Invoice::where('status', 'pending')->count(),
+                ],
+                'billingPerformance' => round($billingPerformance, 1),
                 'pendingBillsAmount' => $pendingBillsAmount,
                 'overdueBillsCount' => $overdueBillsCount,
                 'activeTariffsCount' => $activeTariffsCount,
@@ -253,7 +295,9 @@ class DashboardController extends Controller
             ],
             'chartData' => $usageChartData,
             'usageByCategory' => $usageByCategory,
-            'recentSales' => $recentPayments
+            'usageByZone' => $usageByZone,
+            'overdueReadings' => $overdueReadings, // New
+            'overdueBills' => $overdueBillsList, // New
         ]);
     }
 }

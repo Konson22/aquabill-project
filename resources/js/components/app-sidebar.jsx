@@ -6,8 +6,6 @@ import {
 } from '@/components/ui/sidebar';
 import { usePage } from '@inertiajs/react';
 import {
-    Activity,
-    BarChart3,
     ClipboardList,
     CreditCard,
     FileText,
@@ -86,21 +84,6 @@ const financeNavItems = [
         icon: LayoutGrid,
     },
     {
-        title: 'Financial Overview',
-        href: route('finance.overview'),
-        icon: Activity,
-    },
-    {
-        title: 'Customers',
-        href: route('customers.index'),
-        icon: Users,
-    },
-    {
-        title: 'Homes',
-        href: route('homes.index'),
-        icon: Home,
-    },
-    {
         title: 'Bills',
         href: route('bills'),
         icon: Receipt,
@@ -111,14 +94,19 @@ const financeNavItems = [
         icon: FileText,
     },
     {
+        title: 'Payments',
+        href: route('payments'),
+        icon: CreditCard,
+    },
+    {
+        title: 'Homes',
+        href: route('homes.index'),
+        icon: Home,
+    },
+    {
         title: 'Tariff',
         href: route('tariffs.index'),
         icon: FileText,
-    },
-    {
-        title: 'Bill Reports',
-        href: route('bills.report'),
-        icon: BarChart3,
     },
 ];
 

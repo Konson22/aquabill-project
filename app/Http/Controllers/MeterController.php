@@ -89,7 +89,7 @@ class MeterController extends Controller
             "Expires" => "0"
         ];
 
-        $columns = ['ID', 'Serial Number', 'Type', 'Status', 'Customer Name', 'Home Address'];
+        $columns = ['ID', 'Meter Number', 'Type', 'Status', 'Customer Name', 'Home Address'];
 
         $callback = function () use ($meters, $columns) {
             $file = fopen('php://output', 'w');
@@ -119,14 +119,15 @@ class MeterController extends Controller
             'meter_number' => 'required|unique:meters',
             'meter_type' => 'required|string',
             'home_id' => 'nullable|exists:homes,id',
-            'installation_date' => 'nullable|date',
+            'meter_install_date' => 'nullable|date',
             'status' => 'required|in:active,inactive,maintenance,damage',
         ]);
 
         $validated['home_id'] = $validated['home_id'] ?? null;
-        $validated['installation_date'] = $validated['installation_date'] ?? null;
+        $meterInstallDate = $validated['meter_install_date'] ?? now();
+        unset($validated['meter_install_date']);
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $request) {
+        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $request, $meterInstallDate) {
             // Unassign old meter if exists
             if (!empty($validated['home_id'])) {
                 $oldMeter = \App\Models\Meter::where('home_id', $validated['home_id'])->first();
@@ -140,7 +141,7 @@ class MeterController extends Controller
                         'meter_id' => $oldMeter->id,
                         'customer_id' => $oldMeter->home ? $oldMeter->home->customer_id : null,
                         'final_reading' => $lastReading ? $lastReading->current_reading : 0,
-                        'assigned_at' => $oldMeter->installation_date,
+                        'assigned_at' => $oldMeter->home ? $oldMeter->home->meter_install_date : null,
                         'unassigned_at' => now(),
                         'replaced_by' => auth()->id(),
                         'reason' => 'replacement',
@@ -155,6 +156,12 @@ class MeterController extends Controller
 
             $meter = \App\Models\Meter::create($validated);
 
+            if (!empty($validated['home_id'])) {
+                \App\Models\Home::where('id', $validated['home_id'])->update([
+                    'meter_install_date' => $meterInstallDate
+                ]);
+            }
+
             if ($request->filled('initial_reading') && $validated['home_id']) {
                 \App\Models\MeterReading::create([
                     'meter_id' => $meter->id,
@@ -162,6 +169,7 @@ class MeterController extends Controller
                     'reading_date' => now(),
                     'current_reading' => $request->initial_reading,
                     'previous_reading' => 0,
+                    'is_initial' => true,
                     'read_by' => auth()->id(),
                 ]);
             }
@@ -181,6 +189,7 @@ class MeterController extends Controller
         $validated = $request->validate([
             'home_id' => 'sometimes|nullable|exists:homes,id',
             'initial_reading' => 'nullable|numeric|min:0',
+            'meter_install_date' => 'nullable|date',
             'status' => 'sometimes|in:active,inactive,maintenance,damage',
         ]);
 
@@ -203,7 +212,7 @@ class MeterController extends Controller
                             'meter_id' => $oldMeter->id,
                             'customer_id' => $oldMeter->home ? $oldMeter->home->customer_id : null,
                             'final_reading' => $lastReading ? $lastReading->current_reading : 0,
-                            'assigned_at' => $oldMeter->installation_date,
+                            'assigned_at' => $oldMeter->home ? $oldMeter->home->meter_install_date : null,
                             'unassigned_at' => now(),
                             'replaced_by' => auth()->id(),
                             'reason' => 'replacement',
@@ -219,7 +228,10 @@ class MeterController extends Controller
                 $meter->update([
                     'home_id' => $validated['home_id'],
                     'status' => 'active', // Default to active on assignment
-                    'installation_date' => now(),
+                ]);
+
+                \App\Models\Home::where('id', $validated['home_id'])->update([
+                    'meter_install_date' => $validated['meter_install_date'] ?? now(),
                 ]);
 
                  if ($request->filled('initial_reading') && $validated['home_id']) {
@@ -229,6 +241,7 @@ class MeterController extends Controller
                         'reading_date' => now(),
                         'current_reading' => $request->initial_reading,
                         'previous_reading' => 0,
+                        'is_initial' => true,
                         'read_by' => auth()->id(),
                     ]);
                 }

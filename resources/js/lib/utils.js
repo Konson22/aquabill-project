@@ -28,3 +28,18 @@ export function formatCurrency(amount) {
         maximumFractionDigits: 0,
     })} SSP`;
 }
+
+/**
+ * Formats a number to a compact string (e.g., 1000 -> 1K)
+ * @param {number} value - The number to format
+ * @returns {string} Compactly formatted string
+ */
+export function formatCompactNumber(value) {
+    if (value >= 1000000) {
+        return (value / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    if (value >= 1000) {
+        return (value / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    }
+    return value.toString();
+}

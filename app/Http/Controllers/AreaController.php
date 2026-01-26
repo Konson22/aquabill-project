@@ -10,7 +10,6 @@ class AreaController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:areas,code',
             'zone_id' => 'required|exists:zones,id',
             'description' => 'nullable|string',
         ]);
@@ -25,7 +24,7 @@ class AreaController extends Controller
         
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'code' => 'sometimes|string|max:50|unique:areas,code,' . $id,
+            'zone_id' => 'sometimes|exists:zones,id',
             'description' => 'nullable|string',
         ]);
 

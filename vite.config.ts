@@ -25,7 +25,8 @@ export default defineConfig({
         jsx: 'automatic',
     },
     server: {
-        host: 'localhost',
+        host: '127.0.0.1',
+        // host: '192.168.13.43',
         port: 5173,
         strictPort: true,
         cors: true,

@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Zone;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class ZoneSeeder extends Seeder
 {
@@ -14,30 +14,23 @@ class ZoneSeeder extends Seeder
     public function run(): void
     {
         $zones = [
-            [
-                'name' => 'North Zone',
-                'code' => 'NZ',
-                'description' => 'Northern region of the city',
-            ],
-            [
-                'name' => 'South Zone',
-                'code' => 'SZ',
-                'description' => 'Southern region of the city',
-            ],
-            [
-                'name' => 'East Zone',
-                'code' => 'EZ',
-                'description' => 'Eastern region of the city',
-            ],
-            [
-                'name' => 'West Zone',
-                'code' => 'WZ',
-                'description' => 'Western region of the city',
-            ],
+            'ATLABARA',
+            'HOSPITAL ZONE',
+            'JEBEL ZONE',
+            'NYAKURON',
+            'JUBA UNIVERSITY ZONE',
+            'KATOR',
+            'PARLIAMENT ZONE',
+            'OTHER',
         ];
 
-        foreach ($zones as $zone) {
-            Zone::create($zone);
+        foreach ($zones as $zoneName) {
+            Zone::updateOrCreate(
+                ['name' => $zoneName],
+                [
+                    'description' => "Service zone for $zoneName",
+                ]
+            );
         }
     }
 }

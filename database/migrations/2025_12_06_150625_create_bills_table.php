@@ -19,14 +19,13 @@ return new class extends Migration
             $table->foreignId('home_id')->constrained('homes')->onDelete('cascade');
             $table->date('billing_period_start');
             $table->date('billing_period_end');
-            $table->decimal('consumption', 10, 2)->default(0);
             $table->decimal('tariff', 10, 2)->default(0);
             $table->decimal('fix_charges', 10, 2)->default(0);
             $table->decimal('previous_balance', 10, 2)->default(0);
             $table->decimal('total_amount', 10, 2);
             $table->decimal('current_balance', 10, 2)->default(0);
             $table->date('due_date');
-            $table->enum('status', ['pending', 'paid', 'overdue', 'forwarded', 'partial_paid', 'balance_forwarded'])->default('pending');
+            $table->enum('status', ['pending', 'fully paid', 'forwarded', 'partial paid', 'balance forwarded'])->default('pending');
             $table->timestamps();
             
             $table->index('meter_reading_id');

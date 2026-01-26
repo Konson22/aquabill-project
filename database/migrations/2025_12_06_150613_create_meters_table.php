@@ -15,8 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('home_id')->nullable()->constrained('homes')->onDelete('cascade');
             $table->string('meter_number')->unique();
-            $table->string('meter_type')->nullable();
-            $table->date('installation_date')->nullable();
             $table->enum('status', ['active', 'inactive', 'maintenance', 'disconnect', 'damage'])->default('active');
             $table->timestamps();
             

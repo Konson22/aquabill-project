@@ -146,18 +146,6 @@ export default function MeterReadings({ meterReadings, meters }) {
                             </Link>
                         </Button>
                         <Dialog open={open} onOpenChange={setOpen}>
-                            <Button
-                                className="h-10"
-                                onClick={() => {
-                                    reset();
-                                    setEditingId(null);
-                                    setSelectedMeter(null);
-                                    setQuery('');
-                                    setOpen(true);
-                                }}
-                            >
-                                Add Reading
-                            </Button>
                             <DialogContent className="sm:max-w-[425px]">
                                 <DialogHeader>
                                     <DialogTitle>
@@ -499,20 +487,31 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                 ).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
-                                                <Badge
-                                                    variant={
-                                                        reading.bill?.status ===
+                                                {reading.is_initial ? (
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                                    >
+                                                        Initial
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge
+                                                        variant={
+                                                            reading.bill
+                                                                ?.status ===
+                                                            'overdue'
+                                                                ? 'destructive'
+                                                                : 'outline'
+                                                        }
+                                                        className="capitalize"
+                                                    >
+                                                        {reading.bill
+                                                            ?.status ===
                                                         'overdue'
-                                                            ? 'destructive'
-                                                            : 'outline'
-                                                    }
-                                                    className="capitalize"
-                                                >
-                                                    {reading.bill?.status ===
-                                                    'overdue'
-                                                        ? 'Overdue'
-                                                        : reading.status}
-                                                </Badge>
+                                                            ? 'Overdue'
+                                                            : reading.status}
+                                                    </Badge>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-1">
@@ -560,6 +559,18 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                         onClick={() =>
                                                             handleDelete(
                                                                 reading.id,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            reading.bill &&
+                                                            [
+                                                                'fully paid',
+                                                                'forwarded',
+                                                                'partial paid',
+                                                                'balance forwarded',
+                                                            ].includes(
+                                                                reading.bill
+                                                                    .status,
                                                             )
                                                         }
                                                         className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"

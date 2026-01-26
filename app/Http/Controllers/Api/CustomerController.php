@@ -65,8 +65,10 @@ class CustomerController extends Controller
                 if ($meter) {
                     $meter->update([
                         'home_id' => $home->id,
-                        'installation_date' => now(),
                         'status' => 'active',
+                    ]);
+                    $home->update([
+                        'meter_install_date' => now()
                     ]);
                 }
             }

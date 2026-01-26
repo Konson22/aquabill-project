@@ -14,20 +14,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { formatCurrency } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
-import {
-    Activity,
-    ArrowUpRight,
-    Banknote,
-    CreditCard,
-    FileBarChart,
-    FilePieChart,
-    FileSpreadsheet,
-    FileText,
-    Receipt,
-    Wallet,
-} from 'lucide-react';
+import { formatCompactNumber, formatCurrency } from '@/lib/utils';
+import { Activity, ArrowUpRight } from 'lucide-react';
 import {
     Area,
     AreaChart,
@@ -37,210 +25,27 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import BillsAndNvoicesOverview from './sections/bills_and_nvoices_overview';
+import QuickLinks from './sections/quick-links';
 
 const breadcrumbs = [
     {
         title: 'Dashboard',
-        href: '#',
-    },
-    {
-        title: 'Finance',
-        href: '#',
+        href: '/',
     },
 ];
 
 export default function DashboardFinance({
     stats,
     revenueTrend,
-    recentPayments,
+    overdueBills,
 }) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <div className="flex flex-col gap-6 py-6">
-                {/* Top Summary Stats */}
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Card className="border-l-4 border-l-emerald-500 transition-shadow hover:shadow-md">
-                        <CardHeader className="flex flex-row items-center justify-between border-none pb-2 shadow-none">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Total Revenue Collected
-                            </CardTitle>
-                            <Wallet className="h-4 w-4 text-emerald-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-emerald-600">
-                                {formatCurrency(stats.totalCollected)}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Lifetime collections
-                            </p>
-                        </CardContent>
-                    </Card>
+                <QuickLinks />
 
-                    <Card className="border-l-4 border-l-blue-500 transition-shadow hover:shadow-md">
-                        <CardHeader className="flex flex-row items-center justify-between border-none pb-2 shadow-none">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Collections Today
-                            </CardTitle>
-                            <Banknote className="h-4 w-4 text-blue-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-blue-600">
-                                {formatCurrency(stats.collectedToday)}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Received in the last 24h
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-l-4 border-l-orange-500 transition-shadow hover:shadow-md">
-                        <CardHeader className="flex flex-row items-center justify-between border-none pb-2 shadow-none">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Pending Revenue
-                            </CardTitle>
-                            <CreditCard className="h-4 w-4 text-orange-500" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-orange-600">
-                                {formatCurrency(stats.totalPending)}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Outstanding bills & invoices
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Bills & Invoices Overview */}
-                <div className="grid gap-6 md:grid-cols-2">
-                    {/* Bills Breakdown */}
-                    <Card className="overflow-hidden transition-shadow hover:shadow-md">
-                        <CardHeader className="bg-muted/30">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="text-lg">
-                                        Bills Overview
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Monthly water bills statistics
-                                    </CardDescription>
-                                </div>
-                                <FileText className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                        </CardHeader>
-                        <CardContent className="pt-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1 border-r pr-4">
-                                    <span className="text-xs tracking-wider text-muted-foreground uppercase">
-                                        Total Count
-                                    </span>
-                                    <div className="text-xl font-bold">
-                                        {stats.billStats.total}
-                                    </div>
-                                </div>
-                                <div className="space-y-1 pl-4">
-                                    <span className="text-xs tracking-wider text-muted-foreground uppercase">
-                                        Unpaid Amount
-                                    </span>
-                                    <div className="text-xl font-bold text-orange-600">
-                                        {formatCurrency(stats.billStats.amount)}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="mt-6 flex gap-4">
-                                <div className="flex-1 rounded-lg bg-emerald-50 p-3 text-center">
-                                    <div className="text-sm font-medium text-emerald-700">
-                                        Paid
-                                    </div>
-                                    <div className="text-lg font-bold text-emerald-800">
-                                        {stats.billStats.paid}
-                                    </div>
-                                </div>
-                                <div className="flex-1 rounded-lg bg-orange-50 p-3 text-center">
-                                    <div className="text-sm font-medium text-orange-700">
-                                        Unpaid
-                                    </div>
-                                    <div className="text-lg font-bold text-orange-800">
-                                        {stats.billStats.unpaid}
-                                    </div>
-                                </div>
-                                <div className="flex-1 rounded-lg bg-red-50 p-3 text-center text-red-700">
-                                    <div className="text-sm font-medium text-red-700">
-                                        Overdue
-                                    </div>
-                                    <div className="text-lg font-bold text-red-800">
-                                        {stats.billStats.overdue}
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Invoices Breakdown */}
-                    <Card className="overflow-hidden transition-shadow hover:shadow-md">
-                        <CardHeader className="bg-muted/30">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="text-lg">
-                                        Invoices Overview
-                                    </CardTitle>
-                                    <CardDescription>
-                                        One-time installation & service fees
-                                    </CardDescription>
-                                </div>
-                                <Receipt className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                        </CardHeader>
-                        <CardContent className="pt-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1 border-r pr-4">
-                                    <span className="text-xs tracking-wider text-muted-foreground uppercase">
-                                        Total Count
-                                    </span>
-                                    <div className="text-xl font-bold">
-                                        {stats.invoiceStats.total}
-                                    </div>
-                                </div>
-                                <div className="space-y-1 pl-4">
-                                    <span className="text-xs tracking-wider text-muted-foreground uppercase">
-                                        Unpaid Amount
-                                    </span>
-                                    <div className="text-xl font-bold text-orange-600">
-                                        {formatCurrency(
-                                            stats.invoiceStats.amount,
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="mt-6 flex gap-4">
-                                <div className="flex-1 rounded-lg bg-emerald-50 p-3 text-center">
-                                    <div className="text-sm font-medium text-emerald-700">
-                                        Paid
-                                    </div>
-                                    <div className="text-lg font-bold text-emerald-800">
-                                        {stats.invoiceStats.paid}
-                                    </div>
-                                </div>
-                                <div className="flex-1 rounded-lg bg-orange-50 p-3 text-center">
-                                    <div className="text-sm font-medium text-orange-700">
-                                        Unpaid
-                                    </div>
-                                    <div className="text-lg font-bold text-orange-800">
-                                        {stats.invoiceStats.unpaid}
-                                    </div>
-                                </div>
-                                <div className="flex-1 rounded-lg bg-red-50 p-3 text-center">
-                                    <div className="text-sm font-medium text-red-700">
-                                        Overdue
-                                    </div>
-                                    <div className="text-lg font-bold text-red-800">
-                                        {stats.invoiceStats.overdue}
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <BillsAndNvoicesOverview stats={stats} />
 
                 <div className="grid gap-6 lg:grid-cols-7">
                     {/* Revenue Trend Chart */}
@@ -248,8 +53,8 @@ export default function DashboardFinance({
                         <CardHeader>
                             <CardTitle>Revenue Trend</CardTitle>
                             <CardDescription>
-                                Monthly collection performance for the last 6
-                                months.
+                                Monthly collection performance for the current
+                                year.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -294,7 +99,7 @@ export default function DashboardFinance({
                                             tickLine={false}
                                             axisLine={false}
                                             tickFormatter={(value) =>
-                                                formatCurrency(value)
+                                                formatCompactNumber(value)
                                             }
                                         />
                                         <Tooltip
@@ -309,7 +114,7 @@ export default function DashboardFinance({
                                                 color: 'hsl(var(--popover-foreground))',
                                             }}
                                             formatter={(value) =>
-                                                formatCurrency(value)
+                                                `${formatCompactNumber(value)} SSP`
                                             }
                                         />
                                         <Area
@@ -325,17 +130,19 @@ export default function DashboardFinance({
                         </CardContent>
                     </Card>
 
-                    {/* Recent Payments Table */}
-                    <Card className="transition-shadow hover:shadow-md lg:col-span-3">
+                    {/* Overdue Bills Table */}
+                    <Card className="border-red-100 transition-shadow hover:shadow-md lg:col-span-3 dark:border-red-900/30">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle>Recent Payments</CardTitle>
+                                    <CardTitle className="text-red-600 dark:text-red-400">
+                                        Overdue Bills
+                                    </CardTitle>
                                     <CardDescription>
-                                        Latest financial transactions
+                                        Unpaid for more than 30 days
                                     </CardDescription>
                                 </div>
-                                <Activity className="h-4 w-4 text-muted-foreground" />
+                                <Activity className="h-4 w-4 text-red-500" />
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -350,43 +157,47 @@ export default function DashboardFinance({
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {recentPayments.map((payment) => (
+                                        {overdueBills.map((bill) => (
                                             <TableRow
-                                                key={payment.id}
+                                                key={bill.id}
                                                 className="hover:bg-muted/50"
                                             >
                                                 <TableCell>
                                                     <div className="flex flex-col">
                                                         <span className="text-sm font-medium">
-                                                            {payment.customer}
+                                                            {bill.customer}
                                                         </span>
                                                         <span className="text-xs text-muted-foreground">
-                                                            {payment.type} •{' '}
-                                                            {payment.date}
+                                                            Due: {bill.due_date}{' '}
+                                                            •{' '}
+                                                            <span className="font-medium text-red-500">
+                                                                {
+                                                                    bill.days_overdue
+                                                                }{' '}
+                                                                days late
+                                                            </span>
                                                         </span>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex flex-col items-end">
-                                                        <span className="font-bold text-emerald-600">
+                                                        <span className="font-bold text-red-600">
                                                             {formatCurrency(
-                                                                payment.amount,
+                                                                bill.amount,
                                                             )}
-                                                        </span>
-                                                        <span className="text-[10px] text-muted-foreground uppercase">
-                                                            {payment.method}
                                                         </span>
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
-                                        {recentPayments.length === 0 && (
+                                        {overdueBills.length === 0 && (
                                             <TableRow>
                                                 <TableCell
                                                     colSpan={2}
                                                     className="h-24 text-center text-muted-foreground"
                                                 >
-                                                    No recent payments recorded.
+                                                    Perfect! No overdue bills
+                                                    found.
                                                 </TableCell>
                                             </TableRow>
                                         )}
@@ -395,72 +206,15 @@ export default function DashboardFinance({
                             </div>
                             <div className="mt-4 flex justify-end">
                                 <a
-                                    href="/finance/payments"
+                                    href="/bills?status=overdue"
                                     className="flex items-center text-xs font-semibold text-primary hover:underline"
                                 >
-                                    View all payments{' '}
+                                    View all overdue bills{' '}
                                     <ArrowUpRight className="ml-1 h-3 w-3" />
                                 </a>
                             </div>
                         </CardContent>
                     </Card>
-                </div>
-
-                {/* Quick Links Section */}
-                <div>
-                    <h3 className="mb-4 text-lg font-semibold tracking-tight">
-                        Quick Reports
-                    </h3>
-                    <div className="grid gap-4 md:grid-cols-3">
-                        <Link href={route('payments.report')}>
-                            <Card className="cursor-pointer shadow-sm transition-all hover:border-blue-500 hover:shadow-md">
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <CardTitle className="text-sm font-medium">
-                                        Payment Reports
-                                    </CardTitle>
-                                    <FileBarChart className="h-4 w-4 text-blue-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-xs text-muted-foreground">
-                                        View settlement trends, tariff revenue,
-                                        and zone contributions.
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                        <Link href={route('meter-readings.report')}>
-                            <Card className="cursor-pointer shadow-sm transition-all hover:border-emerald-500 hover:shadow-md">
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <CardTitle className="text-sm font-medium">
-                                        Meter Reading Reports
-                                    </CardTitle>
-                                    <FilePieChart className="h-4 w-4 text-emerald-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-xs text-muted-foreground">
-                                        Analyze consumption patterns by tariff
-                                        and zone.
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                        <Link href={route('bills.report')}>
-                            <Card className="cursor-pointer shadow-sm transition-all hover:border-amber-500 hover:shadow-md">
-                                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <CardTitle className="text-sm font-medium">
-                                        Billing Reports
-                                    </CardTitle>
-                                    <FileSpreadsheet className="h-4 w-4 text-amber-500" />
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-xs text-muted-foreground">
-                                        Track billing performance, paid vs
-                                        unpaid trends.
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    </div>
                 </div>
             </div>
         </AppLayout>

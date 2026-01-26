@@ -126,7 +126,7 @@ export default function Invoices({ invoices, filters = {}, tariffs = [] }) {
 
         setPayData({
             invoice_id: invoice.id,
-            amount: balance > 0 ? balance : 0,
+            amount: invoice.amount,
             payment_date: new Date().toISOString().split('T')[0],
             payment_method: 'cash',
             reference_number: '',

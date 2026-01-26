@@ -1,7 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -52,37 +51,6 @@ export default function Bills({ bills, filters }) {
     const [payOpen, setPayOpen] = useState(false);
     const [paymentBill, setPaymentBill] = useState(null);
     const [search, setSearch] = useState(filters.search || '');
-    const [selected, setSelected] = useState(new Set());
-
-    const toggleAll = (checked) => {
-        if (checked) {
-            setSelected(
-                new Set(
-                    bills.data
-                        .filter((bill) => bill.status === 'pending')
-                        .map((bill) => bill.id),
-                ),
-            );
-        } else {
-            setSelected(new Set());
-        }
-    };
-
-    const toggleOne = (id) => {
-        const newSelected = new Set(selected);
-        if (newSelected.has(id)) {
-            newSelected.delete(id);
-        } else {
-            newSelected.add(id);
-        }
-        setSelected(newSelected);
-    };
-
-    const handleBulkPrint = () => {
-        const ids = Array.from(selected).join(',');
-        const url = route('bills.bulk-print', { ids });
-        window.open(url, '_blank');
-    };
 
     const {
         data: payData,
@@ -199,16 +167,6 @@ export default function Bills({ bills, filters }) {
                 <Card className="flex flex-1 flex-col overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-2">
                         <div className="flex gap-2">
-                            {selected.size > 0 && (
-                                <Button
-                                    variant="default"
-                                    onClick={handleBulkPrint}
-                                    className="gap-2"
-                                >
-                                    <Printer className="h-4 w-4" />
-                                    Print Selected ({selected.size})
-                                </Button>
-                            )}
                             <Link href={route('bills.export')}>
                                 <Button variant="outline" className="gap-2">
                                     <FileText className="h-4 w-4" />
@@ -228,31 +186,6 @@ export default function Bills({ bills, filters }) {
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableHead className="w-[40px]">
-                                        <Checkbox
-                                            checked={
-                                                bills.data.filter(
-                                                    (b) =>
-                                                        b.status === 'pending',
-                                                ).length > 0 &&
-                                                selected.size ===
-                                                    bills.data.filter(
-                                                        (b) =>
-                                                            b.status ===
-                                                            'pending',
-                                                    ).length
-                                            }
-                                            onCheckedChange={toggleAll}
-                                            disabled={
-                                                bills.data.filter(
-                                                    (b) =>
-                                                        b.status === 'pending',
-                                                ).length === 0
-                                            }
-                                            aria-label="Select all pending"
-                                            className="border-gray-500"
-                                        />
-                                    </TableHead>
                                     <TableHead className="w-[120px]">
                                         Bill ID
                                     </TableHead>
@@ -282,27 +215,7 @@ export default function Bills({ bills, filters }) {
                                         <TableRow
                                             key={bill.id}
                                             className="hover:bg-muted/5"
-                                            data-state={
-                                                selected.has(bill.id) &&
-                                                'selected'
-                                            }
                                         >
-                                            <TableCell>
-                                                <Checkbox
-                                                    checked={selected.has(
-                                                        bill.id,
-                                                    )}
-                                                    onCheckedChange={() =>
-                                                        toggleOne(bill.id)
-                                                    }
-                                                    disabled={
-                                                        bill.status !==
-                                                        'pending'
-                                                    }
-                                                    aria-label={`Select bill ${bill.id}`}
-                                                    className="border-gray-500"
-                                                />
-                                            </TableCell>
                                             <TableCell className="font-mono font-medium">
                                                 <Link
                                                     href={route(
@@ -383,29 +296,32 @@ export default function Bills({ bills, filters }) {
                                             <TableCell>
                                                 <Badge
                                                     variant={
-                                                        bill.status === 'paid'
-                                                            ? 'default' // Using default (usually black/primary) for paid
+                                                        bill.status ===
+                                                        'fully paid'
+                                                            ? 'default'
                                                             : bill.status ===
-                                                                'partial'
-                                                              ? 'secondary' // Using secondary (usually gray) for partial
-                                                              : 'destructive' // Red for unpaid/overdue
+                                                                'partial paid'
+                                                              ? 'secondary'
+                                                              : 'destructive'
                                                     }
                                                     className={`capitalize ${
-                                                        bill.status === 'paid'
+                                                        bill.status ===
+                                                        'fully paid'
                                                             ? 'bg-green-600 hover:bg-green-700'
                                                             : ''
                                                     } ${
                                                         bill.status ===
-                                                        'partial'
+                                                        'partial paid'
                                                             ? 'bg-yellow-500 text-white hover:bg-yellow-600'
                                                             : ''
                                                     }`}
                                                 >
-                                                    {bill.status === 'paid' && (
+                                                    {bill.status ===
+                                                        'fully paid' && (
                                                         <CheckCircle className="mr-1 h-3 w-3" />
                                                     )}
                                                     {bill.status ===
-                                                        'unpaid' && (
+                                                        'pending' && (
                                                         <AlertCircle className="mr-1 h-3 w-3" />
                                                     )}
                                                     {bill.status}
@@ -446,38 +362,40 @@ export default function Bills({ bills, filters }) {
                                                                 </Link>
                                                             </DropdownMenuItem>
 
-                                                            {bill.status ==
-                                                            'pending' ? (
-                                                                <>
-                                                                    <DropdownMenuItem
-                                                                        onClick={() =>
-                                                                            handlePayClick(
-                                                                                bill,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <CreditCard className="mr-2 h-4 w-4" />
-                                                                        Record
-                                                                        Payment
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem
-                                                                        asChild
-                                                                    >
-                                                                        <a
-                                                                            href={route(
-                                                                                'bills.print',
-                                                                                bill.id,
-                                                                            )}
-                                                                            target="_blank"
-                                                                            rel="noopener noreferrer"
-                                                                        >
-                                                                            <Printer className="mr-2 h-4 w-4" />
-                                                                            Print
-                                                                            Bill
-                                                                        </a>
-                                                                    </DropdownMenuItem>
-                                                                </>
-                                                            ) : null}
+                                                            {[
+                                                                'pending',
+                                                                'partial paid',
+                                                            ].includes(
+                                                                bill.status,
+                                                            ) && (
+                                                                <DropdownMenuItem
+                                                                    onClick={() =>
+                                                                        handlePayClick(
+                                                                            bill,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <CreditCard className="mr-2 h-4 w-4" />
+                                                                    Record
+                                                                    Payment
+                                                                </DropdownMenuItem>
+                                                            )}
+
+                                                            <DropdownMenuItem
+                                                                asChild
+                                                            >
+                                                                <a
+                                                                    href={route(
+                                                                        'bills.print',
+                                                                        bill.id,
+                                                                    )}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                >
+                                                                    <Printer className="mr-2 h-4 w-4" />
+                                                                    Print Bill
+                                                                </a>
+                                                            </DropdownMenuItem>
 
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
@@ -486,6 +404,14 @@ export default function Bills({ bills, filters }) {
                                                                         bill.id,
                                                                     )
                                                                 }
+                                                                disabled={[
+                                                                    'fully paid',
+                                                                    'forwarded',
+                                                                    'partial paid',
+                                                                    'balance forwarded',
+                                                                ].includes(
+                                                                    bill.status,
+                                                                )}
                                                                 className="text-red-600 focus:text-red-600"
                                                             >
                                                                 <Trash2 className="mr-2 h-4 w-4" />

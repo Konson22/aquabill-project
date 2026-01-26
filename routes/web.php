@@ -121,6 +121,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Customers
     Route::middleware(['department:finance,meters'])->group(function () {
+        Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
         Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
         Route::get('customers/create', [CustomerController::class, 'create'])->name('customers.create');

@@ -105,7 +105,11 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
                 if (home.bills) {
                     billCount += home.bills.length;
                     home.bills.forEach((bill) => {
-                        if (bill.status === 'overdue') {
+                        const isOverdue =
+                            new Date(bill.due_date) < new Date() &&
+                            (bill.status === 'pending' ||
+                                bill.status === 'partial paid');
+                        if (bill.status === 'overdue' || isOverdue) {
                             overdueBills++;
                         }
                         if (bill.payments) {
@@ -757,20 +761,19 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
                                                         <span
                                                             className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${
                                                                 bill.status ===
-                                                                'paid'
+                                                                'fully paid'
                                                                     ? 'bg-green-50 text-green-700 ring-green-600/20'
                                                                     : bill.status ===
-                                                                        'overdue'
+                                                                            'pending' ||
+                                                                        new Date(
+                                                                            bill.due_date,
+                                                                        ) <
+                                                                            new Date()
                                                                       ? 'bg-red-50 text-red-700 ring-red-600/20'
                                                                       : 'bg-yellow-50 text-yellow-800 ring-yellow-600/20'
                                                             }`}
                                                         >
-                                                            {bill.status
-                                                                .charAt(0)
-                                                                .toUpperCase() +
-                                                                bill.status.slice(
-                                                                    1,
-                                                                )}
+                                                            {bill.status}
                                                         </span>
                                                     </TableCell>
                                                 </TableRow>

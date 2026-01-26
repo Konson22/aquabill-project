@@ -18,7 +18,20 @@ class Home extends Model
         'plot_number',
         'phone',
         'property_type',
+        'contract_date',
+        'meter_install_date',
+        'supply_status',
+        'meter_disconnect_date',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'contract_date' => 'date',
+            'meter_install_date' => 'date',
+            'meter_disconnect_date' => 'date',
+        ];
+    }
 
     public function customer()
     {

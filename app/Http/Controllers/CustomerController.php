@@ -40,6 +40,55 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function export(Request $request)
+    {
+        $customers = \App\Models\Customer::query()
+            ->when($request->search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                });
+            })
+            ->when($request->zone_id && $request->zone_id !== 'all', function ($query, $zoneId) {
+                $query->whereHas('homes', function ($q) use ($zoneId) {
+                    $q->where('zone_id', $zoneId);
+                });
+            })
+            ->when($request->tariff_id && $request->tariff_id !== 'all', function ($query, $tariffId) {
+                $query->whereHas('homes', function ($q) use ($tariffId) {
+                    $q->where('tariff_id', $tariffId);
+                });
+            })
+            ->withCount('homes')
+            ->latest()
+            ->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="customers_export_' . now()->format('Y-m-d') . '.csv"',
+        ];
+
+        $callback = function () use ($customers) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, ['Name', 'Email', 'Phone', 'Unit Connections', 'Status']);
+
+            foreach ($customers as $customer) {
+                fputcsv($file, [
+                    $customer->name,
+                    $customer->email ?? 'N/A',
+                    $customer->phone ?? 'N/A',
+                    $customer->homes_count,
+                    $customer->homes_count > 0 ? 'Connected' : 'Pending',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
     public function create()
     {
         return Inertia::render('customers/create', [
@@ -89,8 +138,11 @@ class CustomerController extends Controller
                 if ($meter) {
                     $meter->update([
                         'home_id' => $home->id,
-                        'installation_date' => now(),
                         'status' => 'active',
+                    ]);
+
+                    $home->update([
+                        'meter_install_date' => now(),
                     ]);
 
                     // Add initial reading if provided
@@ -100,6 +152,7 @@ class CustomerController extends Controller
                             'current_reading' => $validated['initial_reading'],
                             'previous_reading' => 0, // Assuming 0 for initial
                             'reading_date' => now(),
+                            'is_initial' => true,
                             'reading_type' => 'Initial',
                         ]);
                     }

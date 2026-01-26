@@ -72,9 +72,9 @@ class BillController extends Controller
             ->leftJoin('bills', 'homes.id', '=', 'bills.home_id')
             ->select('tariffs.name as name')
             ->selectRaw('COUNT(bills.id) as total')
-            ->selectRaw("SUM(CASE WHEN bills.status = 'paid' THEN 1 ELSE 0 END) as paid")
-            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial_paid', 'overdue') THEN 1 ELSE 0 END) as unpaid")
-            ->selectRaw("SUM(CASE WHEN bills.status = 'overdue' THEN 1 ELSE 0 END) as overdue")
+            ->selectRaw("SUM(CASE WHEN bills.status = 'fully paid' THEN 1 ELSE 0 END) as paid")
+            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial paid') THEN 1 ELSE 0 END) as unpaid")
+            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial paid') AND bills.due_date < NOW() THEN 1 ELSE 0 END) as overdue")
             ->when($tariffId, fn($q) => $q->where('tariffs.id', $tariffId))
             ->when($zoneId, fn($q) => $q->where('homes.zone_id', $zoneId))
             ->groupBy('tariffs.id', 'tariffs.name')
@@ -86,9 +86,9 @@ class BillController extends Controller
             ->leftJoin('bills', 'homes.id', '=', 'bills.home_id')
             ->select('zones.name as name')
             ->selectRaw('COUNT(bills.id) as total')
-            ->selectRaw("SUM(CASE WHEN bills.status = 'paid' THEN 1 ELSE 0 END) as paid")
-            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial_paid', 'overdue') THEN 1 ELSE 0 END) as unpaid")
-            ->selectRaw("SUM(CASE WHEN bills.status = 'overdue' THEN 1 ELSE 0 END) as overdue")
+            ->selectRaw("SUM(CASE WHEN bills.status = 'fully paid' THEN 1 ELSE 0 END) as paid")
+            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial paid') THEN 1 ELSE 0 END) as unpaid")
+            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial paid') AND bills.due_date < NOW() THEN 1 ELSE 0 END) as overdue")
             ->when($tariffId, fn($q) => $q->where('homes.tariff_id', $tariffId))
             ->when($zoneId, fn($q) => $q->where('zones.id', $zoneId))
             ->groupBy('zones.id', 'zones.name')
@@ -105,9 +105,11 @@ class BillController extends Controller
         $collectionRate = $totalBilled > 0 ? ($totalCollected / $totalBilled) * 100 : 0;
         
         $allBillsCount = (clone $kpiQuery)->count();
-        $paidBillsCount = (clone $kpiQuery)->where('bills.status', 'paid')->count();
-        $unpaidBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial_paid', 'overdue'])->count();
-        $overdueBillsCount = (clone $kpiQuery)->where('bills.status', 'overdue')->count();
+        $paidBillsCount = (clone $kpiQuery)->where('bills.status', 'fully paid')->count();
+        $unpaidBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial paid'])->count();
+        $overdueBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial paid'])
+            ->where('bills.due_date', '<', now())
+            ->count();
 
         return Inertia::render('bills/report', [
             'monthlyTrend' => $monthlyTrend,
@@ -153,8 +155,8 @@ class BillController extends Controller
             $totalBilled = (clone $kpiQuery)->sum('total_amount');
             $totalCollected = (clone $kpiQuery)->sum(\DB::raw('total_amount - current_balance'));
             $allBillsCount = (clone $kpiQuery)->count();
-            $paidBillsCount = (clone $kpiQuery)->where('bills.status', 'paid')->count();
-            $unpaidBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial_paid', 'overdue'])->count();
+            $paidBillsCount = (clone $kpiQuery)->where('bills.status', 'fully paid')->count();
+            $unpaidBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial paid'])->count();
             
             fputcsv($file, ['KPI SUMMARY']);
             fputcsv($file, ['Total Billed Amount', number_format($totalBilled, 2)]);

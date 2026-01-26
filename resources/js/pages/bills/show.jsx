@@ -92,7 +92,7 @@ export default function BillShow({ bill }) {
                         </p>
                     </div>
                     <div className="flex gap-2">
-                        {bill.status !== 'paid' && (
+                        {bill.status !== 'fully paid' && (
                             <Button
                                 onClick={() => setPayOpen(true)}
                                 className="bg-purple-600 text-white hover:bg-purple-700"
@@ -166,9 +166,9 @@ export default function BillShow({ bill }) {
                                     <Badge
                                         variant="outline"
                                         className={`mt-1 h-5 px-2 text-xs capitalize ${
-                                            bill.status === 'paid'
+                                            bill.status === 'fully paid'
                                                 ? 'border-green-500 bg-green-50 text-green-600'
-                                                : bill.status === 'unpaid'
+                                                : bill.status === 'pending'
                                                   ? 'border-red-500 bg-red-50 text-red-600'
                                                   : 'border-yellow-500 bg-yellow-50 text-yellow-600'
                                         }`}

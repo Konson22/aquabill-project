@@ -1,4 +1,3 @@
-import AppLogo from '@/components/app-logo';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import {
     DropdownMenu,
@@ -8,7 +7,7 @@ import {
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { UserInfo } from '@/components/user-info';
 import { UserMenuContent } from '@/components/user-menu-content';
-import { Link, usePage } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import { ChevronDown } from 'lucide-react';
 
 export function AppSidebarHeader({ breadcrumbs = [] }) {
@@ -18,13 +17,6 @@ export function AppSidebarHeader({ breadcrumbs = [] }) {
     return (
         <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border bg-white px-4 text-black transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
             <div className="flex items-center gap-2">
-                <Link
-                    href={route('dashboard')}
-                    className="flex items-center gap-2"
-                    prefetch
-                >
-                    <AppLogo />
-                </Link>
                 <div className="ml-2 flex items-center gap-2 border-l pl-2">
                     <SidebarTrigger className="-ml-1" />
                     <Breadcrumbs breadcrumbs={breadcrumbs} />

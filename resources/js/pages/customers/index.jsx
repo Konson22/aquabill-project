@@ -1,14 +1,9 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -27,16 +22,23 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    flexRender,
+    getCoreRowModel,
+    getSortedRowModel,
+    useReactTable,
+} from '@tanstack/react-table';
+import {
+    ArrowUpDown,
+    Download,
     Eye,
     Home,
     Pencil,
     Plus,
     Search,
     Trash2,
-    Users,
     X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 export default function Customers({ customers, filters, zones, tariffs }) {
     const [search, setSearch] = useState(filters.search || '');
@@ -76,97 +78,319 @@ export default function Customers({ customers, filters, zones, tariffs }) {
         }
     };
 
+    const exportToExcel = () => {
+        if (!customers?.data?.length) return;
+
+        const data = customers.data.map((customer) => ({
+            Name: customer.name,
+            Email: customer.email || 'N/A',
+            Phone: customer.phone || 'N/A',
+            'Unit Connections': customer.homes_count || 0,
+            Status: customer.homes_count > 0 ? 'Connected' : 'Pending',
+        }));
+
+        const headers = Object.keys(data[0]);
+        const csvContent = [
+            headers.join(','),
+            ...data.map((row) =>
+                headers
+                    .map((header) => {
+                        const cell = row[header] === null ? '' : row[header];
+                        return `"${String(cell).replace(/"/g, '""')}"`;
+                    })
+                    .join(','),
+            ),
+        ].join('\n');
+
+        const blob = new Blob([csvContent], {
+            type: 'text/csv;charset=utf-8;',
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute(
+            'download',
+            `customers_export_${new Date().toISOString().split('T')[0]}.csv`,
+        );
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const getInitials = (name) => {
         return name
-            .split(' ')
-            .map((n) => n[0])
-            .slice(0, 2)
-            .join('')
-            .toUpperCase();
+            ? name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase()
+            : '??';
     };
 
     const breadcrumbs = [
-        {
-            title: 'Dashboard',
-            href: route('dashboard'),
-        },
-        {
-            title: 'Customers',
-            href: route('customers.index'),
-        },
+        { title: 'Dashboard', href: route('dashboard') },
+        { title: 'Customers', href: route('customers.index') },
     ];
+
+    const [sorting, setSorting] = useState([]);
+
+    const columns = useMemo(
+        () => [
+            {
+                accessorKey: 'name',
+                header: ({ column }) => (
+                    <Button
+                        variant="ghost"
+                        onClick={() =>
+                            column.toggleSorting(column.getIsSorted() === 'asc')
+                        }
+                        className="p-0 font-bold text-foreground hover:bg-transparent"
+                    >
+                        Customer Identity
+                        <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
+                    </Button>
+                ),
+                cell: ({ row }) => {
+                    const customer = row.original;
+                    return (
+                        <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-[10px] font-bold">
+                                    {getInitials(customer.name)}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col text-left">
+                                <span className="text-sm font-medium text-foreground">
+                                    {customer.name}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                    {customer.email || 'No email'}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                },
+            },
+            {
+                accessorKey: 'phone',
+                header: () => (
+                    <div className="text-center font-bold text-foreground">
+                        Contact
+                    </div>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex justify-center text-xs font-medium text-muted-foreground">
+                        {row.original.phone}
+                    </div>
+                ),
+            },
+            {
+                accessorKey: 'homes_count',
+                header: ({ column }) => (
+                    <div className="flex justify-center">
+                        <Button
+                            variant="ghost"
+                            onClick={() =>
+                                column.toggleSorting(
+                                    column.getIsSorted() === 'asc',
+                                )
+                            }
+                            className="p-0 font-bold text-foreground hover:bg-transparent"
+                        >
+                            Homes
+                            <ArrowUpDown className="ml-2 h-3.5 w-3.5 text-muted-foreground/30" />
+                        </Button>
+                    </div>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex justify-center">
+                        <span className="font-mono text-sm font-bold">
+                            {row.original.homes_count || 0}
+                        </span>
+                    </div>
+                ),
+            },
+            {
+                id: 'status',
+                header: () => (
+                    <div className="text-center font-bold text-foreground">
+                        Status
+                    </div>
+                ),
+                cell: ({ row }) => {
+                    const hasHomes = row.original.homes_count > 0;
+                    return (
+                        <div className="flex justify-center">
+                            <div className="flex items-center gap-1.5">
+                                <div
+                                    className={`h-1.5 w-1.5 rounded-full ${hasHomes ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`}
+                                />
+                                <span
+                                    className={`text-[11px] font-medium ${hasHomes ? 'text-emerald-600' : 'text-muted-foreground'}`}
+                                >
+                                    {hasHomes ? 'Connected' : 'Pending'}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                },
+            },
+            {
+                id: 'actions',
+                header: () => (
+                    <div className="text-right font-bold text-foreground">
+                        Operations
+                    </div>
+                ),
+                cell: ({ row }) => {
+                    const customer = row.original;
+                    return (
+                        <div className="flex items-center justify-end gap-1">
+                            <Button
+                                asChild
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                            >
+                                <Link
+                                    href={route('customers.show', customer.id)}
+                                >
+                                    <Eye className="h-3.5 w-3.5" />
+                                </Link>
+                            </Button>
+
+                            {department === 'admin' && (
+                                <>
+                                    <Button
+                                        asChild
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7"
+                                    >
+                                        <Link
+                                            href={route(
+                                                'customers.edit',
+                                                customer.id,
+                                            )}
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </Link>
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() =>
+                                            handleDelete(customer.id)
+                                        }
+                                        className="h-7 w-7 text-destructive"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    );
+                },
+            },
+        ],
+        [department],
+    );
+
+    const table = useReactTable({
+        data: customers?.data || [],
+        columns,
+        state: {
+            sorting,
+        },
+        onSortingChange: setSorting,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+    });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Customers" />
+            <Head title="Customer Directory" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header Section */}
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-6 pb-8">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
                             Customers
                         </h1>
-                        <p className="text-muted-foreground">
-                            Manage your customer base, verify details, and track
-                            connections.
+                        <p className="text-sm text-muted-foreground">
+                            Manage your customers and their service connections.
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button asChild variant="outline" className="gap-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={exportToExcel}
+                            className="h-11 gap-2 border-emerald-200 bg-emerald-50/30 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                        >
+                            <Download className="h-4 w-4" />
+                            <span>Export Data</span>
+                        </Button>
+                        <Button
+                            asChild
+                            variant="outline"
+                            className="h-11 gap-2 border-primary/20 bg-background/50 px-5 backdrop-blur-sm transition-all hover:border-primary/50 hover:bg-primary/5"
+                        >
                             <Link href={route('homes.index')}>
                                 <Home className="h-4 w-4" />
-                                <span className="hidden sm:inline">
-                                    All Connections
-                                </span>
-                                <span className="sm:hidden">Homes</span>
+                                <span>All Connections</span>
                             </Link>
                         </Button>
                         {department === 'admin' && (
-                            <Button asChild className="gap-2 shadow-sm">
+                            <Button
+                                asChild
+                                className="h-11 gap-2 px-6 shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
+                            >
                                 <Link href={route('customers.create')}>
                                     <Plus className="h-4 w-4" />
-                                    Add Customer
+                                    Add New Customer
                                 </Link>
                             </Button>
                         )}
                     </div>
                 </div>
 
-                {/* Filters Section */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-lg font-medium">
-                            Filters & Search
-                        </CardTitle>
-                        <CardDescription>
-                            Find customers by name, phone, zone, or tariff plan.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center">
-                            <div className="relative flex-1">
-                                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search by name, email, or phone..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-9"
-                                />
+                <Card className="overflow-hidden border shadow-sm">
+                    <div className="flex flex-col gap-5 px-4 lg:flex-row lg:items-end">
+                        <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
+                            <div className="space-y-1">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
+                                    Search
+                                </Label>
+                                <div className="relative">
+                                    <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground/50" />
+                                    <Input
+                                        placeholder="Name, email, or phone..."
+                                        value={search}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
+                                        className="h-9 pl-9"
+                                    />
+                                </div>
                             </div>
-                            <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+                            <div className="space-y-1">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
+                                    Tariff
+                                </Label>
                                 <Select
                                     value={tariffId}
                                     onValueChange={setTariffId}
                                 >
-                                    <SelectTrigger className="w-full sm:w-[180px]">
-                                        <SelectValue placeholder="Tariff" />
+                                    <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="All Tariffs" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">
                                             All Tariffs
                                         </SelectItem>
-                                        {tariffs.map((tariff) => (
+                                        {tariffs?.map((tariff) => (
                                             <SelectItem
                                                 key={tariff.id}
                                                 value={tariff.id.toString()}
@@ -176,19 +400,23 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
+                                    Zone
+                                </Label>
                                 <Select
                                     value={zoneId}
                                     onValueChange={setZoneId}
                                 >
-                                    <SelectTrigger className="w-full sm:w-[180px]">
-                                        <SelectValue placeholder="Zone" />
+                                    <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="All Zones" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">
                                             All Zones
                                         </SelectItem>
-                                        {zones.map((zone) => (
+                                        {zones?.map((zone) => (
                                             <SelectItem
                                                 key={zone.id}
                                                 value={zone.id.toString()}
@@ -198,180 +426,105 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-
-                                {(search ||
-                                    zoneId !== 'all' ||
-                                    tariffId !== 'all') && (
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={clearFilters}
-                                        title="Clear filters"
-                                        className="shrink-0"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                )}
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
 
-                {/* Results Table */}
-                <Card className="overflow-hidden">
-                    <div className="flex items-center justify-between border-b px-6 py-4">
-                        <div className="flex items-center gap-2">
-                            <Users className="h-5 w-5 text-muted-foreground" />
-                            <h2 className="text-lg font-semibold">
-                                Total Customers{' '}
-                                <Badge variant="secondary" className="ml-2">
-                                    {customers.total}
-                                </Badge>
-                            </h2>
-                        </div>
+                        {(search || zoneId !== 'all' || tariffId !== 'all') && (
+                            <Button
+                                variant="ghost"
+                                onClick={clearFilters}
+                                className="h-9 gap-2 text-muted-foreground"
+                            >
+                                <X className="h-4 w-4" />
+                                Clear
+                            </Button>
+                        )}
                     </div>
+                    <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
+                        <h2 className="flex items-center gap-2 text-sm font-semibold">
+                            Customer Records
+                            <Badge variant="outline" className="font-mono">
+                                {customers.total || 0}
+                            </Badge>
+                        </h2>
+                    </div>
+
                     <div className="overflow-x-auto">
                         <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead className="w-[300px]">
-                                        Customer
-                                    </TableHead>
-                                    <TableHead>Contact</TableHead>
-                                    <TableHead className="text-center">
-                                        Homes
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Actions
-                                    </TableHead>
-                                </TableRow>
+                            <TableHeader>
+                                {table.getHeaderGroups().map((headerGroup) => (
+                                    <TableRow
+                                        key={headerGroup.id}
+                                        className="border-b hover:bg-transparent"
+                                    >
+                                        {headerGroup.headers.map((header) => (
+                                            <TableHead
+                                                key={header.id}
+                                                className="h-10 px-4 text-xs font-semibold text-muted-foreground uppercase"
+                                            >
+                                                {header.isPlaceholder
+                                                    ? null
+                                                    : flexRender(
+                                                          header.column
+                                                              .columnDef.header,
+                                                          header.getContext(),
+                                                      )}
+                                            </TableHead>
+                                        ))}
+                                    </TableRow>
+                                ))}
                             </TableHeader>
                             <TableBody>
-                                {customers.data.length > 0 ? (
-                                    customers.data.map((customer) => (
-                                        <TableRow
-                                            key={customer.id}
-                                            className="hover:bg-muted/5"
-                                        >
-                                            <TableCell>
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="h-9 w-9 border">
-                                                        <AvatarFallback className="bg-primary/10 text-primary">
-                                                            {getInitials(
-                                                                customer.name,
-                                                            )}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="flex flex-col">
-                                                        <span className="font-medium">
-                                                            {customer.name}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {customer.email ||
-                                                                'No email'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-sm font-medium">
-                                                        {customer.phone}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-center">
-                                                <Badge
-                                                    variant="outline"
-                                                    className="font-mono"
-                                                >
-                                                    {customer.homes_count}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <Button
-                                                        asChild
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                        title="View Profile"
+                                {table.getRowModel().rows?.length ? (
+                                    table.getRowModel().rows.map((row) => (
+                                        <TableRow key={row.id}>
+                                            {row
+                                                .getVisibleCells()
+                                                .map((cell) => (
+                                                    <TableCell
+                                                        key={cell.id}
+                                                        className="px-4 py-2"
                                                     >
-                                                        <Link
-                                                            href={route(
-                                                                'customers.show',
-                                                                customer.id,
-                                                            )}
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                            <span className="sr-only">
-                                                                View Profile
-                                                            </span>
-                                                        </Link>
-                                                    </Button>
-
-                                                    {department === 'admin' && (
-                                                        <>
-                                                            <Button
-                                                                asChild
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                                                title="Edit Details"
-                                                            >
-                                                                <Link
-                                                                    href={route(
-                                                                        'customers.edit',
-                                                                        customer.id,
-                                                                    )}
-                                                                >
-                                                                    <Pencil className="h-4 w-4" />
-                                                                    <span className="sr-only">
-                                                                        Edit
-                                                                        Details
-                                                                    </span>
-                                                                </Link>
-                                                            </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() =>
-                                                                    handleDelete(
-                                                                        customer.id,
-                                                                    )
-                                                                }
-                                                                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                                                title="Delete"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                                <span className="sr-only">
-                                                                    Delete
-                                                                </span>
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </TableCell>
+                                                        {flexRender(
+                                                            cell.column
+                                                                .columnDef.cell,
+                                                            cell.getContext(),
+                                                        )}
+                                                    </TableCell>
+                                                ))}
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={4}
-                                            className="h-32 text-center text-muted-foreground"
+                                            colSpan={columns.length}
+                                            className="h-[400px] text-center"
                                         >
-                                            <div className="flex flex-col items-center justify-center gap-2">
-                                                <Users className="h-8 w-8 opacity-20" />
-                                                <p>
-                                                    No customers found matching
-                                                    your criteria.
-                                                </p>
+                                            <div className="flex animate-in flex-col items-center justify-center gap-6 duration-500 fade-in zoom-in">
+                                                <div className="relative">
+                                                    <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+                                                    <div className="relative rounded-full bg-muted/50 p-10 shadow-inner ring-1 ring-border/50">
+                                                        <Search className="h-12 w-12 text-muted-foreground/30" />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <p className="text-2xl font-black tracking-tight">
+                                                        No matches discovered
+                                                    </p>
+                                                    <p className="mx-auto max-w-[280px] text-sm font-medium text-muted-foreground italic">
+                                                        "We've searched the
+                                                        entire grid, but
+                                                        couldn't find those
+                                                        records."
+                                                    </p>
+                                                </div>
                                                 <Button
-                                                    variant="link"
+                                                    variant="secondary"
                                                     onClick={clearFilters}
-                                                    className="px-0"
+                                                    className="mt-2 gap-2 font-bold shadow-lg shadow-muted/50 transition-all hover:bg-primary hover:text-white"
                                                 >
-                                                    Clear filters
+                                                    <X className="h-4 w-4" />
+                                                    Reset Discovery Tool
                                                 </Button>
                                             </div>
                                         </TableCell>
@@ -382,27 +535,17 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                     </div>
 
                     {/* Pagination */}
-                    <div className="border-t p-4">
-                        <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-sm text-muted-foreground">
-                                Showing{' '}
-                                <span className="font-medium">
-                                    {customers.from || 0}
-                                </span>{' '}
-                                to{' '}
-                                <span className="font-medium">
-                                    {customers.to || 0}
-                                </span>{' '}
-                                of{' '}
-                                <span className="font-medium">
-                                    {customers.total}
-                                </span>{' '}
-                                results
+                    <div className="border-t bg-muted/5 p-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="text-xs font-semibold text-muted-foreground uppercase opacity-60">
+                                    Showing {customers.from || 0} —{' '}
+                                    {customers.to || 0} of {customers.total}
+                                </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 {customers.links &&
                                     customers.links.map((link, index) => {
-                                        // Clean up HTML entities in labels like &laquo;
                                         const label = link.label
                                             .replace('&laquo; Previous', 'Prev')
                                             .replace('Next &raquo;', 'Next');
@@ -418,11 +561,11 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                                                 size="sm"
                                                 disabled={!link.url}
                                                 asChild={!!link.url}
-                                                className={
-                                                    !link.url
-                                                        ? 'cursor-default opacity-50'
-                                                        : ''
-                                                }
+                                                className={`h-9 min-w-[36px] px-3 font-semibold transition-all ${
+                                                    link.active
+                                                        ? 'shadow-md shadow-primary/20'
+                                                        : 'border-border/50 bg-background/50 backdrop-blur-sm'
+                                                } ${!link.url ? 'opacity-30' : 'hover:scale-105 active:scale-95'}`}
                                             >
                                                 {link.url ? (
                                                     <Link

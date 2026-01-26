@@ -37,12 +37,12 @@ export default function Login({ status }) {
                             <div className="grid gap-2">
                                 <Label
                                     htmlFor="email"
-                                    className="text-sm font-medium"
+                                    className="text-sm font-semibold text-white/90"
                                 >
                                     Email address
                                 </Label>
                                 <div className="relative">
-                                    <Mail className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Mail className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-white/50" />
                                     <Input
                                         id="email"
                                         type="email"
@@ -52,7 +52,7 @@ export default function Login({ status }) {
                                         tabIndex={1}
                                         autoComplete="email"
                                         placeholder="Enter your email"
-                                        className={`pl-9 ${errors.email ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                        className={`border-white/20 bg-white/10 pl-9 text-white placeholder:text-white/40 focus-visible:ring-white/30 ${errors.email ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                                     />
                                 </div>
                                 <InputError message={errors.email} />
@@ -62,19 +62,19 @@ export default function Login({ status }) {
                                 <div className="flex items-center justify-between">
                                     <Label
                                         htmlFor="password"
-                                        className="text-sm font-medium"
+                                        className="text-sm font-semibold text-white/90"
                                     >
                                         Password
                                     </Label>
                                     <Link
                                         href={forgotPassword().url}
-                                        className="text-xs text-muted-foreground transition-colors hover:text-primary hover:underline"
+                                        className="text-xs font-medium text-white/60 transition-colors hover:text-white hover:underline"
                                     >
                                         Forgot password?
                                     </Link>
                                 </div>
                                 <div className="relative">
-                                    <Lock className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Lock className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-white/50" />
                                     <Input
                                         id="password"
                                         type="password"
@@ -83,7 +83,7 @@ export default function Login({ status }) {
                                         tabIndex={2}
                                         autoComplete="current-password"
                                         placeholder="Enter your password"
-                                        className={`pl-9 ${errors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                        className={`border-white/20 bg-white/10 pl-9 text-white placeholder:text-white/40 focus-visible:ring-white/30 ${errors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                                     />
                                 </div>
                                 <InputError message={errors.password} />
@@ -94,10 +94,11 @@ export default function Login({ status }) {
                                     id="remember"
                                     name="remember"
                                     tabIndex={3}
+                                    className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-blue-600"
                                 />
                                 <Label
                                     htmlFor="remember"
-                                    className="cursor-pointer text-sm font-normal"
+                                    className="cursor-pointer text-sm font-medium text-white/70"
                                 >
                                     Remember me for 30 days
                                 </Label>
@@ -105,7 +106,7 @@ export default function Login({ status }) {
 
                             <Button
                                 type="submit"
-                                className="mt-2 w-full"
+                                className="mt-2 w-full bg-white py-6 text-lg font-bold text-blue-600 shadow-xl hover:bg-white/90"
                                 size="lg"
                                 tabIndex={4}
                                 disabled={processing}
@@ -113,7 +114,7 @@ export default function Login({ status }) {
                             >
                                 {processing ? (
                                     <>
-                                        <Spinner className="mr-2" />
+                                        <Spinner className="mr-2 text-blue-600" />
                                         Signing in...
                                     </>
                                 ) : (
@@ -124,18 +125,6 @@ export default function Login({ status }) {
                     </>
                 )}
             </Form>
-
-            <div className="mt-6 text-center text-sm text-muted-foreground">
-                <p>
-                    Don't have an account?{' '}
-                    <Link
-                        href="/register"
-                        className="font-medium text-primary hover:underline"
-                    >
-                        Contact administrator
-                    </Link>
-                </p>
-            </div>
         </AuthLayout>
     );
 }

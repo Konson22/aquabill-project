@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('zone_id')->constrained('zones')->onDelete('cascade');
             $table->string('name');
-            $table->string('code')->nullable();
             $table->text('description')->nullable();
             $table->timestamps();
             

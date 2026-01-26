@@ -628,20 +628,30 @@ export default function CustomerHome({ home, overview }) {
                                                                     }
                                                                 </TableCell>
                                                                 <TableCell>
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="gap-1"
-                                                                    >
-                                                                        <Droplets className="h-3 w-3 text-sky-500" />
-                                                                        {reading.consumption_units ||
-                                                                            (
-                                                                                reading.current_reading -
-                                                                                reading.previous_reading
-                                                                            ).toFixed(
-                                                                                2,
-                                                                            )}{' '}
-                                                                        Units
-                                                                    </Badge>
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <Badge
+                                                                            variant="outline"
+                                                                            className="gap-1"
+                                                                        >
+                                                                            <Droplets className="h-3 w-3 text-sky-500" />
+                                                                            {reading.consumption_units ||
+                                                                                (
+                                                                                    reading.current_reading -
+                                                                                    reading.previous_reading
+                                                                                ).toFixed(
+                                                                                    2,
+                                                                                )}{' '}
+                                                                            Units
+                                                                        </Badge>
+                                                                        {reading.is_initial && (
+                                                                            <Badge
+                                                                                variant="secondary"
+                                                                                className="mt-1 w-fit bg-blue-50 text-blue-600 hover:bg-blue-100"
+                                                                            >
+                                                                                Initial
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
                                                                 </TableCell>
                                                                 <TableCell className="text-right text-muted-foreground">
                                                                     {reading
@@ -901,9 +911,7 @@ export default function CustomerHome({ home, overview }) {
                                                                 <Calendar className="h-4 w-4 text-muted-foreground" />
                                                                 <span>
                                                                     {formatDate(
-                                                                        home
-                                                                            .meter
-                                                                            .installation_date,
+                                                                        home.meter_install_date,
                                                                     )}
                                                                 </span>
                                                             </div>

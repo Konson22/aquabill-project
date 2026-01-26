@@ -27,7 +27,7 @@ class MeterSeeder extends Seeder
         // }
 
         $meterTypes = ['Digital', 'Analog'];
-        $meterCounter = 230000000;
+        $meterCounter = 23100000000;
 
         for ($i = 0; $i < 8000; $i++) {
             Meter::create([
