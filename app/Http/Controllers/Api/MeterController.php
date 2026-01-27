@@ -16,7 +16,15 @@ class MeterController extends Controller
         $meters = \App\Models\Meter::with('home.customer')->paginate(10);
         return response()->json($meters);
     }
-   
+    public function show($id)
+    {
+        $meter = \App\Models\Meter::with(['home.customer', 'home.tariff', 'readings' => function($q) {
+            $q->latest()->limit(5);
+        }])->findOrFail($id);
+        
+        return response()->json($meter);
+    }
+
 
     /**
      * Update the specified resource in storage.

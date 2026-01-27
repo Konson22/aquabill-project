@@ -221,14 +221,29 @@ class DashboardController extends Controller
 
         // 8. Water Usage Overview Chart Data (m³)
         $usageChartData = [];
+        $billsChartData = [];
+        $paymentChartData = [];
         $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         
-        foreach ($months as $index => $month) {
-            $sum = MeterReading::whereMonth('reading_date', $index + 1)
+        foreach ($months as $index => $monthName) {
+            // Usage data
+            $usageSum = MeterReading::whereMonth('reading_date', $index + 1)
                 ->whereYear('reading_date', now()->year)
                 ->selectRaw('SUM(current_reading - previous_reading) as total')
                 ->value('total') ?? 0;
-            $usageChartData[] = ['name' => $month, 'total' => round($sum, 2)];
+            $usageChartData[] = ['name' => $monthName, 'total' => round($usageSum, 2)];
+
+            // Bills generated data
+            $billsCount = Bill::whereMonth('created_at', $index + 1)
+                ->whereYear('created_at', now()->year)
+                ->count();
+            $billsChartData[] = ['name' => $monthName, 'total' => $billsCount];
+
+            // Payment collected data
+            $paymentSum = Payment::whereMonth('payment_date', $index + 1)
+                ->whereYear('payment_date', now()->year)
+                ->sum('amount');
+            $paymentChartData[] = ['name' => $monthName, 'total' => round($paymentSum, 2)];
         }
 
         // 9. Overdue Readings (No reading in > 30 days) - simplified logic
@@ -294,6 +309,8 @@ class DashboardController extends Controller
                 'totalConsumptionThisYear' => round($totalConsumptionThisYear, 2),
             ],
             'chartData' => $usageChartData,
+            'billsChartData' => $billsChartData,
+            'paymentChartData' => $paymentChartData,
             'usageByCategory' => $usageByCategory,
             'usageByZone' => $usageByZone,
             'overdueReadings' => $overdueReadings, // New

@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MeterController;
 use App\Http\Controllers\Api\HomesController;
 use App\Http\Controllers\Api\ReadingController;
+use App\Http\Controllers\Api\CustomerController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
@@ -19,8 +20,7 @@ Route::middleware('auth:sanctum')->name('api.')->group(function () {
     })->name('user');
 
     Route::apiResource('meters', MeterController::class);
-    Route::apiResource('customers', HomesController::class);
-    Route::apiResource('readings', ReadingController::class)->only(['store']);
+    Route::apiResource('customers', CustomerController::class);
+    Route::apiResource('homes', HomesController::class);
+    Route::apiResource('readings', ReadingController::class)->only(['index', 'store']);
 });
-    Route::apiResource('test', MeterController::class);
-// Route::apiResource('test', HomesController::class);

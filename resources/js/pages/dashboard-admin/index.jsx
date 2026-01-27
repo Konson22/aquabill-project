@@ -36,6 +36,8 @@ const QuickAction = ({
 export default function Dashboard({
     stats,
     chartData,
+    billsChartData,
+    paymentChartData,
     usageByCategory,
     usageByZone,
     overdueReadings = [],
@@ -93,6 +95,8 @@ export default function Dashboard({
                 <MeterSection stats={stats.meters} trend={stats.metersTrend} />
                 <ReadingSection
                     chartData={chartData}
+                    billsChartData={billsChartData}
+                    paymentChartData={paymentChartData}
                     usageByCategory={usageByCategory}
                     usageByZone={usageByZone}
                 />

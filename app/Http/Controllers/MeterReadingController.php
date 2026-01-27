@@ -9,6 +9,8 @@ use App\Models\MeterReading;
 use App\Models\Bill;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class MeterReadingController extends Controller
 {
@@ -42,51 +44,81 @@ class MeterReadingController extends Controller
 
     public function store(Request $request)
     {
+        Log::info('Web reading submission', [
+            'payload' => $request->all(),
+            'user_id' => Auth::id()
+        ]);
+
         $validated = $request->validate([
             'meter_id' => ['required', 'exists:meters,id'],
             'reading_date' => ['required', 'date'],
             'current_reading' => ['required', 'numeric', 'min:0'],
             'previous_reading' => ['nullable', 'numeric', 'min:0'],
-            'status' => ['nullable', 'in:pending,billed,void'],
+            'image' => ['nullable', 'image', 'max:2048'],
+            'notes' => ['nullable', 'string'],
         ]);
 
         // Get meter with relationships
         $meter = Meter::with('home.customer', 'home.tariff')->findOrFail($validated['meter_id']);
+        $home = $meter->home;
 
         // Validate that meter has a home and customer
-        if (!$meter->home || !$meter->home->customer) {
+        if (!$home || !$home->customer) {
             return redirect()
-                ->route('meter-readings')
+                ->back()
                 ->with('error', 'Meter must be associated with a home and customer.');
         }
 
-        // Get previous reading if not provided
-        if (empty($validated['previous_reading']) || $validated['previous_reading'] === null) {
-            $previousReading = MeterReading::where('meter_id', $validated['meter_id'])
-                ->latest('reading_date')
-                ->first();
-            
-            $validated['previous_reading'] = $previousReading ? $previousReading->current_reading : 0;
+        // Fetch the latest reading from database to validate against
+        $dbLastReading = MeterReading::where('meter_id', $meter->id)
+            ->where('home_id', $home->id)
+            ->orderBy('reading_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if ($dbLastReading && $validated['current_reading'] < $dbLastReading->current_reading) {
+            return redirect()
+                ->back()
+                ->with('error', "Current reading ({$validated['current_reading']}) cannot be less than the last recorded reading ({$dbLastReading->current_reading}).");
         }
 
-            // Calculate consumption units
-            $validated['consumption'] = max(
-                0,
-                $validated['current_reading'] - $validated['previous_reading'],
-            );
-            $consumptionUnits = $validated['consumption'];
+        // Get previous reading if not provided
+        if (!isset($validated['previous_reading']) || $validated['previous_reading'] === null) {
+            $validated['previous_reading'] = $dbLastReading ? $dbLastReading->current_reading : 0;
+        }
 
-            // Get tariff information
-            $tariff = $meter->home->tariff;
+        // Calculate consumption units
+        $consumption = max(0, $validated['current_reading'] - $validated['previous_reading']);
+
+        // Handle image upload
+        $imagePath = null;
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')->store('readings', 'public');
+        }
+
+        DB::beginTransaction();
+        try {
+            // Create the reading
+            $reading = MeterReading::create([
+                'meter_id' => $meter->id,
+                'home_id' => $home->id,
+                'reading_date' => $validated['reading_date'],
+                'current_reading' => $validated['current_reading'],
+                'previous_reading' => $validated['previous_reading'],
+                'read_by' => Auth::id(),
+                'status' => 'billed',
+                'image' => $imagePath,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            // Billing logic
+            $tariff = $home->tariff;
             $tariffRate = $tariff ? $tariff->price : 0;
             $fixedCharge = $tariff ? $tariff->fixed_charge : 0;
+            $consumptionAmount = $consumption * $tariffRate;
             
-            // Calculate consumption cost correctly
-            $consumptionAmount = $consumptionUnits * $tariffRate;
-            
-            // Calculate previous balance from the latest bill for the same home
-            // Find the last bill that is effectively "active" (not cancelled or already forwarded)
-            $lastBill = Bill::where('home_id', $meter->home_id)
+            // Previous balance from last active bill
+            $lastBill = Bill::where('home_id', $home->id)
                 ->where('status', '!=', 'cancelled')
                 ->where('status', '!=', 'forwarded')
                 ->latest('id')
@@ -94,70 +126,43 @@ class MeterReadingController extends Controller
             
             $previousBalance = 0;
             if ($lastBill) {
-                if ($lastBill->status == 'fully paid') {
-                     $previousBalance = 0;
-                } else {
-                     $previousBalance = $lastBill->current_balance;
+                if ($lastBill->status !== 'fully paid') {
+                    $previousBalance = $lastBill->current_balance;
+                    $lastBill->update(['status' => 'forwarded']);
                 }
             }
 
-            // Set the reader (current user)
-            $validated['read_by'] = Auth::id();
-
-            // Set default status if not provided
-            $validated['status'] = $validated['status'] ?? 'pending';
-
-            // Create the reading within a transaction
-            DB::beginTransaction();
-            try {
-                $validated['home_id'] = $meter->home_id;
-                $reading = MeterReading::create($validated);
+            // Ensure any other lingering unpaid bills are also forwarded
+            Bill::where('home_id', $home->id)
+                ->whereIn('status', ['pending', 'overdue', 'partial paid'])
+                ->update(['status' => 'forwarded']);
 
             $totalAmount = $consumptionAmount + $fixedCharge + $previousBalance;
 
             // Generate unique bill number
-            do {
-                $billCount = Bill::count();
-                $billNumber = 'BILL-' . str_pad($billCount + 1, 8, '0', STR_PAD_LEFT);
-            } while (Bill::where('bill_number', $billNumber)->exists());
+            $billCount = Bill::count();
+            $billNumber = 'BILL-' . str_pad($billCount + 1, 8, '0', STR_PAD_LEFT);
 
-            // Check for previous pending or overdue bills for the same home and update their status to forwarded
-             if ($lastBill && $lastBill->status != 'fully paid') {
-                 $lastBill->update(['status' => 'forwarded']);
-             }
-             
-             // Ensure any other lingering unpaid bills are also forwarded
-             Bill::where('home_id', $meter->home_id)
-                ->whereIn('status', ['pending', 'overdue', 'partial paid'])
-                ->where('id', '!=', $lastBill ? $lastBill->id : 0)
-                ->update(['status' => 'forwarded']);
-
-            // Calculate billing period (monthly)
-            $readingDate = \Carbon\Carbon::parse($validated['reading_date']);
-            $billingPeriodStart = $readingDate->copy()->startOfMonth();
-            $billingPeriodEnd = $readingDate->copy()->endOfMonth();
-            $dueDate = $readingDate->copy()->addDays(14); 
-
+            // Calculate billing period and due date
+            $readingDate = Carbon::parse($validated['reading_date']);
+            
             // Create the bill
             Bill::create([
                 'bill_number' => $billNumber,
                 'meter_reading_id' => $reading->id,
-                'customer_id' => $meter->home->customer_id,
-                'home_id' => $meter->home_id,
-                'billing_period_start' => $billingPeriodStart,
-                'billing_period_end' => $billingPeriodEnd,
-                'consumption' => $consumptionUnits, // STORE UNITS HERE
+                'customer_id' => $home->customer_id,
+                'home_id' => $home->id,
+                'billing_period_start' => $readingDate->copy()->startOfMonth(),
+                'billing_period_end' => $readingDate->copy()->endOfMonth(),
+                'consumption' => $consumption,
                 'tariff' => $tariffRate,
                 'fix_charges' => $fixedCharge,
-                'total_amount' => $totalAmount, // INCLUDES COST
+                'total_amount' => $totalAmount,
                 'current_balance' => $totalAmount,
                 'previous_balance' => $previousBalance,
-                'due_date' => $dueDate,
+                'due_date' => $readingDate->copy()->addDays(14),
                 'status' => 'pending',
             ]);
-
-            // Update reading status to billed
-            $reading->update(['status' => 'billed']);
 
             DB::commit();
 
@@ -166,6 +171,10 @@ class MeterReadingController extends Controller
                 ->with('success', 'Meter reading and bill created successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Web reading submission failed', [
+                'error' => $e->getMessage(),
+                'payload' => $request->all()
+            ]);
 
             return redirect()
                 ->back()
@@ -487,6 +496,10 @@ class MeterReadingController extends Controller
     {
         $meterReading = MeterReading::with(['meter.home.customer', 'reader', 'bill'])
             ->findOrFail($id);
+
+        if ($meterReading->image) {
+            $meterReading->image_url = url('storage/' . $meterReading->image);
+        }
 
         return Inertia::render('meter-reading/show', [
             'meterReading' => $meterReading,
