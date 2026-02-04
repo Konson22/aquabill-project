@@ -40,6 +40,7 @@ Route::middleware(['auth'])->group(function () {
     // Admin Routes
     Route::middleware(['department:admin'])->group(function () {
         // Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+        Route::get('general-report', [DashboardController::class, 'generalReport'])->name('general-report');
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');

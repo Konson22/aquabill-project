@@ -317,4 +317,59 @@ class DashboardController extends Controller
             'overdueBills' => $overdueBillsList, // New
         ]);
     }
+
+    public function generalReport()
+    {
+        $summary = [
+            'customers' => Customer::count(),
+            'homes' => Home::count(),
+            'meters' => Meter::count(),
+            'consumption' => round(
+                MeterReading::whereYear('reading_date', now()->year)
+                    ->selectRaw('SUM(current_reading - previous_reading) as total')
+                    ->value('total') ?? 0,
+                2
+            ),
+        ];
+
+        $overdueBillsCount = Bill::whereIn('status', ['pending', 'partial paid'])
+            ->where('due_date', '<', now())
+            ->count();
+        $overdueBillsAmount = Bill::whereIn('status', ['pending', 'partial paid'])
+            ->where('due_date', '<', now())
+            ->sum('current_balance');
+
+        $overdueReadingsCount = Meter::where('status', 'active')
+            ->whereDoesntHave('readings', function ($query) {
+                $query->where('reading_date', '>=', now()->subDays(30));
+            })
+            ->count();
+
+        $billsTotal = Bill::count();
+        $fullyPaidBills = Bill::where('status', 'fully paid')->count();
+        $collectionRate = $billsTotal > 0 ? ($fullyPaidBills / $billsTotal) * 100 : 0;
+
+        $highlights = [
+            [
+                'label' => 'Overdue bills',
+                'value' => number_format($overdueBillsCount),
+                'description' => 'Pending balance: ' . number_format($overdueBillsAmount, 2),
+            ],
+            [
+                'label' => 'Readings overdue',
+                'value' => number_format($overdueReadingsCount),
+                'description' => 'Active meters without 30-day read',
+            ],
+            [
+                'label' => 'Collection rate',
+                'value' => number_format($collectionRate, 1) . '%',
+                'description' => 'Fully paid bills vs total',
+            ],
+        ];
+
+        return Inertia::render('dashboard-admin/general-report', [
+            'stats' => $summary,
+            'highlights' => $highlights,
+        ]);
+    }
 }

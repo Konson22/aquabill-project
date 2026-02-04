@@ -1,6 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
 import { Link, usePage } from '@inertiajs/react';
-import { Activity, Banknote, FileText, Receipt } from 'lucide-react';
+import {
+    Activity,
+    Banknote,
+    BarChart3,
+    ChevronRight,
+    FileText,
+    Receipt,
+} from 'lucide-react';
 import FinanceSection from './sections/finance';
 import HomesSection from './sections/homes-section';
 import MeterSection from './sections/meters-section';
@@ -16,18 +23,33 @@ const QuickAction = ({
 }) => (
     <Link
         href={href}
-        className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 transition-all hover:border-slate-300 hover:shadow-md"
+        className="group relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
     >
-        <div
-            className={`absolute -top-4 -right-4 h-24 w-24 rounded-full opacity-5 transition-transform group-hover:scale-110 ${bgClass}`}
-        />
-        <div className="relative z-10 flex items-center gap-4">
-            <div className={`rounded-lg p-2.5 ${bgClass} bg-opacity-10`}>
-                <Icon className={`h-5 w-5 ${colorClass}`} />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 opacity-70 transition-opacity group-hover:opacity-100">
+            <div className={`h-full w-full ${bgClass}`} />
+        </div>
+        <div className="relative z-10 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+                <div
+                    className={`grid h-12 w-12 place-items-center rounded-2xl ${bgClass} bg-opacity-10 ring-1 ring-inset ring-slate-200/70 transition-transform group-hover:-rotate-3`}
+                >
+                    <Icon className={`h-6 w-6 ${colorClass}`} />
+                </div>
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition-colors group-hover:border-slate-300 group-hover:bg-white group-hover:text-slate-700">
+                    Open
+                    <ChevronRight
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                    />
+                </span>
             </div>
-            <div>
-                <h3 className="font-semibold text-slate-900">{title}</h3>
-                <p className="text-xs text-slate-500">{description}</p>
+            <div className="space-y-1.5">
+                <h3 className="text-base font-semibold tracking-tight text-slate-900">
+                    {title}
+                </h3>
+                <p className="text-sm leading-relaxed text-slate-500">
+                    {description}
+                </p>
             </div>
         </div>
     </Link>
@@ -54,11 +76,19 @@ export default function Dashboard({
             <div className="mx-auto min-h-screen max-w-[1600px] space-y-8 pb-8">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <QuickAction
+                        href={route('general-report')}
+                        icon={BarChart3}
+                        title="General Report"
+                        description="System-wide overview"
+                        colorClass="text-white"
+                        bgClass="bg-slate-900"
+                    />
+                    <QuickAction
                         href={route('bills.report')}
                         icon={FileText}
                         title="Billing Report"
                         description="View billing analytics"
-                        colorClass="text-blue-600"
+                        colorClass="text-white"
                         bgClass="bg-blue-600"
                     />
                     <QuickAction
@@ -68,14 +98,6 @@ export default function Dashboard({
                         description="Track revenue streams"
                         colorClass="text-emerald-600"
                         bgClass="bg-emerald-600"
-                    />
-                    <QuickAction
-                        href={route('bills')}
-                        icon={Receipt}
-                        title="Billing Management"
-                        description="Manage customer bills"
-                        colorClass="text-violet-600"
-                        bgClass="bg-violet-600"
                     />
                     <QuickAction
                         href={route('meter-readings.report')}

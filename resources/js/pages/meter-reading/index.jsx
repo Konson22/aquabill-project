@@ -44,6 +44,7 @@ export default function MeterReadings({ meterReadings, meters }) {
     const [query, setQuery] = useState('');
     const [selectedMeter, setSelectedMeter] = useState(null);
     const [editingId, setEditingId] = useState(null);
+    const [search, setSearch] = useState('');
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
         meter_id: '',
@@ -121,24 +122,38 @@ export default function MeterReadings({ meterReadings, meters }) {
         return new Date(dateString).toLocaleDateString();
     };
 
+    const filteredReadings = meterReadings.data.filter((reading) => {
+        if (!search.trim()) return true;
+        const term = search.toLowerCase();
+        return (
+            reading.meter?.meter_number?.toLowerCase().includes(term) ||
+            reading.home?.customer?.name?.toLowerCase().includes(term) ||
+            reading.bill?.bill_number?.toLowerCase().includes(term)
+        );
+    });
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Meter Readings" />
-            <div className="flex h-full flex-col gap-6 p-4 md:p-0">
-                <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div className="flex flex-col gap-6 p-4 md:p-0">
+                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                             Meter Readings
+                        </p>
+                        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+                            Reading History
                         </h1>
-                        <p className="text-muted-foreground">
-                            History of meter readings and consumption.
+                        <p className="text-sm text-slate-500">
+                            Track meter readings and consumption updates.
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                       
                         <Button
                             variant="outline"
                             asChild
-                            className="h-10 gap-2 bg-white"
+                            className="h-10 gap-2 border-slate-200 bg-white shadow-sm"
                         >
                             <Link href={route('meter-readings.report')}>
                                 <Activity className="h-4 w-4" />
@@ -376,29 +391,50 @@ export default function MeterReadings({ meterReadings, meters }) {
                     </div>
                 </div>
 
-                <Card className="flex flex-1 flex-col overflow-hidden border-t-2 border-slate-200">
+                <Card className="flex flex-1 flex-col overflow-hidden border-slate-200/80 shadow-sm">
+                        <div className="w-full sm:w-[400px] sm:ml-auto">
+                            <Input
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
+                                placeholder="Search meter, customer, bill..."
+                                className="h-12 rounded-xl border-slate-200 bg-white shadow-sm placeholder:text-slate-400"
+                            />
+                        </div>
                     <div className="flex-1 overflow-auto">
                         <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-muted/50">
+                            <TableHeader className="sticky top-0 z-10 bg-slate-50/80">
                                 <TableRow>
-                                    <TableHead>Meter Serial</TableHead>
-                                    <TableHead>Home / Customer</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Bill</TableHead>
-                                    <TableHead>Readings</TableHead>
-                                    <TableHead>Usage</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Meter Serial
+                                    </TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Home / Customer
+                                    </TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Date
+                                    </TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Bill
+                                    </TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Readings
+                                    </TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                        Usage
+                                    </TableHead>
+                                    <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                                         Actions
                                     </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {meterReadings.data.length > 0 ? (
-                                    meterReadings.data.map((reading) => (
+                                {filteredReadings.length > 0 ? (
+                                    filteredReadings.map((reading) => (
                                         <TableRow
                                             key={reading.id}
-                                            className="hover:bg-muted/5"
+                                            className="hover:bg-slate-50/60"
                                         >
                                             <TableCell className="font-medium">
                                                 <Badge
@@ -414,10 +450,6 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                     <span className="font-medium">
                                                         {reading.home?.customer
                                                             ?.name || 'Unknown'}
-                                                    </span>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {reading.home
-                                                            ?.address || '-'}
                                                     </span>
                                                 </div>
                                             </TableCell>
@@ -485,33 +517,6 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                         reading.previous_reading,
                                                     )
                                                 ).toFixed(2)}
-                                            </TableCell>
-                                            <TableCell>
-                                                {reading.is_initial ? (
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className="bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                                    >
-                                                        Initial
-                                                    </Badge>
-                                                ) : (
-                                                    <Badge
-                                                        variant={
-                                                            reading.bill
-                                                                ?.status ===
-                                                            'overdue'
-                                                                ? 'destructive'
-                                                                : 'outline'
-                                                        }
-                                                        className="capitalize"
-                                                    >
-                                                        {reading.bill
-                                                            ?.status ===
-                                                        'overdue'
-                                                            ? 'Overdue'
-                                                            : reading.status}
-                                                    </Badge>
-                                                )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-1">
@@ -585,8 +590,8 @@ export default function MeterReadings({ meterReadings, meters }) {
                                 ) : (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={8}
-                                            className="h-32 text-center text-muted-foreground"
+                                            colSpan={7}
+                                            className="h-32 text-center text-sm text-slate-500"
                                         >
                                             No meter readings found.
                                         </TableCell>
@@ -597,9 +602,9 @@ export default function MeterReadings({ meterReadings, meters }) {
                     </div>
 
                     {/* Pagination */}
-                    <div className="border-t p-4">
+                    <div className="border-t border-slate-200 p-4">
                         <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-slate-500">
                                 Showing{' '}
                                 <span className="font-medium">
                                     {meterReadings.from || 0}

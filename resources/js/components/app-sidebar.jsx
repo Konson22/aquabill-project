@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/sidebar';
 import { usePage } from '@inertiajs/react';
 import {
+    BarChart3,
     ClipboardList,
     CreditCard,
     FileText,
@@ -24,6 +25,11 @@ const adminNavItems = [
         title: 'Dashboard',
         href: route('dashboard'),
         icon: LayoutGrid,
+    },
+    {
+        title: 'General Report',
+        href: route('general-report'),
+        icon: BarChart3,
     },
     {
         title: 'Customers',

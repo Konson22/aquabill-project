@@ -398,6 +398,32 @@ class MeterReadingController extends Controller
         $totalConsumption = $kpiQuery->sum(\DB::raw('GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))'));
         $avgConsumption = $kpiQuery->avg(\DB::raw('GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))'));
 
+        $overdueQuery = MeterReading::with(['meter', 'home.customer'])
+            ->whereDate('reading_date', '<', now()->subMonth())
+            ->when($tariffId, function ($query) use ($tariffId) {
+                $query->whereHas('home', function ($q) use ($tariffId) {
+                    $q->where('tariff_id', $tariffId);
+                });
+            })
+            ->when($zoneId, function ($query) use ($zoneId) {
+                $query->whereHas('home', function ($q) use ($zoneId) {
+                    $q->where('zone_id', $zoneId);
+                });
+            })
+            ->orderBy('reading_date');
+
+        $overdueReadings = $overdueQuery
+            ->limit(10)
+            ->get()
+            ->map(function ($reading) {
+                return [
+                    'id' => $reading->id,
+                    'reading_date' => $reading->reading_date,
+                    'meter_number' => $reading->meter->meter_number ?? '—',
+                    'customer_name' => $reading->home->customer->name ?? 'Unknown',
+                ];
+            });
+
         return Inertia::render('meter-reading/report', [
             'monthlyConsumption' => $monthlyConsumption,
             'readingsByTariff' => $readingsByTariff,
@@ -407,6 +433,7 @@ class MeterReadingController extends Controller
             'totalReadings' => $totalReadings,
             'totalConsumption' => $totalConsumption,
             'avgConsumption' => $avgConsumption,
+            'overdueReadings' => $overdueReadings,
             'filters' => $request->only(['tariff_id', 'zone_id']),
             'tariffs' => \App\Models\Tariff::select('id', 'name')->get(),
             'zones' => \App\Models\Zone::select('id', 'name')->get(),

@@ -8,9 +8,11 @@ use App\Http\Controllers\Api\MeterController;
 use App\Http\Controllers\Api\HomesController;
 use App\Http\Controllers\Api\ReadingController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\ZonesController;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/zones', [ZonesController::class, 'index']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->name('api.')->group(function () {
@@ -19,8 +21,6 @@ Route::middleware('auth:sanctum')->name('api.')->group(function () {
         return $request->user();
     })->name('user');
 
-    Route::apiResource('meters', MeterController::class);
-    Route::apiResource('customers', CustomerController::class);
-    Route::apiResource('homes', HomesController::class);
+    Route::apiResource('customers', HomesController::class);
     Route::apiResource('readings', ReadingController::class)->only(['index', 'store']);
 });

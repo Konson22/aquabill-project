@@ -2,12 +2,11 @@ export const zones = [
   {
     "name": "ATLABARA",
     "areas": [
-      "HAI ATLABARA",
-      "HAI ATLABARA A",
-      "HAI ATLABARA A KATOR",
-      "HAI ATLABARA B",
-      "HAI ATLABARA C",
-      "HAI ATLABARA/KELI BALA"
+      "ATLABARA A",
+      "ATLABARA A KATOR",
+      "ATLABARA B",
+      "ATLABARA C",
+      "ATLABARA/KELI BALA"
     ]
   },
   {
@@ -93,7 +92,6 @@ export const zones = [
       "HAI NEGLI",
       "HAI THOURA",
       "HAI ZENDIA",
-      "JUBA TOWN"
     ]
   },
   {
@@ -113,7 +111,8 @@ export const zones = [
       "MINA",
       "MINISTRY OF AGRICULTURE FOOD",
        "HAI KONYONYO",
-      "JEBEL NYOKA"
+      "JEBEL NYOKA",
+       "JUBA TOWN"
     ]
   }
 ];
