@@ -14,7 +14,8 @@ export default function PrintInvoiceCard({ invoice }) {
             : '';
 
     const home = bill?.home;
-    const tariff = home?.tariff || {};
+    const customer = bill?.customer;
+    const tariff = home?.tariff || customer?.tariff || {};
     const meterReading = bill?.meter_reading;
     const grandTotal = Number(bill?.amount || bill?.total_amount || 0);
 
@@ -60,7 +61,7 @@ export default function PrintInvoiceCard({ invoice }) {
                     }
                 `}
             </style>
-                <div className="bill-print-root flex h-full w-full flex-col rounded-2xl border border-slate-300 bg-white p-4 text-xs leading-none text-slate-900 print:p-4 print:shadow-none">
+            <div className="bill-print-root flex h-full w-full flex-col rounded-2xl border border-slate-300 bg-white p-4 text-xs leading-none text-slate-900 print:p-4 print:shadow-none">
                 {/* Header Section */}
                 <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -70,7 +71,7 @@ export default function PrintInvoiceCard({ invoice }) {
                             className="h-10 w-10 object-contain"
                         />
                         <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            <p className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
                                 South Sudan Urban Water Corp.
                             </p>
                             <p className="text-sm font-semibold text-slate-900">
@@ -79,7 +80,7 @@ export default function PrintInvoiceCard({ invoice }) {
                         </div>
                     </div>
                     <div className="text-right">
-                        <span className="inline-block rounded bg-slate-100 px-2 py-1 text-[10px] font-bold tracking-wider uppercase text-slate-600 print:bg-slate-100">
+                        <span className="inline-block rounded bg-slate-100 px-2 py-1 text-[10px] font-bold tracking-wider text-slate-600 uppercase print:bg-slate-100">
                             {isWaterBill ? 'Water Bill' : 'Invoice'}
                         </span>
                         <div className="mt-1 text-sm font-bold text-slate-900">
@@ -92,38 +93,44 @@ export default function PrintInvoiceCard({ invoice }) {
                 <div className="grid flex-1 grid-cols-12 gap-4">
                     {/* Left Column: Customer & Location (Col-Span 5) */}
                     <div className="col-span-5 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-                        <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                        <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                             Customer Details
                         </p>
                         <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 print:bg-slate-50">
                             <p className="truncate text-sm font-bold text-slate-900">
                                 {bill?.customer?.name || '—'}
                             </p>
-                            <p className="mt-0.5 text-[10px] font-semibold uppercase text-slate-500">
+                            <p className="mt-0.5 text-[10px] font-semibold text-slate-500 uppercase">
                                 {tariff?.name || bill?.type || '—'}
                             </p>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-[10px]">
                             <div>
-                                <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                                     Zone
                                 </p>
                                 <p className="font-semibold text-slate-700">
-                                    {home?.zone?.name || '—'}
+                                    {home?.zone?.name ||
+                                        customer?.zone?.name ||
+                                        '—'}
                                 </p>
                             </div>
                             <div>
-                                <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                                     Area
                                 </p>
                                 <p className="font-semibold text-slate-700">
-                                    {home?.address || home?.area?.name || '—'}
+                                    {home?.address ||
+                                        home?.area?.name ||
+                                        customer?.address ||
+                                        customer?.area?.name ||
+                                        '—'}
                                 </p>
                             </div>
                         </div>
                         {isWaterBill && (
                             <div>
-                                <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                                     Meter No.
                                 </p>
                                 <p className="font-mono text-[10px] font-semibold text-slate-700">
@@ -136,7 +143,7 @@ export default function PrintInvoiceCard({ invoice }) {
                     {/* Billing + Charges (Col-Span 7) */}
                     <div className="col-span-7 space-y-4 rounded-xl border border-slate-200 bg-white p-3">
                         <div>
-                            <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                            <p className="mb-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                                 Billing Date
                             </p>
                             <p className="text-[10px] font-semibold text-slate-700">
@@ -151,7 +158,7 @@ export default function PrintInvoiceCard({ invoice }) {
                         {isWaterBill ? (
                             <>
                                 <div>
-                                    <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                    <p className="mb-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                                         Readings
                                     </p>
                                     <div className="grid grid-cols-2 gap-3 text-[10px]">
@@ -177,7 +184,7 @@ export default function PrintInvoiceCard({ invoice }) {
                                 </div>
                                 <div className="border-t border-slate-200 pt-2">
                                     <div className="flex items-baseline justify-between">
-                                        <span className="text-[9px] font-semibold uppercase text-slate-500">
+                                        <span className="text-[9px] font-semibold text-slate-500 uppercase">
                                             Consumption
                                         </span>
                                         <span className="text-sm font-bold text-slate-900 print:text-black">
@@ -188,7 +195,7 @@ export default function PrintInvoiceCard({ invoice }) {
                             </>
                         ) : (
                             <div>
-                                <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                                <p className="mb-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                                     Description
                                 </p>
                                 <p className="text-[10px] text-slate-600 italic">
@@ -198,7 +205,7 @@ export default function PrintInvoiceCard({ invoice }) {
                         )}
 
                         <div className="border-t border-slate-200 pt-2">
-                            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                            <p className="mb-1 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                                 Charges Breakdown
                             </p>
                             <div className="space-y-1">
@@ -282,7 +289,7 @@ export default function PrintInvoiceCard({ invoice }) {
                             </p>
                         </div>
                         <div className="text-right">
-                            <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400">
+                            <p className="mb-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                                 Total Payable
                             </p>
                             <p className="text-2xl leading-none font-black text-slate-900">
@@ -290,7 +297,7 @@ export default function PrintInvoiceCard({ invoice }) {
                             </p>
                         </div>
                     </div>
-                    <div className="mt-4 grid grid-cols-2 gap-6 text-[9px] uppercase tracking-wide text-slate-400">
+                    <div className="mt-4 grid grid-cols-2 gap-6 text-[9px] tracking-wide text-slate-400 uppercase">
                         <div>
                             <p className="mb-2 font-semibold">Signature</p>
                             <div className="h-10 border-b border-dashed border-slate-300"></div>

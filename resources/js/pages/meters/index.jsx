@@ -398,7 +398,7 @@ export default function Meters({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Serial Number</TableHead>
-                                <TableHead>Type</TableHead>
+                                <TableHead>Tariff</TableHead>
                                 <TableHead>Customer Name</TableHead>
                                 <TableHead>Home Address</TableHead>
                                 <TableHead>Status</TableHead>
@@ -418,16 +418,17 @@ export default function Meters({
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {meter.meter_type}
+                                            {meter.customer?.tariff?.name ??
+                                                '—'}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-col">
-                                                {meter.home?.customer?.name ||
+                                                {meter.customer?.name ||
                                                     '---------'}
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {meter.home?.address ||
+                                            {meter.customer?.address ||
                                                 '----------'}
                                         </TableCell>
                                         <TableCell>

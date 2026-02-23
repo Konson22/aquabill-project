@@ -24,12 +24,12 @@ export default function ResetPassword({ token, email }) {
                 {({ processing, errors }) => (
                     <div className="grid gap-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">Username</Label>
                             <Input
                                 id="email"
-                                type="email"
+                                type="text"
                                 name="email"
-                                autoComplete="email"
+                                autoComplete="username"
                                 value={email}
                                 className="mt-1 block w-full"
                                 readOnly

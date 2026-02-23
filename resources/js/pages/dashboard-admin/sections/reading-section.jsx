@@ -41,7 +41,7 @@ export default function ReadingSection({
 
     return (
         <div className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+            <div className="flex space-x-4">
                 <Card className="flex-1">
                     <CardHeader>
                         <CardTitle>Water Consumption Overview</CardTitle>
@@ -93,7 +93,108 @@ export default function ReadingSection({
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
+                <Card className="w-[40%]">
+                    <CardHeader>
+                        <CardTitle>Usage by Zone</CardTitle>
+                        <CardDescription>
+                            Distribution of consumption across zones
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={usageByZone}>
+                                <XAxis
+                                    dataKey="name"
+                                    stroke="#888888"
+                                    fontSize={10}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <Tooltip
+                                    formatter={(value) => `${value} m³`}
+                                    contentStyle={{
+                                        backgroundColor: '#fff',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e5e7eb',
+                                    }}
+                                />
+                                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                    {usageByZone.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={
+                                                COLORS[
+                                                    (index + 3) % COLORS.length
+                                                ]
+                                            }
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+               
+            </div>
 
+            <div className="flex space-x-2">
+                <Card className="flex-1">
+                    <CardHeader>
+                        <CardTitle>Payments Collected</CardTitle>
+                        <CardDescription>
+                            Total amount of payments collected per month for the
+                            current year
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pl-2">
+                        <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={paymentChartData}>
+                                <XAxis
+                                    dataKey="name"
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                />
+                                <YAxis
+                                    stroke="#888888"
+                                    fontSize={12}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    tickFormatter={(value) =>
+                                        `SSP ${formatCompactNumber(value)}`
+                                    }
+                                />
+                                <CartesianGrid
+                                    strokeDasharray="3 3"
+                                    vertical={false}
+                                    stroke="#e5e7eb"
+                                />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: '#fff',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e5e7eb',
+                                        boxShadow:
+                                            '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                                    }}
+                                />
+                                <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                                    {paymentChartData.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={
+                                                COLORS[
+                                                    (index + 4) % COLORS.length
+                                                ]
+                                            }
+                                        />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
                 <Card className="flex-1">
                     <CardHeader>
                         <CardTitle>Bills Generated</CardTitle>
@@ -148,149 +249,7 @@ export default function ReadingSection({
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>
-            </div>
-
-            <div className="flex space-x-2">
-                <Card className="flex-1">
-                    <CardHeader>
-                        <CardTitle>Payments Collected</CardTitle>
-                        <CardDescription>
-                            Total amount of payments collected per month for the
-                            current year
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pl-2">
-                        <ResponsiveContainer width="100%" height={200}>
-                            <BarChart data={paymentChartData}>
-                                <XAxis
-                                    dataKey="name"
-                                    stroke="#888888"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <YAxis
-                                    stroke="#888888"
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={(value) =>
-                                        `SSP ${formatCompactNumber(value)}`
-                                    }
-                                />
-                                <CartesianGrid
-                                    strokeDasharray="3 3"
-                                    vertical={false}
-                                    stroke="#e5e7eb"
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: '#fff',
-                                        borderRadius: '8px',
-                                        border: '1px solid #e5e7eb',
-                                        boxShadow:
-                                            '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                                    }}
-                                />
-                                <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                                    {paymentChartData.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={
-                                                COLORS[
-                                                    (index + 4) % COLORS.length
-                                                ]
-                                            }
-                                        />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Usage by Tariff</CardTitle>
-                        <CardDescription>
-                            Distribution of consumption across tariffs
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <BarChart data={usageByCategory}>
-                                <XAxis
-                                    dataKey="name"
-                                    stroke="#888888"
-                                    fontSize={10}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <Tooltip
-                                    formatter={(value) => `${value} m³`}
-                                    contentStyle={{
-                                        backgroundColor: '#fff',
-                                        borderRadius: '8px',
-                                        border: '1px solid #e5e7eb',
-                                    }}
-                                />
-                                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                    {usageByCategory.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={
-                                                COLORS[
-                                                    (index + 1) % COLORS.length
-                                                ]
-                                            }
-                                        />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Usage by Zone</CardTitle>
-                        <CardDescription>
-                            Distribution of consumption across zones
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <BarChart data={usageByZone}>
-                                <XAxis
-                                    dataKey="name"
-                                    stroke="#888888"
-                                    fontSize={10}
-                                    tickLine={false}
-                                    axisLine={false}
-                                />
-                                <Tooltip
-                                    formatter={(value) => `${value} m³`}
-                                    contentStyle={{
-                                        backgroundColor: '#fff',
-                                        borderRadius: '8px',
-                                        border: '1px solid #e5e7eb',
-                                    }}
-                                />
-                                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                    {usageByZone.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            fill={
-                                                COLORS[
-                                                    (index + 3) % COLORS.length
-                                                ]
-                                            }
-                                        />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
+               
             </div>
         </div>
     );

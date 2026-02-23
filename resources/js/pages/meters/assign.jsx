@@ -6,6 +6,11 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -18,50 +23,63 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, Search, Zap } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ArrowLeft, ChevronDown, Search, Zap } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
-export default function AssignMeter({ home }) {
+export default function AssignMeter({ customer }) {
     const [activeTab, setActiveTab] = useState('existing');
+    const [meterDropdownOpen, setMeterDropdownOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+    const [initialMeterList, setInitialMeterList] = useState([]);
     const [selectedMeter, setSelectedMeter] = useState(null);
     const [isSearching, setIsSearching] = useState(false);
 
+    const fetchMeters = useCallback(async (q) => {
+        setIsSearching(true);
+        try {
+            const url = route('meters.search', { q: q ?? '' });
+            const response = await fetch(url, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+            if (!response.ok) throw new Error('Search failed');
+            const data = await response.json();
+            return Array.isArray(data) ? data : [];
+        } catch (error) {
+            console.error('Search error:', error);
+            return [];
+        } finally {
+            setIsSearching(false);
+        }
+    }, []);
+
+    // When dropdown opens, load initial list for scrolling
     useEffect(() => {
-        const fetchMeters = async () => {
-            if (
-                searchTerm.length < 2 ||
-                (selectedMeter && searchTerm === selectedMeter.meter_number)
-            ) {
+        if (!meterDropdownOpen) return;
+        setSearchTerm('');
+        setSearchResults([]);
+        fetchMeters('').then(setInitialMeterList);
+    }, [meterDropdownOpen, fetchMeters]);
+
+    // When user types, search (debounced)
+    useEffect(() => {
+        if (!meterDropdownOpen) return;
+        const timeoutId = setTimeout(() => {
+            if (searchTerm.trim() === '') {
                 setSearchResults([]);
                 return;
             }
-            setIsSearching(true);
-            try {
-                const url = route('meters.search', { q: searchTerm });
-                const response = await fetch(url, {
-                    headers: {
-                        Accept: 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-
-                if (!response.ok) throw new Error('Search failed');
-
-                const data = await response.json();
-                setSearchResults(Array.isArray(data) ? data : []);
-            } catch (error) {
-                console.error('Search error:', error);
-                setSearchResults([]);
-            } finally {
-                setIsSearching(false);
-            }
-        };
-
-        const timeoutId = setTimeout(fetchMeters, 300);
+            fetchMeters(searchTerm.trim()).then(setSearchResults);
+        }, 300);
         return () => clearTimeout(timeoutId);
-    }, [searchTerm, selectedMeter]);
+    }, [searchTerm, meterDropdownOpen, fetchMeters]);
+
+    const meterList =
+        searchTerm.trim() !== '' ? searchResults : initialMeterList;
 
     // Form for creating new meter
     const {
@@ -74,7 +92,7 @@ export default function AssignMeter({ home }) {
         meter_number: '',
         meter_type: 'Analog',
         initial_reading: '',
-        home_id: home.id,
+        customer_id: customer.id,
         status: 'active',
     });
 
@@ -87,7 +105,7 @@ export default function AssignMeter({ home }) {
         errors: existingErrors,
     } = useForm({
         meter_id: '',
-        home_id: home.id,
+        customer_id: customer.id,
         initial_reading: '',
     });
 
@@ -111,41 +129,52 @@ export default function AssignMeter({ home }) {
         });
     };
 
+    const selectMeter = (meter) => {
+        setExistingData('meter_id', meter.id);
+        setSelectedMeter(meter);
+        setSearchTerm('');
+        setSearchResults([]);
+        setMeterDropdownOpen(false);
+    };
+
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Homes', href: route('homes.index') },
-                { title: home.address, href: route('customers.home', home.id) },
+                { title: 'Customers', href: route('customers.index') },
+                {
+                    title: customer.address || customer.name,
+                    href: route('customers.show', customer.id),
+                },
                 { title: 'Assign Meter', href: '#' },
             ]}
         >
-            <Head title={`Assign Meter - ${home.address}`} />
+            <Head
+                title={`Assign Meter - ${customer.address || customer.name}`}
+            />
 
             <div className="mx-auto max-w-2xl">
                 <div className="mb-6">
                     <Button variant="ghost" size="sm" asChild className="mb-2">
-                        <Link href={route('customers.home', home.id)}>
+                        <Link href={route('customers.show', customer.id)}>
                             <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Property
+                            Back to Customer
                         </Link>
                     </Button>
                     <h1 className="text-3xl font-bold tracking-tight">
                         Assign Meter
                     </h1>
                     <p className="text-muted-foreground">
-                        Property:{' '}
+                        Address:{' '}
                         <span className="font-medium text-foreground">
-                            {home.address}
+                            {customer.address || '—'}
                         </span>
-                        {home.customer && (
-                            <span>
-                                {' '}
-                                • Customer:{' '}
-                                <span className="font-medium text-foreground">
-                                    {home.customer.name}
-                                </span>
+                        <span>
+                            {' '}
+                            • Customer:{' '}
+                            <span className="font-medium text-foreground">
+                                {customer.name}
                             </span>
-                        )}
+                        </span>
                     </p>
                 </div>
 
@@ -177,75 +206,103 @@ export default function AssignMeter({ home }) {
                                     onSubmit={submitExisting}
                                     className="space-y-6"
                                 >
-                                    <div className="relative space-y-2">
-                                        <Label htmlFor="meter_search">
-                                            Search Meter Number
-                                        </Label>
-                                        <div className="relative">
-                                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                            <Input
-                                                id="meter_search"
-                                                className="pl-9"
-                                                placeholder="Type serial number (e.g. SSUWC...)"
-                                                value={searchTerm}
-                                                onChange={(e) =>
-                                                    setSearchTerm(
-                                                        e.target.value,
-                                                    )
+                                    <div className="space-y-2">
+                                        <Label>Select Meter</Label>
+                                        <DropdownMenu
+                                            open={meterDropdownOpen}
+                                            onOpenChange={setMeterDropdownOpen}
+                                        >
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    className="w-full justify-between font-normal"
+                                                >
+                                                    <span className="truncate">
+                                                        {selectedMeter
+                                                            ? `${selectedMeter.meter_number}${selectedMeter.meter_type ? ` (${selectedMeter.meter_type})` : ''}`
+                                                            : 'Select meter or search by number...'}
+                                                    </span>
+                                                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent
+                                                className="min-w-[var(--radix-dropdown-menu-trigger-width)] p-0"
+                                                align="start"
+                                                onCloseAutoFocus={(e) =>
+                                                    e.preventDefault()
                                                 }
-                                                autoComplete="off"
-                                            />
-                                            {isSearching && (
-                                                <div className="absolute top-1/2 right-3 -translate-y-1/2">
-                                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {searchResults.length > 0 && (
-                                            <div className="absolute z-10 mt-1 w-full rounded-md border bg-popover py-1 shadow-lg">
-                                                {searchResults.map((meter) => (
-                                                    <div
-                                                        key={meter.id}
-                                                        className="cursor-pointer px-4 py-2 text-sm hover:bg-accent hover:text-accent-foreground"
-                                                        onClick={() => {
-                                                            setExistingData(
-                                                                'meter_id',
-                                                                meter.id,
-                                                            );
-                                                            setSelectedMeter(
-                                                                meter,
-                                                            );
-                                                            setSearchTerm(
-                                                                meter.meter_number,
-                                                            );
-                                                            setSearchResults(
-                                                                [],
-                                                            );
-                                                        }}
-                                                    >
-                                                        <div className="font-medium">
-                                                            {meter.meter_number}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            Type:{' '}
-                                                            {meter.meter_type}
-                                                        </div>
+                                            >
+                                                <div
+                                                    className="border-b p-2"
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                >
+                                                    <div className="relative">
+                                                        <Search className="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                                        <Input
+                                                            placeholder="Search by meter number..."
+                                                            value={searchTerm}
+                                                            onChange={(e) =>
+                                                                setSearchTerm(
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className="h-9 pl-8"
+                                                            autoComplete="off"
+                                                        />
+                                                        {isSearching && (
+                                                            <div className="absolute top-1/2 right-2.5 -translate-y-1/2">
+                                                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {searchTerm.length >= 2 &&
-                                            !isSearching &&
-                                            searchResults.length === 0 && (
-                                                <div className="mt-1 text-sm text-yellow-600">
-                                                    No available (unassigned)
-                                                    meters found matching "
-                                                    {searchTerm}"
                                                 </div>
-                                            )}
-
+                                                <div className="max-h-60 overflow-auto p-1">
+                                                    {meterList.length === 0 &&
+                                                    !isSearching ? (
+                                                        <p className="py-4 text-center text-sm text-muted-foreground">
+                                                            {searchTerm.trim()
+                                                                ? `No unassigned meters matching "${searchTerm}"`
+                                                                : 'No unassigned meters available'}
+                                                        </p>
+                                                    ) : (
+                                                        meterList.map(
+                                                            (meter) => (
+                                                                <button
+                                                                    key={
+                                                                        meter.id
+                                                                    }
+                                                                    type="button"
+                                                                    className="flex w-full cursor-pointer flex-col items-start rounded-sm px-2 py-2 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                                                                    onClick={() =>
+                                                                        selectMeter(
+                                                                            meter,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <span className="font-medium">
+                                                                        {
+                                                                            meter.meter_number
+                                                                        }
+                                                                    </span>
+                                                                    {meter.meter_type && (
+                                                                        <span className="text-xs text-muted-foreground">
+                                                                            Type:{' '}
+                                                                            {
+                                                                                meter.meter_type
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            ),
+                                                        )
+                                                    )}
+                                                </div>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                         {existingErrors.meter_id && (
                                             <p className="text-sm font-medium text-destructive">
                                                 {existingErrors.meter_id}

@@ -21,8 +21,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Download, Droplets, Hash, TrendingUp } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { Download, Droplets, Filter, Hash, TrendingUp, X } from 'lucide-react';
 import {
     Bar,
     BarChart,
@@ -35,6 +35,22 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+
+const MONTH_OPTIONS = (() => {
+    const opts = [{ value: 'all', label: 'All months' }];
+    const now = new Date();
+    for (let i = 0; i < 24; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        opts.push({
+            value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+            label: d.toLocaleDateString('en-US', {
+                month: 'long',
+                year: 'numeric',
+            }),
+        });
+    }
+    return opts;
+})();
 
 export default function MeterReadingReport({
     monthlyConsumption,
@@ -150,10 +166,16 @@ export default function MeterReadingReport({
         return acc;
     }, {});
 
-    const monthlyConsumptionData = monthOrder.map((name, index) => ({
-        name,
-        total: monthlyConsumptionMap[index] || 0,
-    }));
+    const monthlyConsumptionData =
+        monthlyConsumption.length === 1
+            ? monthlyConsumption.map((item) => ({
+                  name: item.name ?? item.month ?? '—',
+                  total: Number(item.total || item.value || 0),
+              }))
+            : monthOrder.map((name, index) => ({
+                  name,
+                  total: monthlyConsumptionMap[index] || 0,
+              }));
 
     const tariffTotal = consumptionByTariff.reduce(
         (sum, item) => sum + Number(item.value || 0),
@@ -175,6 +197,17 @@ export default function MeterReadingReport({
         window.location.href = route('meter-readings.export', filters || {});
     };
 
+    const clearFilters = () => {
+        router.get(
+            route('meter-readings.report'),
+            {},
+            {
+                preserveState: false,
+                preserveScroll: true,
+            },
+        );
+    };
+
     const formatAge = (dateString) => {
         const date = new Date(dateString);
         if (Number.isNaN(date.getTime())) return '-';
@@ -192,30 +225,59 @@ export default function MeterReadingReport({
         return `${days} d`;
     };
 
+    const hasFilters =
+        filters.tariff_id ||
+        filters.zone_id ||
+        (filters.month && filters.month !== 'all');
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Meter Reading Reports" />
-            <div className="flex flex-col gap-8 p-4 md:p-0">
-                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
-                    <div className="">
-                            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-                                Meter Reading Reports
-                            </h1>
-                            <p className="text-sm text-slate-500">
-                                Water consumption analytics and reading stats
-                            </p>
+            <div className="flex flex-col gap-8 pb-8">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                            Meter Reading Reports
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Water consumption analytics and reading stats
+                        </p>
                     </div>
 
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/70 bg-slate-50/60 p-2.5">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/50 p-1.5 shadow-sm">
+                            <div className="flex items-center gap-2 px-2 py-1 text-sm font-bold text-muted-foreground">
+                                <Filter className="h-4 w-4" />
+                                FILTERS
+                            </div>
+                            <Select
+                                value={filters.month || 'all'}
+                                onValueChange={(val) =>
+                                    handleFilterChange('month', val)
+                                }
+                            >
+                                <SelectTrigger className="h-9 w-[160px] rounded-lg border-none bg-background shadow-none">
+                                    <SelectValue placeholder="Month" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {MONTH_OPTIONS.map((opt) => (
+                                        <SelectItem
+                                            key={opt.value}
+                                            value={opt.value}
+                                        >
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <Select
                                 value={filters.tariff_id?.toString() || 'all'}
                                 onValueChange={(val) =>
                                     handleFilterChange('tariff_id', val)
                                 }
                             >
-                                <SelectTrigger className="h-10 w-[170px] bg-white shadow-sm">
-                                    <SelectValue placeholder="All Tariffs" />
+                                <SelectTrigger className="h-9 w-[140px] rounded-lg border-none bg-background shadow-none">
+                                    <SelectValue placeholder="Tariff" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">
@@ -231,15 +293,14 @@ export default function MeterReadingReport({
                                     ))}
                                 </SelectContent>
                             </Select>
-
                             <Select
                                 value={filters.zone_id?.toString() || 'all'}
                                 onValueChange={(val) =>
                                     handleFilterChange('zone_id', val)
                                 }
                             >
-                                <SelectTrigger className="h-10 w-[170px] bg-white shadow-sm">
-                                    <SelectValue placeholder="All Zones" />
+                                <SelectTrigger className="h-9 w-[140px] rounded-lg border-none bg-background shadow-none">
+                                    <SelectValue placeholder="Zone" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">
@@ -255,108 +316,114 @@ export default function MeterReadingReport({
                                     ))}
                                 </SelectContent>
                             </Select>
-
                         </div>
-
-                        <div className="hidden h-6 w-px bg-slate-200 sm:block" />
-
+                        {hasFilters && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={clearFilters}
+                                className="h-9 gap-2 text-muted-foreground"
+                            >
+                                <X className="h-4 w-4" />
+                                Clear
+                            </Button>
+                        )}
                         <Button
-                            variant="outline"
+                            variant="default"
                             onClick={handleExport}
-                            className="h-10 gap-2 bg-white shadow-sm"
+                            className="h-11 gap-2 shadow-lg shadow-primary/20"
                         >
-                            <Download className="h-4 w-4 text-emerald-600" />
-                            Export CSV
+                            <Download className="h-4 w-4" />
+                            Export
                         </Button>
                     </div>
                 </div>
 
                 {/* KPI Cards */}
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <Card className="border-slate-800 bg-slate-900 text-white shadow-lg">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <Card className="overflow-hidden border border-border bg-card shadow-sm transition-colors hover:border-primary/20">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                            <CardTitle className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 Total Consumption
                             </CardTitle>
-                            <div className="rounded-full bg-slate-800 p-2">
-                                <Droplets className="h-4 w-4 text-sky-300" />
+                            <div className="rounded-xl bg-primary/10 p-2">
+                                <Droplets className="h-4 w-4 text-primary" />
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-semibold">
+                            <div className="text-2xl font-bold">
                                 {totalConsumption.toLocaleString()} m³
                             </div>
-                            <p className="text-xs text-slate-400">
-                                All time volume recorded
+                            <p className="text-xs text-muted-foreground">
+                                Volume recorded
                             </p>
                         </CardContent>
                     </Card>
-                    <Card className="border-slate-800 bg-slate-900 text-white shadow-lg">
+                    <Card className="overflow-hidden border border-border bg-card shadow-sm transition-colors hover:border-primary/20">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                            <CardTitle className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 Total Readings
                             </CardTitle>
-                            <div className="rounded-full bg-slate-800 p-2">
-                                <Hash className="h-4 w-4 text-emerald-300" />
+                            <div className="rounded-xl bg-emerald-500/10 p-2">
+                                <Hash className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-semibold">
+                            <div className="text-2xl font-bold">
                                 {totalReadings.toLocaleString()}
                             </div>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-muted-foreground">
                                 History across filters
                             </p>
                         </CardContent>
                     </Card>
-                    <Card className="border-slate-800 bg-slate-900 text-white shadow-lg">
+                    <Card className="overflow-hidden border border-border bg-card shadow-sm transition-colors hover:border-primary/20">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                            <CardTitle className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 Avg. Consumption
                             </CardTitle>
-                            <div className="rounded-full bg-slate-800 p-2">
-                                <TrendingUp className="h-4 w-4 text-amber-300" />
+                            <div className="rounded-xl bg-amber-500/10 p-2">
+                                <TrendingUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-semibold">
+                            <div className="text-2xl font-bold">
                                 {Number(avgConsumption).toFixed(2)} m³
                             </div>
-                            <p className="text-xs text-slate-400">
-                                Average per reading
+                            <p className="text-xs text-muted-foreground">
+                                Per reading
                             </p>
                         </CardContent>
                     </Card>
-                    <Card className="border-slate-800 bg-slate-900 text-white shadow-lg">
+                    <Card className="overflow-hidden border border-border bg-card shadow-sm transition-colors hover:border-primary/20">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+                            <CardTitle className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                 Active Tariffs
                             </CardTitle>
-                            <div className="rounded-full bg-slate-800 p-2">
-                                <Droplets className="h-4 w-4 text-purple-300" />
+                            <div className="rounded-xl bg-violet-500/10 p-2">
+                                <Droplets className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-semibold">
+                            <div className="text-2xl font-bold">
                                 {tariffs.length}
                             </div>
-                            <p className="text-xs text-slate-400">
-                                Tariff plans in system
+                            <p className="text-xs text-muted-foreground">
+                                Tariff plans
                             </p>
                         </CardContent>
                     </Card>
                 </div>
 
-               
                 {/* Charts */}
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-                    <Card className="border-slate-200/80 shadow-sm">
-                        <CardHeader className="border-b border-slate-100 pb-4">
+                    <Card className="overflow-hidden border border-border shadow-sm">
+                        <CardHeader className="border-b border-border bg-muted/30 pb-4">
                             <div>
-                                <CardTitle className="text-base font-semibold text-slate-900">
+                                <CardTitle className="text-base font-semibold">
                                     Monthly Consumption Trend
                                 </CardTitle>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-muted-foreground">
                                     Meter reading volumes by month
                                 </p>
                             </div>
@@ -373,7 +440,7 @@ export default function MeterReadingReport({
                                     />
                                     <XAxis
                                         dataKey="name"
-                                        stroke="#94a3b8"
+                                        stroke="hsl(var(--muted-foreground))"
                                         fontSize={12}
                                         tickLine={false}
                                         axisLine={false}
@@ -399,13 +466,13 @@ export default function MeterReadingReport({
                             </ChartContainer>
                         </CardContent>
                     </Card>
-                    <Card className="border-slate-200/80 shadow-sm">
-                        <CardHeader className="border-b border-slate-100 pb-4">
+                    <Card className="overflow-hidden border border-border shadow-sm">
+                        <CardHeader className="border-b border-border bg-muted/30 pb-4">
                             <div>
-                                <CardTitle className="text-base font-semibold text-slate-900">
+                                <CardTitle className="text-base font-semibold">
                                     Consumption by Zone
                                 </CardTitle>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-muted-foreground">
                                     Top zones by total usage
                                 </p>
                             </div>
@@ -422,7 +489,7 @@ export default function MeterReadingReport({
                                     />
                                     <XAxis
                                         dataKey="name"
-                                        stroke="#94a3b8"
+                                        stroke="hsl(var(--muted-foreground))"
                                         fontSize={12}
                                         tickLine={false}
                                         axisLine={false}
@@ -463,10 +530,10 @@ export default function MeterReadingReport({
 
                 {/* Detailed Breakdowns */}
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                    <Card className="border-slate-200/80 shadow-sm">
-                        <CardHeader className="border-b border-slate-100 pb-4">
+                    <Card className="overflow-hidden border border-border shadow-sm">
+                        <CardHeader className="border-b border-border bg-muted/30 pb-4">
                             <div>
-                                <CardTitle className="text-base font-semibold text-slate-900">
+                                <CardTitle className="text-base font-semibold">
                                     Consumption by Tariff
                                 </CardTitle>
                                 <p className="text-xs text-slate-500">
@@ -516,10 +583,10 @@ export default function MeterReadingReport({
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="border-slate-200/80 shadow-sm">
-                        <CardHeader className="border-b border-slate-100 pb-4">
+                    <Card className="overflow-hidden border border-border shadow-sm">
+                        <CardHeader className="border-b border-border bg-muted/30 pb-4">
                             <div>
-                                <CardTitle className="text-base font-semibold text-slate-900">
+                                <CardTitle className="text-base font-semibold">
                                     Tariff Split
                                 </CardTitle>
                                 <p className="text-xs text-slate-500">
@@ -570,21 +637,20 @@ export default function MeterReadingReport({
                             </ChartContainer>
                         </CardContent>
                     </Card>
-                  
                 </div>
 
-                <Card className="border-slate-200/80 shadow-sm">
-                    <CardHeader className="border-b border-slate-100 pb-4">
+                <Card className="overflow-hidden border border-border shadow-sm">
+                    <CardHeader className="border-b border-border bg-muted/30 pb-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-base font-semibold text-slate-900">
+                                <CardTitle className="text-base font-semibold">
                                     Overdue Readings
                                 </CardTitle>
                                 <p className="text-xs text-slate-500">
                                     Readings older than one month
                                 </p>
                             </div>
-                            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-400">
                                 {overdueReadings.length} overdue
                             </span>
                         </div>
@@ -595,16 +661,16 @@ export default function MeterReadingReport({
                                 <Table>
                                     <TableHeader className="bg-slate-50/80">
                                         <TableRow>
-                                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <TableHead className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
                                                 Customer
                                             </TableHead>
-                                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <TableHead className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
                                                 Meter
                                             </TableHead>
-                                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <TableHead className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
                                                 Reading Date
                                             </TableHead>
-                                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                            <TableHead className="text-right text-xs font-semibold tracking-wide text-slate-500 uppercase">
                                                 Age
                                             </TableHead>
                                         </TableRow>
@@ -613,9 +679,9 @@ export default function MeterReadingReport({
                                         {overdueReadings.map((reading) => (
                                             <TableRow
                                                 key={reading.id}
-                                                className="hover:bg-slate-50/60"
+                                                className="hover:bg-muted/50"
                                             >
-                                                <TableCell className="text-sm font-medium text-slate-700">
+                                                <TableCell className="text-sm font-medium">
                                                     {reading.customer_name}
                                                 </TableCell>
                                                 <TableCell className="text-sm text-slate-600">
@@ -637,13 +703,12 @@ export default function MeterReadingReport({
                                 </Table>
                             </div>
                         ) : (
-                            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 py-6 text-center text-sm text-slate-500">
+                            <div className="rounded-xl border border-dashed border-border bg-muted/30 py-6 text-center text-sm text-muted-foreground">
                                 No overdue readings found.
                             </div>
                         )}
                     </CardContent>
                 </Card>
-
             </div>
             <div className="py-8"></div>
         </AppLayout>

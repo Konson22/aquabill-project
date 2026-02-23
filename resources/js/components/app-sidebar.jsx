@@ -11,7 +11,6 @@ import {
     CreditCard,
     FileText,
     Gauge,
-    Home,
     LayoutGrid,
     MapPin,
     Receipt,
@@ -35,11 +34,6 @@ const adminNavItems = [
         title: 'Customers',
         href: route('customers.index'),
         icon: Users,
-    },
-    {
-        title: 'Homes',
-        href: route('homes.index'),
-        icon: Home,
     },
     {
         title: 'Billing',
@@ -105,9 +99,9 @@ const financeNavItems = [
         icon: CreditCard,
     },
     {
-        title: 'Homes',
-        href: route('homes.index'),
-        icon: Home,
+        title: 'Customers',
+        href: route('customers.index'),
+        icon: Users,
     },
     {
         title: 'Tariff',

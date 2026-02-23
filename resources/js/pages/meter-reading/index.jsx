@@ -11,6 +11,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Table,
     TableBody,
     TableCell,
@@ -31,20 +38,58 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     Camera,
+    Check,
     ChevronsUpDown,
     Eye,
     Pencil,
+    Plus,
+    Search,
     Trash2,
+    X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-export default function MeterReadings({ meterReadings, meters }) {
+const MONTH_OPTIONS = (() => {
+    const opts = [{ value: 'all', label: 'All months' }];
+    const now = new Date();
+    for (let i = 0; i < 24; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        opts.push({
+            value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+            label: d.toLocaleDateString('en-US', {
+                month: 'long',
+                year: 'numeric',
+            }),
+        });
+    }
+    return opts;
+})();
+
+export default function MeterReadings({ meterReadings, meters, filters = {} }) {
     const { auth } = usePage().props;
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [selectedMeter, setSelectedMeter] = useState(null);
     const [editingId, setEditingId] = useState(null);
     const [search, setSearch] = useState('');
+    const [month, setMonth] = useState(filters.month || 'all');
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.get(
+                route('meter-readings'),
+                {
+                    month: month && month !== 'all' ? month : undefined,
+                },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                },
+            );
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [month]);
 
     const { data, setData, post, put, processing, errors, reset } = useForm({
         meter_id: '',
@@ -87,16 +132,44 @@ export default function MeterReadings({ meterReadings, meters }) {
         }
     };
 
+    const handleAddOpen = () => {
+        setEditingId(null);
+        reset();
+        setSelectedMeter(null);
+        setQuery('');
+        setData({
+            meter_id: '',
+            reading_date: new Date().toISOString().split('T')[0],
+            current_reading: '',
+            status: 'pending',
+        });
+        setOpen(true);
+    };
+
     const handleEdit = (reading) => {
         setEditingId(reading.id);
+        const dateStr =
+            (reading.reading_date?.date || reading.reading_date || '')
+                .toString()
+                .split('T')[0] || new Date().toISOString().split('T')[0];
         setData({
             meter_id: reading.meter_id,
-            reading_date: reading.reading_date,
+            reading_date: dateStr,
             current_reading: reading.current_reading,
             status: reading.status,
         });
         setSelectedMeter(meters.find((m) => m.id === reading.meter_id) || null);
         setOpen(true);
+    };
+
+    const handleDialogClose = (isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen) {
+            setEditingId(null);
+            setSelectedMeter(null);
+            setQuery('');
+            reset();
+        }
     };
 
     const handleDelete = (id) => {
@@ -123,44 +196,56 @@ export default function MeterReadings({ meterReadings, meters }) {
     };
 
     const filteredReadings = meterReadings.data.filter((reading) => {
+        if (reading.is_initial !== true) return false;
         if (!search.trim()) return true;
         const term = search.toLowerCase();
         return (
             reading.meter?.meter_number?.toLowerCase().includes(term) ||
+            reading.customer?.name?.toLowerCase().includes(term) ||
             reading.home?.customer?.name?.toLowerCase().includes(term) ||
             reading.bill?.bill_number?.toLowerCase().includes(term)
         );
     });
 
+    const clearFilters = () => {
+        setMonth('all');
+        setSearch('');
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Meter Readings" />
-            <div className="flex flex-col gap-6 p-4 md:p-0">
-                <div className="flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-6 pb-8">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
                             Meter Readings
-                        </p>
-                        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-                            Reading History
                         </h1>
-                        <p className="text-sm text-slate-500">
+                        <p className="text-sm text-muted-foreground">
                             Track meter readings and consumption updates.
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                       
+                    <div className="flex flex-wrap items-center gap-3">
                         <Button
                             variant="outline"
                             asChild
-                            className="h-10 gap-2 border-slate-200 bg-white shadow-sm"
+                            className="h-11 gap-2"
                         >
                             <Link href={route('meter-readings.report')}>
                                 <Activity className="h-4 w-4" />
                                 Reports
                             </Link>
                         </Button>
-                        <Dialog open={open} onOpenChange={setOpen}>
+                        {auth.user?.department === 'admin' && (
+                            <Button
+                                onClick={handleAddOpen}
+                                className="h-11 gap-2"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Add Reading
+                            </Button>
+                        )}
+                        <Dialog open={open} onOpenChange={handleDialogClose}>
                             <DialogContent className="sm:max-w-[425px]">
                                 <DialogHeader>
                                     <DialogTitle>
@@ -309,15 +394,19 @@ export default function MeterReadings({ meterReadings, meters }) {
                                         )}
                                     </div>
                                     <div className="grid gap-2">
-                                        <Label>Previous Reading</Label>
+                                        <Label>Last Reading</Label>
                                         <Input
                                             value={
                                                 selectedMeter?.last_reading ??
                                                 '0'
                                             }
                                             disabled
-                                            className="bg-muted"
+                                            className="bg-muted font-mono"
                                         />
+                                        <p className="text-xs text-muted-foreground">
+                                            Current reading must be greater than
+                                            last reading.
+                                        </p>
                                     </div>
                                     <div className="grid gap-2">
                                         <Label htmlFor="current_reading">
@@ -328,6 +417,10 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                 id="reading"
                                                 type="number"
                                                 step="0.01"
+                                                min={
+                                                    selectedMeter?.last_reading ??
+                                                    0
+                                                }
                                                 value={data.current_reading}
                                                 onChange={(e) => {
                                                     const val = e.target.value;
@@ -336,10 +429,18 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                         val,
                                                     );
                                                 }}
-                                                placeholder="0.00"
+                                                placeholder={
+                                                    selectedMeter?.last_reading !=
+                                                    null
+                                                        ? String(
+                                                              selectedMeter.last_reading,
+                                                          )
+                                                        : '0.00'
+                                                }
                                             />
                                             {selectedMeter &&
-                                                (selectedMeter.last_reading ||
+                                                (selectedMeter.last_reading !=
+                                                    null ||
                                                     selectedMeter.last_reading ===
                                                         0) &&
                                                 parseFloat(
@@ -349,8 +450,9 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                         selectedMeter.last_reading,
                                                     ) && (
                                                     <span className="text-xs text-red-500">
-                                                        Must be greater than
-                                                        previous reading (
+                                                        Current reading must be
+                                                        greater than last
+                                                        reading (
                                                         {
                                                             selectedMeter.last_reading
                                                         }
@@ -391,40 +493,92 @@ export default function MeterReadings({ meterReadings, meters }) {
                     </div>
                 </div>
 
-                <Card className="flex flex-1 flex-col overflow-hidden border-slate-200/80 shadow-sm">
-                        <div className="w-full sm:w-[400px] sm:ml-auto">
-                            <Input
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                                placeholder="Search meter, customer, bill..."
-                                className="h-12 rounded-xl border-slate-200 bg-white shadow-sm placeholder:text-slate-400"
-                            />
+                <Card className="overflow-hidden border shadow-sm">
+                    <div className="flex flex-col gap-5 border-b bg-muted/30 px-4 py-4 lg:flex-row lg:items-end">
+                        <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 lg:max-w-2xl">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
+                                    Search
+                                </Label>
+                                <div className="relative">
+                                    <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground/50" />
+                                    <Input
+                                        value={search}
+                                        onChange={(e) =>
+                                            setSearch(e.target.value)
+                                        }
+                                        placeholder="Meter, customer, or bill number..."
+                                        className="h-9 pl-9"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
+                                    Month
+                                </Label>
+                                <Select value={month} onValueChange={setMonth}>
+                                    <SelectTrigger className="h-9">
+                                        <SelectValue placeholder="All months" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {MONTH_OPTIONS.map((opt) => (
+                                            <SelectItem
+                                                key={opt.value}
+                                                value={opt.value}
+                                            >
+                                                {opt.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
+                        {(search || (month && month !== 'all')) && (
+                            <Button
+                                variant="ghost"
+                                onClick={clearFilters}
+                                className="h-9 gap-2 text-muted-foreground"
+                            >
+                                <X className="h-4 w-4" />
+                                Clear
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-3">
+                        <h2 className="flex items-center gap-2 text-sm font-semibold">
+                            Reading History
+                            <Badge variant="outline" className="font-mono">
+                                {meterReadings.total ?? 0}
+                            </Badge>
+                        </h2>
+                    </div>
                     <div className="flex-1 overflow-auto">
                         <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-slate-50/80">
+                            <TableHeader className="sticky top-0 z-10 bg-muted/50">
                                 <TableRow>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                         Meter Serial
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Home / Customer
+                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        Customer name
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                         Date
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Bill
+
+                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        Prev
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Readings
+                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        Curr
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                         Usage
                                     </TableHead>
-                                    <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        Bill
+                                    </TableHead>
+                                    <TableHead className="text-right text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                         Actions
                                     </TableHead>
                                 </TableRow>
@@ -434,9 +588,9 @@ export default function MeterReadings({ meterReadings, meters }) {
                                     filteredReadings.map((reading) => (
                                         <TableRow
                                             key={reading.id}
-                                            className="hover:bg-slate-50/60"
+                                            className="hover:bg-muted/50"
                                         >
-                                            <TableCell className="font-medium">
+                                            <TableCell className="">
                                                 <Badge
                                                     variant="secondary"
                                                     className="font-mono"
@@ -446,12 +600,8 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">
-                                                        {reading.home?.customer
-                                                            ?.name || 'Unknown'}
-                                                    </span>
-                                                </div>
+                                                {reading.customer?.name ||
+                                                    'Unknown'}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2">
@@ -462,6 +612,23 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                         <Camera className="h-3.5 w-3.5 text-muted-foreground" />
                                                     )}
                                                 </div>
+                                            </TableCell>
+
+                                            <TableCell className="text-muted-foreground">
+                                                {reading.previous_reading}
+                                            </TableCell>
+                                            <TableCell className="font-bold">
+                                                {reading.current_reading}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {(
+                                                    parseFloat(
+                                                        reading.current_reading,
+                                                    ) -
+                                                    parseFloat(
+                                                        reading.previous_reading,
+                                                    )
+                                                ).toFixed(2)}
                                             </TableCell>
                                             <TableCell>
                                                 {reading.bill ? (
@@ -476,47 +643,12 @@ export default function MeterReadings({ meterReadings, meters }) {
                                                             reading.bill
                                                                 .bill_number
                                                         }
-                                                        <Eye className="h-3 w-3" />
                                                     </Link>
                                                 ) : (
                                                     <span className="text-muted-foreground">
                                                         -
                                                     </span>
                                                 )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col gap-1 text-xs">
-                                                    <div className="flex w-24 justify-between">
-                                                        <span className="text-muted-foreground">
-                                                            Prev:
-                                                        </span>
-                                                        <span>
-                                                            {
-                                                                reading.previous_reading
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex w-24 justify-between">
-                                                        <span className="font-medium">
-                                                            Curr:
-                                                        </span>
-                                                        <span className="font-bold">
-                                                            {
-                                                                reading.current_reading
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="font-medium">
-                                                {(
-                                                    parseFloat(
-                                                        reading.current_reading,
-                                                    ) -
-                                                    parseFloat(
-                                                        reading.previous_reading,
-                                                    )
-                                                ).toFixed(2)}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex justify-end gap-1">
@@ -590,7 +722,7 @@ export default function MeterReadings({ meterReadings, meters }) {
                                 ) : (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={7}
+                                            colSpan={8}
                                             className="h-32 text-center text-sm text-slate-500"
                                         >
                                             No meter readings found.
@@ -602,9 +734,9 @@ export default function MeterReadings({ meterReadings, meters }) {
                     </div>
 
                     {/* Pagination */}
-                    <div className="border-t border-slate-200 p-4">
+                    <div className="border-t bg-muted/5 p-4">
                         <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-sm text-slate-500">
+                            <div className="text-xs font-medium text-muted-foreground">
                                 Showing{' '}
                                 <span className="font-medium">
                                     {meterReadings.from || 0}

@@ -4,57 +4,54 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Models\Bill;
+use App\Models\Invoice;
+use App\Models\Payment;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = \App\Models\Payment::with(['payable.customer', 'payable.home.meter', 'receiver'])
-            ->latest('payment_date');
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
+        $paymentQuery = Payment::with([
+            'payable.customer',
+            'payable.customer.zone',
+            'payable.customer.area',
+            'payable.customer.meter',
+            'receivedBy',
+        ])
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $search = $request->search;
                 $q->where('reference_number', 'like', "%{$search}%")
-                    ->orWhereHasMorph('payable', [\App\Models\Bill::class, \App\Models\Invoice::class], function ($q, $type) use ($search) {
-                        $q->whereHas('customer', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        })->orWhereHas('home', function ($q) use ($search) {
-                            $q->where('address', 'like', "%{$search}%");
-                        });
-
-                        if ($type === \App\Models\Bill::class) {
-                            $q->orWhereHas('meterReading.meter', function ($q) use ($search) {
-                                $q->where('meter_number', 'like', "%{$search}%");
-                            });
-                        }
+                    ->orWhereHasMorph('payable', [Bill::class], function ($query, $type) use ($search) {
+                        $query->whereHas('customer', fn($c) => $c->where('name', 'like', "%{$search}%")->orWhere('address', 'like', "%{$search}%"))
+                            ->orWhereHas('meterReading.meter', fn($m) => $m->where('meter_number', 'like', "%{$search}%"));
+                    })
+                    ->orWhereHasMorph('payable', [Invoice::class], function ($query, $type) use ($search) {
+                        $query->whereHas('customer', fn($c) => $c->where('name', 'like', "%{$search}%")->orWhere('address', 'like', "%{$search}%"));
                     });
-            });
-        }
+            })
+            ->when($request->filled('area_id') && $request->area_id !== 'all', function ($q) use ($request) {
+                $q->whereHasMorph('payable', [Bill::class, Invoice::class], function ($query) use ($request) {
+                    $query->whereHas('customer', fn($c) => $c->where('area_id', $request->area_id));
+                });
+            })
+            ->when($request->filled('zone_id') && $request->zone_id !== 'all', function ($q) use ($request) {
+                $q->whereHasMorph('payable', [Bill::class, Invoice::class], function ($query) use ($request) {
+                    $query->whereHas('customer', fn($c) => $c->where('zone_id', $request->zone_id));
+                });
+            })
+            ->when($request->filled('month'), fn($q) => $q->whereRaw("DATE_FORMAT(payment_date, '%Y-%m') = ?", [$request->month]))
+            ->orderByDesc('payment_date');
 
-        if ($request->filled('area_id') && $request->area_id !== 'all') {
-            $query->whereHasMorph('payable', [\App\Models\Bill::class, \App\Models\Invoice::class], function ($q) use ($request) {
-                $q->whereHas('home', fn($h) => $h->where('area_id', $request->area_id));
-            });
-        }
-
-        if ($request->filled('zone_id') && $request->zone_id !== 'all') {
-            $query->whereHasMorph('payable', [\App\Models\Bill::class, \App\Models\Invoice::class], function ($q) use ($request) {
-                $q->whereHas('home', fn($h) => $h->where('zone_id', $request->zone_id));
-            });
-        }
-
-        if ($request->filled('month')) {
-            $query->where('payment_date', 'like', "{$request->month}%");
-        }
-
-        $payments = $query->paginate(10)->withQueryString();
+        $payments = $paymentQuery->paginate(10);
 
         $stats = [
-            'total_payments' => \App\Models\Payment::count(),
-            'paid' => \App\Models\Bill::where('status', 'fully paid')->count() + \App\Models\Invoice::where('status', 'paid')->count(),
-            'unpaid' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])->count() + \App\Models\Invoice::where('status', 'pending')->count(),
-            'overdue' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])->where('due_date', '<', now())->count() + \App\Models\Invoice::where('status', 'overdue')->count(),
+            'total_payments' => Payment::count(),
+            'paid' => Bill::where('status', 'fully paid')->count() + Invoice::where('status', 'paid')->count(),
+            'unpaid' => Bill::whereIn('status', ['pending', 'partial paid'])->count() + Invoice::whereIn('status', ['pending'])->count(),
+            'overdue' => Bill::whereIn('status', ['pending', 'partial paid'])->where('due_date', '<', now())->count(),
         ];
 
         return Inertia::render('payments/index', [
@@ -70,46 +67,41 @@ class PaymentController extends Controller
     {
         $filename = 'payments-export-' . date('Y-m-d') . '.csv';
 
-        $query = \App\Models\Payment::with(['payable.customer', 'payable.home.tariff', 'receiver'])
-            ->latest('payment_date');
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
+        $payments = Payment::with(['payable.customer', 'payable.customer.tariff', 'receivedBy'])
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $search = $request->search;
                 $q->where('reference_number', 'like', "%{$search}%")
-                    ->orWhereHasMorph('payable', [\App\Models\Bill::class, \App\Models\Invoice::class], function ($q, $type) use ($search) {
-                        $q->whereHas('customer', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        })->orWhereHas('home', function ($q) use ($search) {
-                            $q->where('address', 'like', "%{$search}%");
-                        });
-
-                        if ($type === \App\Models\Bill::class) {
-                            $q->orWhereHas('meterReading.meter', function ($q) use ($search) {
-                                $q->where('meter_number', 'like', "%{$search}%");
-                            });
-                        }
+                    ->orWhereHasMorph('payable', [Bill::class, Invoice::class], function ($query) use ($search) {
+                        $query->whereHas('customer', fn($c) => $c->where('name', 'like', "%{$search}%")->orWhere('address', 'like', "%{$search}%"));
                     });
-            });
-        }
+            })
+            ->when($request->filled('area_id') && $request->area_id !== 'all', function ($q) use ($request) {
+                $q->whereHasMorph('payable', [Bill::class, Invoice::class], function ($query) use ($request) {
+                    $query->whereHas('customer', fn($c) => $c->where('area_id', $request->area_id));
+                });
+            })
+            ->when($request->filled('zone_id') && $request->zone_id !== 'all', function ($q) use ($request) {
+                $q->whereHasMorph('payable', [Bill::class, Invoice::class], function ($query) use ($request) {
+                    $query->whereHas('customer', fn($c) => $c->where('zone_id', $request->zone_id));
+                });
+            })
+            ->when($request->filled('month'), fn($q) => $q->whereRaw("DATE_FORMAT(payment_date, '%Y-%m') = ?", [$request->month]))
+            ->orderByDesc('payment_date')->get();
 
-        if ($request->filled('area_id') && $request->area_id !== 'all') {
-            $query->whereHasMorph('payable', [\App\Models\Bill::class, \App\Models\Invoice::class], function ($q) use ($request) {
-                $q->whereHas('home', fn($h) => $h->where('area_id', $request->area_id));
-            });
+        $rows = collect();
+        foreach ($payments as $payment) {
+            $payable = $payment->payable;
+            $type = $payable instanceof Bill ? 'Bill' : 'Invoice';
+            $payableId = $payable instanceof Bill ? $payable->bill_number : $payable->invoice_number;
+            
+            $rows->push((object)[
+                'type' => $type,
+                'payable_id' => $payableId ?? 'N/A',
+                'tariff' => $payable->customer?->tariff?->name ?? 'N/A',
+                'customer' => $payable->customer?->name ?? 'N/A',
+                'payment' => $payment,
+            ]);
         }
-
-        if ($request->filled('zone_id') && $request->zone_id !== 'all') {
-            $query->whereHasMorph('payable', [\App\Models\Bill::class, \App\Models\Invoice::class], function ($q) use ($request) {
-                $q->whereHas('home', fn($h) => $h->where('zone_id', $request->zone_id));
-            });
-        }
-
-        if ($request->filled('month')) {
-            $query->where('payment_date', 'like', "{$request->month}%");
-        }
-
-        $payments = $query->get();
 
         $headers = [
             "Content-type" => "text/csv",
@@ -120,61 +112,47 @@ class PaymentController extends Controller
         ];
 
         $columns = ['ID', 'Reference', 'Amount', 'Date', 'Type', 'Tariff', 'Payable ID', 'Customer', 'Received By'];
+        $totalBills = 0;
+        $totalInvoices = 0;
+        $tariffTotals = [];
 
-        $callback = function () use ($payments, $columns) {
+        $callback = function () use ($rows, $columns, &$totalBills, &$totalInvoices, &$tariffTotals) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
-            $totalBills = 0;
-            $totalInvoices = 0;
-            $tariffTotals = [];
-
-            foreach ($payments as $payment) {
-                $type = $payment->payable_type === 'App\Models\Bill' ? 'Bill' : ($payment->payable_type === 'App\Models\Invoice' ? 'Invoice' : 'Other');
-                $payableId = $payment->payable ? ($type === 'Bill' ? $payment->payable->bill_number : $payment->payable->invoice_number) : 'N/A';
-                $tariffName = $payment->payable && $payment->payable->home && $payment->payable->home->tariff ? $payment->payable->home->tariff->name : 'N/A';
-
-                // Accumulate totals
-                if ($type === 'Bill') {
-                    $totalBills += $payment->amount;
-                } elseif ($type === 'Invoice') {
-                    $totalInvoices += $payment->amount;
+            foreach ($rows as $row) {
+                $p = $row->payment;
+                if ($row->type === 'Bill') {
+                    $totalBills += (float) $p->amount;
+                } else {
+                    $totalInvoices += (float) $p->amount;
                 }
-
-                if ($tariffName !== 'N/A') {
-                    if (!isset($tariffTotals[$tariffName])) {
-                        $tariffTotals[$tariffName] = 0;
-                    }
-                    $tariffTotals[$tariffName] += $payment->amount;
+                if ($row->tariff !== 'N/A') {
+                    $tariffTotals[$row->tariff] = ($tariffTotals[$row->tariff] ?? 0) + (float) $p->amount;
                 }
-
-                $row = [
-                    $payment->id,
-                    $payment->reference_number,
-                    $payment->amount,
-                    $payment->payment_date,
-                    $type,
-                    $tariffName,
-                    $payableId,
-                    $payment->payable && $payment->payable->customer ? $payment->payable->customer->name : 'N/A',
-                    $payment->receiver ? $payment->receiver->name : 'System',
-                ];
-
-                fputcsv($file, $row);
+                fputcsv($file, [
+                    $p->id,
+                    $p->reference_number ?? '',
+                    $p->amount ?? 0,
+                    $p->payment_date?->format('Y-m-d') ?? '',
+                    $row->type,
+                    $row->tariff,
+                    $row->payable_id,
+                    $row->customer,
+                    $p->receivedBy?->name ?? 'System',
+                ]);
             }
 
-            // Summary Section
-            fputcsv($file, []); // Empty row
+            fputcsv($file, []);
             fputcsv($file, ['SUMMARY REPORT']);
             fputcsv($file, ['Total Bill Payments', $totalBills]);
             fputcsv($file, ['Total Invoice Payments', $totalInvoices]);
             fputcsv($file, ['Total Payments', $totalBills + $totalInvoices]);
-            fputcsv($file, []); // Empty row
+            fputcsv($file, []);
             fputcsv($file, ['TARIFF UPDATE']);
             foreach ($tariffTotals as $tariff => $amount) {
                 fputcsv($file, [$tariff, $amount]);
             }
-
             fclose($file);
         };
 
@@ -183,43 +161,36 @@ class PaymentController extends Controller
 
     public function report(Request $request)
     {
-        // 1. Bills KPIs
-        $billsKpisRaw = \App\Models\Bill::query()
+        // Bills KPIs: totalBilled = sum of bill amount, totalCollected = sum of payments, totalUnpaid = totalBilled - totalCollected
+        $billsKpisRaw = Bill::query()
             ->selectRaw('COUNT(*) as total_count')
             ->selectRaw("SUM(CASE WHEN status IN ('fully paid', 'forwarded', 'partial paid', 'balance forwarded') THEN 1 ELSE 0 END) as paid_count")
             ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as unpaid_count")
-            // Total Billed is the sum of all fresh charges (excluding carried forward balances)
-            ->selectRaw('SUM(total_amount - previous_balance) as total_billed')
-            // Outstanding should only include active unpaid balances that haven't been moved to a newer bill
-            ->selectRaw("SUM(CASE WHEN status NOT IN ('forwarded', 'balance_forwarded') THEN current_balance ELSE 0 END) as total_unpaid")
+            ->selectRaw('COALESCE(SUM(amount), 0) as total_billed')
             ->first();
 
-        // Calculate total payments for bills
-        $billPayments = \App\Models\Payment::where('payable_type', 'App\Models\Bill')->sum('amount');
+        $totalBilledBills = (float) $billsKpisRaw->total_billed;
+        $billPaymentsTotal = (float) Payment::where('payable_type', Bill::class)->sum('amount');
+        $billsTotalUnpaid = $totalBilledBills - $billPaymentsTotal;
 
-        // 2. Invoices KPIs
-        $invoicesKpisRaw = \App\Models\Invoice::query()
+        // Invoices KPIs
+        $invoicesKpisRaw = Invoice::query()
             ->where('status', '!=', 'cancelled')
             ->selectRaw('COUNT(*) as total_count')
             ->selectRaw("SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_count")
             ->selectRaw("SUM(CASE WHEN status NOT IN ('paid', 'cancelled') THEN 1 ELSE 0 END) as unpaid_count")
-            ->selectRaw('SUM(amount) as total_billed')
+            ->selectRaw('COALESCE(SUM(amount), 0) as total_billed')
             ->first();
 
-        // Calculate total payments for invoices (strictly active ones)
-        $invoicePayments = \App\Models\Payment::where('payable_type', 'App\Models\Invoice')
-            ->whereHasMorph('payable', [\App\Models\Invoice::class], function($q) {
-                $q->where('status', '!=', 'cancelled');
-            })
-            ->sum('amount');
+        $invoicePaymentsTotal = (float) Payment::where('payable_type', Invoice::class)->sum('amount');
 
         $billKpis = [
             'totalCount' => (int) $billsKpisRaw->total_count,
             'paidCount' => (int) $billsKpisRaw->paid_count,
             'unpaidCount' => (int) $billsKpisRaw->unpaid_count,
-            'totalBilled' => (float) $billsKpisRaw->total_billed,
-            'totalCollected' => (float) $billPayments,
-            'totalUnpaid' => (float) $billsKpisRaw->total_unpaid,
+            'totalBilled' => $totalBilledBills,
+            'totalCollected' => $billPaymentsTotal,
+            'totalUnpaid' => $billsTotalUnpaid,
         ];
 
         $invoiceKpis = [
@@ -227,81 +198,129 @@ class PaymentController extends Controller
             'paidCount' => (int) $invoicesKpisRaw->paid_count,
             'unpaidCount' => (int) $invoicesKpisRaw->unpaid_count,
             'totalBilled' => (float) $invoicesKpisRaw->total_billed,
-            'totalCollected' => (float) $invoicePayments,
-            'totalUnpaid' => (float) $invoicesKpisRaw->total_billed - (float) $invoicePayments,
+            'totalCollected' => $invoicePaymentsTotal,
+            'totalUnpaid' => (float) ($invoicesKpisRaw->total_billed ?? 0) - $invoicePaymentsTotal,
         ];
 
-        // 3. Revenue by Type
-        $revenueByType = \App\Models\Payment::selectRaw('payable_type, SUM(amount) as total')
-            ->groupBy('payable_type')
+        $revenueByType = collect([
+            ['name' => 'Bill', 'value' => $billPaymentsTotal],
+            ['name' => 'Invoice', 'value' => $invoicePaymentsTotal],
+        ]);
+
+        // Tariff revenue: single grouped query per metric (replaces N+1 per tariff)
+        $tariffBilled = Bill::query()
+            ->join('customers', 'bills.customer_id', '=', 'customers.id')
+            ->selectRaw('COALESCE(customers.tariff_id, -1) as tariff_id')
+            ->selectRaw('COALESCE(SUM(bills.amount), 0) as total_billed')
+            ->groupBy('customers.tariff_id')
             ->get()
-            ->map(function ($item) {
-                return [
-                    'name' => class_basename($item->payable_type),
-                    'value' => (float) $item->total,
-                ];
-            });
+            ->keyBy(fn ($r) => $r->tariff_id === -1 ? 'null' : (string) $r->tariff_id);
 
-        // 4. Water Bill Tariff Performance (Excluding Invoices)
-        $tariffRevenue = \App\Models\Tariff::all()->map(function ($tariff) {
-            // Stats from Bills only
-            $billStats = \App\Models\Bill::whereHas('home', fn($q) => $q->where('tariff_id', $tariff->id))
-                ->selectRaw('SUM(total_amount - previous_balance) as billed')
-                ->selectRaw("SUM(CASE WHEN status NOT IN ('forwarded', 'balance_forwarded') THEN current_balance ELSE 0 END) as unpaid")
-                ->first();
+        $tariffCollected = DB::table('payments')
+            ->join('bills', fn ($j) => $j->on('payments.payable_id', '=', 'bills.id')->where('payments.payable_type', '=', Bill::class))
+            ->join('customers', 'bills.customer_id', '=', 'customers.id')
+            ->selectRaw('COALESCE(customers.tariff_id, -1) as tariff_id')
+            ->selectRaw('COALESCE(SUM(payments.amount), 0) as collected')
+            ->groupBy('customers.tariff_id')
+            ->get()
+            ->keyBy(fn ($r) => $r->tariff_id === -1 ? 'null' : (string) $r->tariff_id);
 
-            // Total Collected for this tariff (from Bills only)
-            $collected = \App\Models\Payment::where('payable_type', \App\Models\Bill::class)
-                ->whereHasMorph('payable', [\App\Models\Bill::class], function ($query) use ($tariff) {
-                    $query->whereHas('home', fn($h) => $h->where('tariff_id', $tariff->id));
-                })->sum('amount');
-
+        $tariffs = \App\Models\Tariff::all();
+        $tariffRevenue = $tariffs->map(function ($tariff) use ($tariffBilled, $tariffCollected) {
+            $key = (string) $tariff->id;
+            $totalBilled = (float) (($tariffBilled[$key] ?? null)?->total_billed ?? 0);
+            $collected = (float) (($tariffCollected[$key] ?? null)?->collected ?? 0);
             return [
+                'id' => $tariff->id,
                 'name' => $tariff->name,
-                'total_billed' => (float) ($billStats->billed ?? 0),
-                'collected' => (float) $collected,
-                'outstanding' => (float) ($billStats->unpaid ?? 0),
+                'total_billed' => round($totalBilled, 2),
+                'collected' => round($collected, 2),
+                'outstanding' => (float) max(0, round($totalBilled - $collected, 2)),
             ];
         });
 
-        // 5. Zone Performance
-        $zoneRevenue = \App\Models\Zone::all()->map(function ($zone) {
-            // Stats from Bills only
-            $billStats = \App\Models\Bill::whereHas('home', fn($q) => $q->where('zone_id', $zone->id))
-                ->selectRaw('SUM(total_amount - previous_balance) as billed')
-                ->selectRaw("SUM(CASE WHEN status NOT IN ('forwarded', 'balance_forwarded') THEN current_balance ELSE 0 END) as unpaid")
-                ->first();
+        $nullBilled = $tariffBilled['null'] ?? null;
+        $nullCollected = $tariffCollected['null'] ?? null;
+        if ($nullBilled && (float) $nullBilled->total_billed > 0) {
+            $tb = (float) $nullBilled->total_billed;
+            $tc = (float) ($nullCollected->collected ?? 0);
+            $tariffRevenue = $tariffRevenue->push([
+                'id' => 0,
+                'name' => 'Unassigned',
+                'total_billed' => round($tb, 2),
+                'collected' => round($tc, 2),
+                'outstanding' => (float) max(0, round($tb - $tc, 2)),
+            ]);
+        }
 
-            // Total Collected for this zone (from Bills only)
-            $collected = \App\Models\Payment::where('payable_type', \App\Models\Bill::class)
-                ->whereHasMorph('payable', [\App\Models\Bill::class], function ($query) use ($zone) {
-                    $query->whereHas('home', fn($h) => $h->where('zone_id', $zone->id));
-                })->sum('amount');
+        // Zone revenue: 2 grouped queries (replaces N+1 per zone + Bill balance accessor)
+        $zoneBilled = DB::table('zones')
+            ->leftJoin('customers', 'zones.id', '=', 'customers.zone_id')
+            ->leftJoin('bills', 'customers.id', '=', 'bills.customer_id')
+            ->select('zones.id', 'zones.name')
+            ->selectRaw('COALESCE(SUM(bills.amount + bills.previous_balance), 0) as total_billed')
+            ->groupBy('zones.id', 'zones.name')
+            ->get()
+            ->keyBy('id');
 
+        $zoneCollected = DB::table('payments')
+            ->join('bills', fn ($j) => $j->on('payments.payable_id', '=', 'bills.id')->where('payments.payable_type', '=', Bill::class))
+            ->join('customers', 'bills.customer_id', '=', 'customers.id')
+            ->select('customers.zone_id as id')
+            ->selectRaw('COALESCE(SUM(payments.amount), 0) as collected')
+            ->groupBy('customers.zone_id')
+            ->get()
+            ->keyBy('id');
+
+        $zoneRevenue = $zoneBilled->map(function ($row) use ($zoneCollected) {
+            $totalBilled = (float) $row->total_billed;
+            $collected = (float) (($zoneCollected[$row->id] ?? null)?->collected ?? 0);
             return [
-                'name' => $zone->name,
-                'total_billed' => (float) ($billStats->billed ?? 0),
-                'collected' => (float) $collected,
-                'outstanding' => (float) ($billStats->unpaid ?? 0),
+                'name' => $row->name,
+                'total_billed' => $totalBilled,
+                'collected' => $collected,
+                'outstanding' => (float) max(0, $totalBilled - $collected),
             ];
-        });
+        })->values();
 
-        // 5. Monthly Performance Trend (Last 12 months - Paid vs Unpaid)
-        $monthlyTrend = \App\Models\Bill::query()
-            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month")
-            ->selectRaw('SUM(total_amount - current_balance) as paid')
-            ->selectRaw('SUM(current_balance) as unpaid')
-            ->where('created_at', '>=', now()->subMonths(11)->startOfMonth())
+        // Monthly trend: 3 queries total instead of 3 per month
+        $monthlyPayments = Payment::query()
+            ->selectRaw("DATE_FORMAT(payment_date, '%Y-%m') as month")
+            ->selectRaw('SUM(amount) as paid')
+            ->where('payment_date', '>=', now()->subMonths(11)->startOfMonth())
             ->groupBy('month')
             ->orderBy('month')
             ->get()
-            ->map(function ($item) {
-                 return [
-                     'month' => $item->month,
-                     'paid' => (float) $item->paid,
-                     'unpaid' => (float) $item->unpaid,
-                 ];
-            });
+            ->keyBy('month');
+
+        $monthlyBilledBills = Bill::query()
+            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month")
+            ->selectRaw('SUM(amount + previous_balance) as billed')
+            ->where('created_at', '>=', now()->subMonths(11)->startOfMonth())
+            ->groupBy('month')
+            ->get()
+            ->keyBy('month');
+
+        $monthlyBilledInvoices = Invoice::query()
+            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month")
+            ->selectRaw('COALESCE(SUM(amount), 0) as billed')
+            ->where('created_at', '>=', now()->subMonths(11)->startOfMonth())
+            ->groupBy('month')
+            ->get()
+            ->keyBy('month');
+
+        $months = collect();
+        for ($i = 0; $i < 12; $i++) {
+            $m = now()->subMonths(11 - $i)->format('Y-m');
+            $billed = (float) (($monthlyBilledBills[$m] ?? null)?->billed ?? 0) + (float) (($monthlyBilledInvoices[$m] ?? null)?->billed ?? 0);
+            $paid = (float) (($monthlyPayments[$m] ?? null)?->paid ?? 0);
+            $months->push([
+                'month' => $m,
+                'paid' => $paid,
+                'unpaid' => (float) max(0, $billed - $paid),
+            ]);
+        }
+        $monthlyTrend = $months;
 
         return Inertia::render('payments/report', [
             'revenueByType' => $revenueByType,
@@ -310,23 +329,23 @@ class PaymentController extends Controller
             'monthlyTrend' => $monthlyTrend,
             'billKpis' => $billKpis,
             'invoiceKpis' => $invoiceKpis,
-            'totalRevenue' => \App\Models\Payment::sum('amount'),
+            'totalRevenue' => $billPaymentsTotal + $invoicePaymentsTotal,
         ]);
     }
 
     public function show($id)
     {
-        $payment = \App\Models\Payment::with(['payable', 'receiver'])->findOrFail($id);
+        $payment = Payment::with(['payable.customer', 'payable.customer.zone', 'payable.customer.area', 'receivedBy'])->findOrFail($id);
         
-        // If the payable is a Bill, we might want to load the customer or home associated with it
-        if ($payment->payable_type === 'App\Models\Bill') {
-            $payment->load(['payable.customer', 'payable.meterReading.meter', 'payable.home', 'payable.payments']);
-        } else if ($payment->payable_type === 'App\Models\Invoice') {
-             $payment->load('payable.customer');
+        $payable = $payment->payable;
+        if ($payable instanceof Bill) {
+            $payable->load(['meterReading.meter']);
         }
 
         return Inertia::render('payments/show', [
-            'payment' => $payment
+            'payment' => $payment,
+            'payable' => $payable,
+            'payment_type' => $payable instanceof Bill ? 'bill' : 'invoice',
         ]);
     }
 
@@ -338,104 +357,111 @@ class PaymentController extends Controller
             'amount' => ['required', 'numeric', 'min:0.01'],
             'payment_date' => ['required', 'date'],
             'payment_method' => ['required', 'string', 'in:cash,card,bank_transfer,mobile_money,check,other'],
-            'reference_number' => ['nullable', 'string', 'max:255', 'unique:payments,reference_number'],
+            'reference_number' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $payable = null;
-        $currentBalance = 0;
-
-        if (!empty($validated['bill_id'])) {
-            $payable = \App\Models\Bill::findOrFail($validated['bill_id']);
-            $currentBalance = $payable->current_balance;
-        } elseif (!empty($validated['invoice_id'])) {
-            $payable = \App\Models\Invoice::findOrFail($validated['invoice_id']);
-            // Invoices don't have a current_balance column, calculate it
-            $paid = $payable->payments()->sum('amount');
-            $currentBalance = $payable->amount - $paid;
-        }
-
-        if ($validated['amount'] > $currentBalance) {
-             return back()->withErrors(['amount' => 'Amount cannot exceed the current balance of ' . $currentBalance]);
-        }
-
-        \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $payable, $currentBalance) {
-            $payment = $payable->payments()->create([
-                'amount' => $validated['amount'],
-                'payment_date' => $validated['payment_date'],
-                'payment_method' => $validated['payment_method'],
-                'reference_number' => $validated['reference_number'],
-                'notes' => $validated['notes'],
-                'received_by' => \Illuminate\Support\Facades\Auth::id(),
-                'balance' => $currentBalance - $validated['amount'], // Balance AFTER payment
-            ]);
-
-            if ($payable instanceof \App\Models\Bill) {
-                $payable->current_balance -= $validated['amount'];
-                
-                if ($payable->current_balance <= 0) {
-                    $payable->status = 'fully paid';
-                    $payable->current_balance = 0;
-                } else {
-                    $payable->status = 'partial paid';
-                }
-                $payable->save();
-            } elseif ($payable instanceof \App\Models\Invoice) {
-                // Invoice status update
-                if (($currentBalance - $validated['amount']) <= 0) {
-                    $payable->status = 'paid';
-                } else {
-                     // Invoices enum is ['pending', 'paid', 'overdue', 'cancelled']
-                     // Does not have 'partial_paid' or 'partial'. We keeping it 'pending' or 'overdue' if partial?
-                     // Or assume 'pending' covers partial.
-                     // Ideally we add 'partial' to enum, but without migration let's stick to 'pending' if not fully paid.
-                }
-                $payable->save();
+        if (!empty($validated['reference_number'])) {
+            if (Payment::where('reference_number', $validated['reference_number'])->exists()) {
+                return back()->withErrors(['reference_number' => 'Reference number already exists.']);
             }
-        });
+        }
 
-        return redirect()->back()->with('success', 'Payment recorded successfully.');
+        DB::beginTransaction();
+        try {
+            if (!empty($validated['bill_id'])) {
+                $bill = Bill::findOrFail($validated['bill_id']);
+                $currentBalance = (float) $bill->balance;
+                if ($validated['amount'] > $currentBalance) {
+                    return back()->withErrors(['amount' => 'Amount cannot exceed the current balance of ' . $currentBalance]);
+                }
+
+                $amountPaidBefore = (float) $bill->amount_paid;
+                $newAmountPaid = $amountPaidBefore + (float) $validated['amount'];
+                $newBalanceAfter = (float) $bill->total_amount - $newAmountPaid;
+
+                $payment = Payment::create([
+                    'payable_type' => Bill::class,
+                    'payable_id' => $bill->id,
+                    'amount' => $validated['amount'],
+                    'payable_total' => (float) $bill->total_amount,
+                    'amount_paid' => $newAmountPaid,
+                    'balance_after' => $newBalanceAfter,
+                    'payment_date' => $validated['payment_date'],
+                    'payment_method' => $validated['payment_method'],
+                    'reference_number' => $validated['reference_number'],
+                    'received_by' => auth()->id(),
+                    'notes' => $validated['notes'],
+                ]);
+
+                $bill->update([
+                    'status' => round($newBalanceAfter, 2) <= 0 ? 'fully paid' : 'partial paid',
+                ]);
+            } else {
+                $invoice = Invoice::findOrFail($validated['invoice_id']);
+                $currentBalance = (float) $invoice->balance;
+                if ($validated['amount'] > $currentBalance) {
+                    return back()->withErrors(['amount' => 'Amount cannot exceed the current balance of ' . $currentBalance]);
+                }
+
+                $amountPaidBefore = (float) $invoice->amount_paid;
+                $newAmountPaid = $amountPaidBefore + (float) $validated['amount'];
+                $newBalanceAfter = (float) $invoice->amount - $newAmountPaid;
+
+                $payment = Payment::create([
+                    'payable_type' => Invoice::class,
+                    'payable_id' => $invoice->id,
+                    'amount' => $validated['amount'],
+                    'payable_total' => (float) $invoice->amount,
+                    'amount_paid' => $newAmountPaid,
+                    'balance_after' => $newBalanceAfter,
+                    'payment_date' => $validated['payment_date'],
+                    'payment_method' => $validated['payment_method'],
+                    'reference_number' => $validated['reference_number'],
+                    'received_by' => auth()->id(),
+                    'notes' => $validated['notes'],
+                ]);
+
+                $invoice->update([
+                    'status' => round($newBalanceAfter, 2) <= 0 ? 'paid' : 'pending',
+                ]);
+            }
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Payment recorded successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors(['error' => 'Failed to record payment: ' . $e->getMessage()]);
+        }
     }
 
     public function destroy($id)
     {
-        $payment = \App\Models\Payment::findOrFail($id);
-        
-        \Illuminate\Support\Facades\DB::transaction(function () use ($payment) {
-            $payable = $payment->payable;
+        $payment = Payment::findOrFail($id);
+        $payable = $payment->payable;
 
-            if ($payable instanceof \App\Models\Bill) {
-                // Revert bill balance
-                $payable->current_balance += $payment->amount;
-                
-                // Revert status based on balance
-                if ($payable->current_balance >= $payable->total_amount) {
-                    $payable->status = 'pending';
-                } else if ($payable->current_balance > 0) {
-                    $payable->status = 'partial paid';
-                }
-                
-                $payable->save();
-            } elseif ($payable instanceof \App\Models\Invoice) {
-                // Revert invoice status if necessary
-                // Check remaining balance if we were to delete this payment
-                // Total paid so far
-                $totalPaid = $payable->payments()->where('id', '!=', $payment->id)->sum('amount');
-                
-                if ($totalPaid < $payable->amount) {
-                    // Update status if it was 'paid'
-                    if ($payable->due_date < now()) {
-                        $payable->status = 'overdue';
-                    } else {
-                        $payable->status = 'pending';
-                    }
-                    $payable->save();
-                }
-            }
-            
+        DB::beginTransaction();
+        try {
             $payment->delete();
-        });
 
-        return redirect()->back()->with('success', 'Payment deleted successfully.');
+            // Recalculate status for the payable
+            if ($payable instanceof Bill) {
+                $balance = (float) $payable->balance;
+                $payable->update([
+                    'status' => round($balance, 2) <= 0 ? 'fully paid' : (round($balance, 2) < (float) $payable->total_amount ? 'partial paid' : 'pending'),
+                ]);
+            } elseif ($payable instanceof Invoice) {
+                $balance = (float) $payable->balance;
+                $payable->update([
+                    'status' => round($balance, 2) <= 0 ? 'paid' : 'pending',
+                ]);
+            }
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Payment deleted successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors(['error' => 'Failed to delete payment: ' . $e->getMessage()]);
+        }
     }
 }

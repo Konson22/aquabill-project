@@ -12,7 +12,6 @@ class MeterHistory extends Model
     protected $table = 'meter_history';
 
     protected $fillable = [
-        'home_id',
         'meter_id',
         'customer_id',
         'final_reading',
@@ -28,11 +27,6 @@ class MeterHistory extends Model
         'assigned_at' => 'datetime',
         'unassigned_at' => 'datetime',
     ];
-
-    public function home()
-    {
-        return $this->belongsTo(Home::class);
-    }
 
     public function meter()
     {

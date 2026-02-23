@@ -1,7 +1,22 @@
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import CreateInvoiceModal from '@/components/invoices/create-invoice-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,7 +35,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     flexRender,
     getCoreRowModel,
@@ -28,30 +43,74 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import {
-    ArrowUpDown,
+    CreditCard,
     Download,
     Eye,
-    Home,
+    Gauge,
+    MoreHorizontal,
     Pencil,
     Plus,
     Search,
+    SlidersHorizontal,
     Trash2,
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-export default function Customers({ customers, filters, zones, tariffs }) {
+export default function Customers({
+    customers,
+    filters,
+    zones,
+    areas = [],
+    tariffs,
+}) {
     const [search, setSearch] = useState(filters.search || '');
     const [zoneId, setZoneId] = useState(filters.zone_id || 'all');
+    const [areaId, setAreaId] = useState(filters.area_id || 'all');
     const [tariffId, setTariffId] = useState(filters.tariff_id || 'all');
+    const [readingModalOpen, setReadingModalOpen] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [invoiceModalCustomer, setInvoiceModalCustomer] = useState(null);
     const { auth } = usePage().props;
     const department = auth?.user?.department;
+
+    const readingForm = useForm({
+        meter_id: '',
+        reading_date: new Date().toISOString().split('T')[0],
+        current_reading: '',
+    });
+
+    const openReadingModal = (customer) => {
+        const meters = customer.meters || [];
+        if (meters.length === 0) return;
+        setSelectedCustomer(customer);
+        readingForm.setData({
+            meter_id: meters[0].id.toString(),
+            reading_date: new Date().toISOString().split('T')[0],
+            current_reading: '',
+        });
+        setReadingModalOpen(true);
+    };
+
+    const closeReadingModal = () => {
+        setReadingModalOpen(false);
+        setSelectedCustomer(null);
+        readingForm.reset();
+    };
+
+    const handleReadingSubmit = (e) => {
+        e.preventDefault();
+        readingForm.post(route('meter-readings.store'), {
+            onSuccess: () => closeReadingModal(),
+        });
+    };
 
     useEffect(() => {
         const timer = setTimeout(() => {
             const query = {};
             if (search) query.search = search;
             if (zoneId && zoneId !== 'all') query.zone_id = zoneId;
+            if (areaId && areaId !== 'all') query.area_id = areaId;
             if (tariffId && tariffId !== 'all') query.tariff_id = tariffId;
 
             router.get(route('customers.index'), query, {
@@ -62,11 +121,12 @@ export default function Customers({ customers, filters, zones, tariffs }) {
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [search, zoneId, tariffId]);
+    }, [search, zoneId, areaId, tariffId]);
 
     const clearFilters = () => {
         setSearch('');
         setZoneId('all');
+        setAreaId('all');
         setTariffId('all');
     };
 
@@ -79,54 +139,21 @@ export default function Customers({ customers, filters, zones, tariffs }) {
     };
 
     const exportToExcel = () => {
-        if (!customers?.data?.length) return;
-
-        const data = customers.data.map((customer) => ({
-            Name: customer.name,
-            Email: customer.email || 'N/A',
-            Phone: customer.phone || 'N/A',
-            'Unit Connections': customer.homes_count || 0,
-            Status: customer.homes_count > 0 ? 'Connected' : 'Pending',
-        }));
-
-        const headers = Object.keys(data[0]);
-        const csvContent = [
-            headers.join(','),
-            ...data.map((row) =>
-                headers
-                    .map((header) => {
-                        const cell = row[header] === null ? '' : row[header];
-                        return `"${String(cell).replace(/"/g, '""')}"`;
-                    })
-                    .join(','),
-            ),
-        ].join('\n');
-
-        const blob = new Blob([csvContent], {
-            type: 'text/csv;charset=utf-8;',
-        });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute(
-            'download',
-            `customers_export_${new Date().toISOString().split('T')[0]}.csv`,
-        );
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const params = {};
+        if (search) params.search = search;
+        if (zoneId && zoneId !== 'all') params.zone_id = zoneId;
+        if (areaId && areaId !== 'all') params.area_id = areaId;
+        if (tariffId && tariffId !== 'all') params.tariff_id = tariffId;
+        window.location.href = route('customers.export', params);
     };
 
-    const getInitials = (name) => {
-        return name
-            ? name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join('')
-                  .toUpperCase()
-            : '??';
+    const formatSupplyStatus = (status) => {
+        if (!status) return '—';
+        const s = String(status).toLowerCase();
+        if (s === 'active') return 'Active';
+        if (s === 'suspended') return 'Suspended';
+        if (s === 'disconnect') return 'Disconnected';
+        return status;
     };
 
     const breadcrumbs = [
@@ -140,100 +167,89 @@ export default function Customers({ customers, filters, zones, tariffs }) {
         () => [
             {
                 accessorKey: 'name',
-                header: ({ column }) => (
-                    <Button
-                        variant="ghost"
-                        onClick={() =>
-                            column.toggleSorting(column.getIsSorted() === 'asc')
-                        }
-                        className="p-0 font-bold text-foreground hover:bg-transparent"
-                    >
-                        Customer Identity
-                        <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />
-                    </Button>
+                header: () => (
+                    <span className="font-bold text-foreground">Name</span>
                 ),
-                cell: ({ row }) => {
-                    const customer = row.original;
-                    return (
-                        <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                                <AvatarFallback className="text-[10px] font-bold">
-                                    {getInitials(customer.name)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col text-left">
-                                <span className="text-sm font-medium text-foreground">
-                                    {customer.name}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground">
-                                    {customer.email || 'No email'}
-                                </span>
-                            </div>
-                        </div>
-                    );
-                },
+                cell: ({ row }) => (
+                    <span className="font-medium text-foreground">
+                        {row.original.name || '—'}
+                    </span>
+                ),
             },
             {
                 accessorKey: 'phone',
                 header: () => (
-                    <div className="text-center font-bold text-foreground">
-                        Contact
-                    </div>
+                    <span className="font-bold text-foreground">Phone</span>
                 ),
                 cell: ({ row }) => (
-                    <div className="flex justify-center text-xs font-medium text-muted-foreground">
-                        {row.original.phone}
-                    </div>
+                    <span className="text-sm text-muted-foreground">
+                        {row.original.phone || '—'}
+                    </span>
                 ),
             },
             {
-                accessorKey: 'homes_count',
-                header: ({ column }) => (
-                    <div className="flex justify-center">
-                        <Button
-                            variant="ghost"
-                            onClick={() =>
-                                column.toggleSorting(
-                                    column.getIsSorted() === 'asc',
-                                )
-                            }
-                            className="p-0 font-bold text-foreground hover:bg-transparent"
-                        >
-                            Homes
-                            <ArrowUpDown className="ml-2 h-3.5 w-3.5 text-muted-foreground/30" />
-                        </Button>
-                    </div>
-                ),
-                cell: ({ row }) => (
-                    <div className="flex justify-center">
-                        <span className="font-mono text-sm font-bold">
-                            {row.original.homes_count || 0}
-                        </span>
-                    </div>
-                ),
-            },
-            {
-                id: 'status',
+                id: 'meter_no',
                 header: () => (
-                    <div className="text-center font-bold text-foreground">
-                        Status
-                    </div>
+                    <span className="font-bold text-foreground">Meter No</span>
                 ),
                 cell: ({ row }) => {
-                    const hasHomes = row.original.homes_count > 0;
+                    const meters = row.original.meters || [];
+                    const numbers = meters
+                        .map((m) => m.meter_number)
+                        .filter(Boolean);
                     return (
-                        <div className="flex justify-center">
-                            <div className="flex items-center gap-1.5">
-                                <div
-                                    className={`h-1.5 w-1.5 rounded-full ${hasHomes ? 'bg-emerald-500' : 'bg-muted-foreground/30'}`}
-                                />
-                                <span
-                                    className={`text-[11px] font-medium ${hasHomes ? 'text-emerald-600' : 'text-muted-foreground'}`}
-                                >
-                                    {hasHomes ? 'Connected' : 'Pending'}
-                                </span>
-                            </div>
-                        </div>
+                        <span className="font-mono text-xs">
+                            {numbers.length ? numbers.join(', ') : '—'}
+                        </span>
+                    );
+                },
+            },
+            {
+                id: 'zone',
+                header: () => (
+                    <span className="font-bold text-foreground">Zone</span>
+                ),
+                cell: ({ row }) => (
+                    <span className="text-sm text-muted-foreground">
+                        {row.original.zone?.name || '—'}
+                    </span>
+                ),
+            },
+            {
+                id: 'area',
+                header: () => (
+                    <span className="font-bold text-foreground">Area</span>
+                ),
+                cell: ({ row }) => (
+                    <span className="text-sm text-muted-foreground">
+                        {row.original.area?.name || '—'}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'supply_status',
+                header: () => (
+                    <span className="font-bold text-foreground">
+                        Supply Status
+                    </span>
+                ),
+                cell: ({ row }) => {
+                    const status = row.original.supply_status;
+                    const label = formatSupplyStatus(status);
+                    const statusClass =
+                        status === 'active'
+                            ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20'
+                            : status === 'suspended'
+                              ? 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                              : status === 'disconnect'
+                                ? 'bg-red-50 text-red-700 ring-red-600/20'
+                                : 'bg-muted/50 text-muted-foreground';
+                    return (
+                        <span
+                            className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${statusClass}`}
+                        >
+                            {label}
+                        </span>
                     );
                 },
             },
@@ -241,55 +257,99 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                 id: 'actions',
                 header: () => (
                     <div className="text-right font-bold text-foreground">
-                        Operations
+                        Actions
                     </div>
                 ),
                 cell: ({ row }) => {
                     const customer = row.original;
+                    const hasMeters = (customer.meters || []).length > 0;
+                    const initialInvoiceCustomer = {
+                        id: customer.id,
+                        address: customer.address,
+                        name: customer.name,
+                        meter:
+                            (customer.meters && customer.meters[0]) ||
+                            customer.meter ||
+                            null,
+                    };
                     return (
-                        <div className="flex items-center justify-end gap-1">
-                            <Button
-                                asChild
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                            >
-                                <Link
-                                    href={route('customers.show', customer.id)}
-                                >
-                                    <Eye className="h-3.5 w-3.5" />
-                                </Link>
-                            </Button>
-
-                            {department === 'admin' && (
-                                <>
+                        <div className="flex items-center justify-end">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
                                     <Button
-                                        asChild
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7"
                                     >
+                                        <MoreHorizontal className="h-4 w-4" />
+                                        <span className="sr-only">
+                                            Open menu
+                                        </span>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>
+                                        Actions
+                                    </DropdownMenuLabel>
+                                    {hasMeters && (
+                                        <DropdownMenuItem
+                                            onClick={() =>
+                                                openReadingModal(customer)
+                                            }
+                                        >
+                                            <Gauge className="mr-2 h-4 w-4" />
+                                            Add Reading
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                        onSelect={(e) => {
+                                            e.preventDefault();
+                                            setInvoiceModalCustomer(
+                                                initialInvoiceCustomer,
+                                            );
+                                        }}
+                                    >
+                                        <CreditCard className="mr-2 h-4 w-4" />
+                                        Create Invoice
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
                                         <Link
                                             href={route(
-                                                'customers.edit',
+                                                'customers.show',
                                                 customer.id,
                                             )}
                                         >
-                                            <Pencil className="h-3.5 w-3.5" />
+                                            <Eye className="mr-2 h-4 w-4" />
+                                            View
                                         </Link>
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                            handleDelete(customer.id)
-                                        }
-                                        className="h-7 w-7 text-destructive"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                </>
-                            )}
+                                    </DropdownMenuItem>
+                                    {department === 'admin' && (
+                                        <>
+                                            <DropdownMenuItem asChild>
+                                                <Link
+                                                    href={route(
+                                                        'customers.edit',
+                                                        customer.id,
+                                                    )}
+                                                >
+                                                    <Pencil className="mr-2 h-4 w-4" />
+                                                    Edit
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    handleDelete(customer.id)
+                                                }
+                                                className="text-red-600 focus:text-red-600"
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Delete
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     );
                 },
@@ -313,78 +373,55 @@ export default function Customers({ customers, filters, zones, tariffs }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Customer Directory" />
 
-            <div className="flex flex-col gap-6 pb-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                            Customers
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage your customers and their service connections.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={exportToExcel}
-                            className="h-11 gap-2 border-emerald-200 bg-emerald-50/30 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                        >
-                            <Download className="h-4 w-4" />
-                            <span>Export Data</span>
-                        </Button>
-                        <Button
-                            asChild
-                            variant="outline"
-                            className="h-11 gap-2 border-primary/20 bg-background/50 px-5 backdrop-blur-sm transition-all hover:border-primary/50 hover:bg-primary/5"
-                        >
-                            <Link href={route('homes.index')}>
-                                <Home className="h-4 w-4" />
-                                <span>All Connections</span>
-                            </Link>
-                        </Button>
-                        {department === 'admin' && (
-                            <Button
-                                asChild
-                                className="h-11 gap-2 px-6 shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
-                            >
-                                <Link href={route('customers.create')}>
-                                    <Plus className="h-4 w-4" />
-                                    Add New Customer
-                                </Link>
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+            <div className="flex h-auto flex-col gap-6 pb-8">
                 <Card className="overflow-hidden border shadow-sm">
-                    <div className="flex flex-col gap-5 px-4 lg:flex-row lg:items-end">
-                        <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
-                            <div className="space-y-1">
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
-                                    Search
-                                </Label>
-                                <div className="relative">
-                                    <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground/50" />
-                                    <Input
-                                        placeholder="Name, email, or phone..."
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        className="h-9 pl-9"
-                                    />
+                    <div className="flex flex-col gap-4 px-4 pt-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                                Customers
+                            </h1>
+                            <p className="text-sm text-muted-foreground">
+                                Manage your customers and their service
+                                connections.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <Button
+                                variant="outline"
+                                onClick={exportToExcel}
+                                className="h-11 gap-2 border-emerald-200 bg-emerald-50/30 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                            >
+                                <Download className="h-4 w-4" />
+                                <span>Export Data</span>
+                            </Button>
+                            {department === 'admin' && (
+                                <Button
+                                    asChild
+                                    className="h-11 gap-2 px-6 shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
+                                >
+                                    <Link href={route('customers.create')}>
+                                        <Plus className="h-4 w-4" />
+                                        Add New Customer
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="border-t bg-gradient-to-br from-muted/40 to-muted/10 px-4 py-5">
+                        <div className="flex flex-col gap-4">
+                            {/* Filters row */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                                    Filters
                                 </div>
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
-                                    Tariff
-                                </Label>
                                 <Select
                                     value={tariffId}
                                     onValueChange={setTariffId}
                                 >
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="All Tariffs" />
+                                    <SelectTrigger className="h-9 w-[140px] rounded-lg border-border/60 bg-background/80 shadow-sm">
+                                        <SelectValue placeholder="Tariff" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">
@@ -400,17 +437,12 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
-                                    Zone
-                                </Label>
                                 <Select
                                     value={zoneId}
                                     onValueChange={setZoneId}
                                 >
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="All Zones" />
+                                    <SelectTrigger className="h-9 w-[140px] rounded-lg border-border/60 bg-background/80 shadow-sm">
+                                        <SelectValue placeholder="Zone" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">
@@ -426,27 +458,117 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                <Select
+                                    value={areaId}
+                                    onValueChange={setAreaId}
+                                >
+                                    <SelectTrigger className="h-9 w-[140px] rounded-lg border-border/60 bg-background/80 shadow-sm">
+                                        <SelectValue placeholder="Area" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All Areas
+                                        </SelectItem>
+                                        {areas?.map((area) => (
+                                            <SelectItem
+                                                key={area.id}
+                                                value={area.id.toString()}
+                                            >
+                                                {area.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {(search ||
+                                    zoneId !== 'all' ||
+                                    areaId !== 'all' ||
+                                    tariffId !== 'all') && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={clearFilters}
+                                        className="h-9 gap-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                        Clear all
+                                    </Button>
+                                )}
                             </div>
-                        </div>
 
-                        {(search || zoneId !== 'all' || tariffId !== 'all') && (
-                            <Button
-                                variant="ghost"
-                                onClick={clearFilters}
-                                className="h-9 gap-2 text-muted-foreground"
-                            >
-                                <X className="h-4 w-4" />
-                                Clear
-                            </Button>
-                        )}
+                            {/* Active filter chips (compact summary) */}
+                            {(search ||
+                                zoneId !== 'all' ||
+                                areaId !== 'all' ||
+                                tariffId !== 'all') && (
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    {search && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                                        >
+                                            Search:{' '}
+                                            {search.length > 20
+                                                ? `${search.slice(0, 20)}…`
+                                                : search}
+                                        </Badge>
+                                    )}
+                                    {tariffId !== 'all' && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                                        >
+                                            {tariffs?.find(
+                                                (t) =>
+                                                    t.id.toString() ===
+                                                    tariffId,
+                                            )?.name ?? 'Tariff'}
+                                        </Badge>
+                                    )}
+                                    {zoneId !== 'all' && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                                        >
+                                            {zones?.find(
+                                                (z) =>
+                                                    z.id.toString() === zoneId,
+                                            )?.name ?? 'Zone'}
+                                        </Badge>
+                                    )}
+                                    {areaId !== 'all' && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
+                                        >
+                                            {areas?.find(
+                                                (a) =>
+                                                    a.id.toString() === areaId,
+                                            )?.name ?? 'Area'}
+                                        </Badge>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
+                </Card>
+
+                <Card className="overflow-hidden border shadow-sm">
+                    <div className="flex items-center justify-between border-b px-4 py-3">
                         <h2 className="flex items-center gap-2 text-sm font-semibold">
                             Customer Records
                             <Badge variant="outline" className="font-mono">
                                 {customers.total || 0}
                             </Badge>
                         </h2>
+                        {/* Search bar — primary focus */}
+                        <div className="relative w-1/2">
+                            <Input
+                                placeholder="Search by name, phone, address, or meter number..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="h-12 rounded-xl border-border/60 bg-white text-base shadow-sm backdrop-blur-sm transition-colors placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-primary/20"
+                            />
+                        </div>
                     </div>
 
                     <div className="overflow-x-auto">
@@ -455,7 +577,7 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                                 {table.getHeaderGroups().map((headerGroup) => (
                                     <TableRow
                                         key={headerGroup.id}
-                                        className="border-b hover:bg-transparent"
+                                        className="hover:bg-transparent"
                                     >
                                         {headerGroup.headers.map((header) => (
                                             <TableHead
@@ -589,6 +711,214 @@ export default function Customers({ customers, filters, zones, tariffs }) {
                     </div>
                 </Card>
             </div>
+
+            {/* Create Invoice Modal (controlled so it stays open when opened from dropdown) */}
+            <CreateInvoiceModal
+                open={!!invoiceModalCustomer}
+                onOpenChange={(open) => !open && setInvoiceModalCustomer(null)}
+                initialCustomer={invoiceModalCustomer}
+            />
+
+            {/* Add Reading Modal */}
+            <Dialog
+                open={readingModalOpen}
+                onOpenChange={(open) => {
+                    setReadingModalOpen(open);
+                    if (!open) {
+                        setSelectedCustomer(null);
+                        readingForm.reset();
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Add Meter Reading</DialogTitle>
+                    </DialogHeader>
+                    {selectedCustomer && (
+                        <form
+                            onSubmit={handleReadingSubmit}
+                            className="grid gap-4 py-4"
+                        >
+                            <p className="text-sm text-muted-foreground">
+                                {selectedCustomer.name}
+                                {(selectedCustomer.meters || []).length > 1 && (
+                                    <span className="ml-1">
+                                        — select meter below
+                                    </span>
+                                )}
+                            </p>
+                            {(selectedCustomer.meters || []).length > 1 ? (
+                                <div className="grid gap-2">
+                                    <Label>Meter</Label>
+                                    <Select
+                                        value={readingForm.data.meter_id}
+                                        onValueChange={(v) =>
+                                            readingForm.setData('meter_id', v)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select meter" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {(
+                                                selectedCustomer.meters || []
+                                            ).map((m) => (
+                                                <SelectItem
+                                                    key={m.id}
+                                                    value={m.id.toString()}
+                                                >
+                                                    {m.meter_number}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            ) : null}
+                            <div className="grid gap-2">
+                                <Label htmlFor="reading_date">
+                                    Reading Date
+                                </Label>
+                                <Input
+                                    id="reading_date"
+                                    type="date"
+                                    value={readingForm.data.reading_date}
+                                    onChange={(e) =>
+                                        readingForm.setData(
+                                            'reading_date',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                {readingForm.errors.reading_date && (
+                                    <p className="text-xs text-red-500">
+                                        {readingForm.errors.reading_date}
+                                    </p>
+                                )}
+                            </div>
+                            {(() => {
+                                const meters = selectedCustomer?.meters || [];
+                                const selectedMeterId =
+                                    readingForm.data.meter_id;
+                                const selectedMeter =
+                                    meters.length === 1
+                                        ? meters[0]
+                                        : meters.find(
+                                              (m) =>
+                                                  String(m.id) ===
+                                                  String(selectedMeterId),
+                                          );
+                                const lastReading =
+                                    selectedMeter?.latest_reading
+                                        ?.current_reading ?? 0;
+                                const currentVal = parseFloat(
+                                    readingForm.data.current_reading || '0',
+                                );
+                                const isInvalid = currentVal <= lastReading;
+                                return (
+                                    <>
+                                        <div className="grid gap-2">
+                                            <Label>Last Reading</Label>
+                                            <Input
+                                                value={lastReading}
+                                                disabled
+                                                className="bg-muted font-mono"
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Current reading must be greater
+                                                than last reading.
+                                            </p>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="current_reading">
+                                                Current Reading
+                                            </Label>
+                                            <Input
+                                                id="current_reading"
+                                                type="number"
+                                                step="any"
+                                                min={lastReading}
+                                                value={
+                                                    readingForm.data
+                                                        .current_reading
+                                                }
+                                                onChange={(e) =>
+                                                    readingForm.setData(
+                                                        'current_reading',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder={String(
+                                                    lastReading,
+                                                )}
+                                            />
+                                            {isInvalid &&
+                                                readingForm.data
+                                                    .current_reading !== '' && (
+                                                    <p className="text-xs text-red-500">
+                                                        Current reading must be
+                                                        greater than last
+                                                        reading ({lastReading}).
+                                                    </p>
+                                                )}
+                                            {readingForm.errors
+                                                .current_reading && (
+                                                <p className="text-xs text-red-500">
+                                                    {
+                                                        readingForm.errors
+                                                            .current_reading
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+                                    </>
+                                );
+                            })()}
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeReadingModal}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        readingForm.processing ||
+                                        (() => {
+                                            const meters =
+                                                selectedCustomer?.meters || [];
+                                            const mid =
+                                                readingForm.data.meter_id;
+                                            const m =
+                                                meters.length === 1
+                                                    ? meters[0]
+                                                    : meters.find(
+                                                          (x) =>
+                                                              String(x.id) ===
+                                                              String(mid),
+                                                      );
+                                            const last =
+                                                m?.latest_reading
+                                                    ?.current_reading ?? 0;
+                                            return (
+                                                parseFloat(
+                                                    readingForm.data
+                                                        .current_reading || '0',
+                                                ) <= last
+                                            );
+                                        })()
+                                    }
+                                >
+                                    {readingForm.processing
+                                        ? 'Saving...'
+                                        : 'Save Reading'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

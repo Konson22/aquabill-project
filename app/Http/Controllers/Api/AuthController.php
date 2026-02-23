@@ -13,7 +13,7 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validated = $request->validate([
-            'email' => 'required|email',
+            'name' => 'required|string',
             'password' => 'required',
         ]);
 
@@ -23,7 +23,7 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $user = User::where('email', $validated['email'])->first();
+        $user = User::where('name', $validated['name'])->first();
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([

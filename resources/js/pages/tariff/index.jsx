@@ -61,10 +61,11 @@ export default function Tariffs({ tariffs }) {
     const handleEdit = (tariff) => {
         setEditingTariff(tariff);
         setData({
-            name: tariff.name,
-            price: tariff.price,
-            fixed_charge: tariff.fixed_charge,
-            description: tariff.description || '',
+            name: tariff.name ?? '',
+            price: tariff.price != null ? String(tariff.price) : '',
+            fixed_charge:
+                tariff.fixed_charge != null ? String(tariff.fixed_charge) : '',
+            description: tariff.description ?? '',
         });
         setOpen(true);
     };
@@ -129,6 +130,7 @@ export default function Tariffs({ tariffs }) {
                                 </DialogDescription>
                             </DialogHeader>
                             <form
+                                key={editingTariff?.id ?? 'new'}
                                 onSubmit={handleSubmit}
                                 className="grid gap-4 py-4"
                             >

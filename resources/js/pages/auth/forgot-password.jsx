@@ -15,7 +15,7 @@ export default function ForgotPassword({ status }) {
     return (
         <AuthLayout
             title="Forgot password"
-            description="Enter your email to receive a password reset link"
+            description="Enter your username to receive a password reset link"
         >
             <Head title="Forgot password" />
 
@@ -30,17 +30,17 @@ export default function ForgotPassword({ status }) {
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                                <Label htmlFor="name">Username</Label>
                                 <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    autoComplete="off"
+                                    id="name"
+                                    type="text"
+                                    name="name"
+                                    autoComplete="username"
                                     autoFocus
-                                    placeholder="email@example.com"
+                                    placeholder="Your username"
                                 />
 
-                                <InputError message={errors.email} />
+                                <InputError message={errors.name} />
                             </div>
 
                             <div className="my-6 flex items-center justify-start">
@@ -52,7 +52,7 @@ export default function ForgotPassword({ status }) {
                                     {processing && (
                                         <LoaderCircle className="h-4 w-4 animate-spin" />
                                     )}
-                                    Email password reset link
+                                    Send password reset link
                                 </Button>
                             </div>
                         </>

@@ -228,14 +228,16 @@ export default function Payments({
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableHead className="w-[180px]">
-                                        Reference
+                                    <TableHead>Type</TableHead>
+                                    <TableHead className="w-[140px]">
+                                        Reference No
                                     </TableHead>
-                                    <TableHead>Customer</TableHead>
-
                                     <TableHead>Bill No</TableHead>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Total Amount</TableHead>
                                     <TableHead>Amount Paid</TableHead>
                                     <TableHead>Balance</TableHead>
+                                    <TableHead>Meter No</TableHead>
                                     <TableHead>Date</TableHead>
                                     <TableHead className="text-right">
                                         Actions
@@ -250,76 +252,111 @@ export default function Payments({
                                             className="hover:bg-muted/5"
                                         >
                                             <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    {payment.reference_number ||
+                                                <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium">
+                                                    {payment.type === 'bill'
+                                                        ? 'Bill'
+                                                        : payment.type ===
+                                                            'invoice'
+                                                          ? 'Invoice'
+                                                          : payment.payable_type?.includes?.(
+                                                                  'Bill',
+                                                              )
+                                                            ? 'Bill'
+                                                            : 'Invoice'}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="font-mono text-sm">
+                                                    {payment.payment
+                                                        ?.reference_number ??
+                                                        payment.reference_number ??
                                                         '-'}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex flex-col">
-                                                    {payment.payable?.customer
-                                                        ?.name ||
-                                                        'Unknown Customer'}
-                                                </div>
-                                            </TableCell>
-
-                                            <TableCell>
-                                                {payment.payable ? (
-                                                    <div className="flex flex-col text-sm">
-                                                        {payment.payable_type.includes(
-                                                            'Bill',
-                                                        ) ? (
-                                                            <Link
-                                                                href={route(
-                                                                    'bills.show',
-                                                                    payment
-                                                                        .payable
-                                                                        .id,
-                                                                )}
-                                                                className="flex items-center gap-1 font-medium text-primary hover:underline"
-                                                            >
-                                                                <FileSpreadsheet className="h-3 w-3" />
-                                                                {
-                                                                    payment
-                                                                        .payable
-                                                                        .bill_number
-                                                                }
-                                                            </Link>
-                                                        ) : (
-                                                            <span className="font-medium">
-                                                                Other Service
-                                                            </span>
+                                                {payment.payable?.bill_number !=
+                                                null ? (
+                                                    <Link
+                                                        href={route(
+                                                            'bills.show',
+                                                            payment.payable.id,
                                                         )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-muted-foreground">
-                                                        -
+                                                        className="font-mono text-sm font-medium text-primary hover:underline"
+                                                    >
+                                                        {
+                                                            payment.payable
+                                                                .bill_number
+                                                        }
+                                                    </Link>
+                                                ) : payment.payable
+                                                      ?.invoice_number !=
+                                                  null ? (
+                                                    <span className="font-mono text-sm">
+                                                        {
+                                                            payment.payable
+                                                                .invoice_number
+                                                        }
                                                     </span>
+                                                ) : (
+                                                    '—'
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="font-bold text-green-600">
-                                                        {formatCurrency(
-                                                            payment.amount,
-                                                        )}
-                                                    </span>
+                                                <div className="font-medium">
+                                                    {payment.payable?.customer
+                                                        ?.name ??
+                                                        payment.payable
+                                                            ?.customer?.name ??
+                                                        '—'}
                                                 </div>
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="font-bold text-green-600">
-                                                        {formatCurrency(
-                                                            payment.balance,
-                                                        )}
-                                                    </span>
-                                                </div>
+                                                <span className="font-medium">
+                                                    {formatCurrency(
+                                                        payment.payable
+                                                            ?.total_amount ??
+                                                            payment.payable
+                                                                ?.amount ??
+                                                            0,
+                                                    )}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="font-semibold text-green-600">
+                                                    {formatCurrency(
+                                                        payment.payment
+                                                            ?.amount_paid ??
+                                                            payment.amount_paid ??
+                                                            0,
+                                                    )}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="text-muted-foreground">
+                                                    {formatCurrency(
+                                                        payment?.balance_after ??
+                                                            0,
+                                                    )}
+                                                </span>
+                                            </TableCell>
+
+                                            <TableCell>
+                                                <span className="font-mono text-sm text-muted-foreground">
+                                                    {payment.payable?.customer
+                                                        ?.meter?.meter_number ??
+                                                        payment.payable
+                                                            ?.meter_reading
+                                                            ?.meter
+                                                            ?.meter_number ??
+                                                        '—'}
+                                                </span>
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                    <Calendar className="h-3 w-3" />
+                                                    <Calendar className="h-3 w-3 shrink-0" />
                                                     {formatDate(
-                                                        payment.payment_date,
+                                                        payment.payment_date ??
+                                                            payment.updated_at,
                                                     )}
                                                 </div>
                                             </TableCell>
@@ -381,7 +418,7 @@ export default function Payments({
                                 ) : (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={6}
+                                            colSpan={10}
                                             className="h-32 text-center text-muted-foreground"
                                         >
                                             <div className="flex flex-col items-center justify-center gap-2">

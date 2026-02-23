@@ -1,6 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -21,11 +21,32 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/utils';
 import { Head, useForm } from '@inertiajs/react';
-import { CreditCard, Printer, User } from 'lucide-react';
+import {
+    Calendar,
+    CreditCard,
+    Droplets,
+    MapPin,
+    Printer,
+    Receipt,
+    User,
+} from 'lucide-react';
 import { useState } from 'react';
 
 export default function BillShow({ bill }) {
     const [payOpen, setPayOpen] = useState(false);
+
+    // Consumption from meter reading (bill has no consumption column)
+    const consumption =
+        Number(bill.meter_reading?.current_reading ?? 0) -
+        Number(bill.meter_reading?.previous_reading ?? 0);
+    const waterUsageAmount = consumption * Number(bill.tariff ?? 0);
+    const fixCharges = Number(bill.fix_charges ?? 0);
+    const previousBalance = Number(bill.previous_balance ?? 0);
+    // Current period total (water + fixed charges)
+    const currentPeriodTotal = waterUsageAmount + fixCharges;
+    // Total due = current period + previous balance
+    const totalDue =
+        Number(bill.total_amount) || currentPeriodTotal + previousBalance;
 
     const {
         data: payData,
@@ -80,15 +101,15 @@ export default function BillShow({ bill }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Bill ${bill.bill_number}`} />
 
-            <div className="mx-auto max-w-4xl space-y-6">
-                {/* Actions Toolbar */}
-                <div className="flex items-center justify-between print:hidden">
+            <div className="mx-auto max-w-4xl space-y-6 pb-10">
+                {/* Header + Actions */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">
-                            Invoice Details
+                            Bill #{bill.bill_number}
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Manage and track billing information.
+                            Bill information and payment history
                         </p>
                     </div>
                     <div className="flex gap-2">
@@ -108,269 +129,244 @@ export default function BillShow({ bill }) {
                                 rel="noopener noreferrer"
                             >
                                 <Printer className="mr-2 h-4 w-4" />
-                                Print PDF
+                                Print
                             </a>
                         </Button>
                     </div>
                 </div>
 
-                {/* Paper Invoice */}
-                <Card className="min-h-[800px] bg-white p-8 shadow-sm md:p-12 print:shadow-none">
-                    {/* Invoice Header */}
-                    <div className="flex flex-col items-center border-b pb-8 text-center">
-                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-50">
-                            <span className="text-2xl font-bold text-blue-600">
-                                SSUWC
-                            </span>
+                {/* Single card: all bill info */}
+                <Card>
+                    <CardHeader className="border-b pb-4">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <CardTitle className="flex items-center gap-2 text-xl">
+                                    <Receipt className="h-5 w-5" />#
+                                    {bill.bill_number}
+                                </CardTitle>
+                                <Badge
+                                    variant="outline"
+                                    className={
+                                        bill.status === 'fully paid'
+                                            ? 'border-green-500 bg-green-50 text-green-700'
+                                            : bill.status === 'pending'
+                                              ? 'border-red-500 bg-red-50 text-red-700'
+                                              : 'border-amber-500 bg-amber-50 text-amber-700'
+                                    }
+                                >
+                                    {bill.status?.replace('_', ' ')}
+                                </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                <span>
+                                    Issued {formatDate(bill.created_at)}
+                                </span>
+                                <span>·</span>
+                                <span>Due {formatDate(bill.due_date)}</span>
+                            </div>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900">
-                            South Sudan Urban Water Corporation
-                        </h2>
-                        <div className="mt-2 text-sm text-muted-foreground">
-                            <p>Juba, South Sudan</p>
-                            <p>contact@ssuwc.com | +211 912 345 678</p>
-                        </div>
-                    </div>
-
-                    {/* Bill To & Details */}
-                    <div className="grid grid-cols-2 gap-8">
-                        <div>
-                            <h3 className="mb-1 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                Bill To
+                    </CardHeader>
+                    <CardContent className="space-y-8 pt-6">
+                        {/* Customer & property */}
+                        <section>
+                            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                                <User className="h-4 w-4" />
+                                Customer & property
                             </h3>
-                            <div className="space-y-1">
-                                <div className="text-lg font-bold text-gray-900">
+                            <div className="space-y-1 text-sm">
+                                <p className="font-medium">
                                     {bill.customer?.name}
+                                </p>
+                                <div className="flex items-start gap-2 text-muted-foreground">
+                                    <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <div>
+                                        <p>{bill?.customer?.address}</p>
+                                        <p>
+                                            Zone:{' '}
+                                            {bill?.customer?.zone?.name ?? '—'}{' '}
+                                            · Plot:{' '}
+                                            {bill?.customer?.plot_number ?? '—'}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="text-sm text-muted-foreground">
-                                    <p>{bill.home?.address}</p>
-                                    <p>
-                                        Zone: {bill.home?.zone?.name} | Plot:{' '}
-                                        {bill.home?.plot_number}
+                                {bill.customer?.phone && (
+                                    <p className="text-muted-foreground">
+                                        {bill.customer.phone}
                                     </p>
-                                    <p>{bill.customer?.phone}</p>
-                                </div>
+                                )}
                             </div>
-                        </div>
-                        <div className="text-right">
-                            <h3 className="mb-1 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                Invoice Details
+                        </section>
+
+                        {/* Meter reading */}
+                        <section>
+                            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                                <Droplets className="h-4 w-4" />
+                                Meter reading & usage
                             </h3>
-                            <div className="space-y-1">
-                                <div className="text-lg font-bold text-gray-900">
-                                    #{bill.bill_number}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    <p>Date: {formatDate(bill.created_at)}</p>
-                                    <p>Due: {formatDate(bill.due_date)}</p>
-                                    <Badge
-                                        variant="outline"
-                                        className={`mt-1 h-5 px-2 text-xs capitalize ${
-                                            bill.status === 'fully paid'
-                                                ? 'border-green-500 bg-green-50 text-green-600'
-                                                : bill.status === 'pending'
-                                                  ? 'border-red-500 bg-red-50 text-red-600'
-                                                  : 'border-yellow-500 bg-yellow-50 text-yellow-600'
-                                        }`}
-                                    >
-                                        {bill.status?.replace('_', ' ')}
-                                    </Badge>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="my-8 border-b" />
-
-                    {/* Meter Details */}
-                    <div className="mb-8">
-                        <h3 className="mb-4 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            Meter Reading & Consumption
-                        </h3>
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                    <TableHead className="w-[150px]">
-                                        Meter Number
-                                    </TableHead>
-                                    <TableHead>Previous Reading</TableHead>
-                                    <TableHead>Current Reading</TableHead>
-                                    <TableHead>Collected By</TableHead>
-                                    <TableHead className="text-right">
-                                        Usage (m³)
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell className="font-medium">
-                                        {
-                                            bill.meter_reading?.meter
-                                                ?.meter_number
-                                        }
-                                    </TableCell>
-                                    <TableCell>
-                                        {bill.meter_reading?.previous_reading}{' '}
-                                        m³
-                                    </TableCell>
-                                    <TableCell>
-                                        {bill.meter_reading?.current_reading} m³
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">
-                                                <User className="h-3 w-3 text-muted-foreground" />
-                                            </div>
-                                            <span className="text-sm">
-                                                {bill.meter_reading?.reader
-                                                    ?.name || 'System'}
-                                            </span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold">
-                                        {bill.consumption} m³
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </div>
-
-                    <div className="my-8 border-b" />
-
-                    {/* Financial Summary */}
-                    {/* Consumption Breakdown */}
-                    <div className="mb-8">
-                        <h3 className="mb-4 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            Consumption Breakdown
-                        </h3>
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                    <TableHead>Description</TableHead>
-                                    <TableHead className="text-right">
-                                        Units / Rate
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                        Amount
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell>
-                                        Water Usage ({bill.consumption} m³)
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatCurrency(bill.tariff)} / m³
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatCurrency(
-                                            bill.consumption * bill.tariff,
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell>Fixed Charges</TableCell>
-
-                                    <TableCell className="text-right">
-                                        -
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {formatCurrency(bill.fix_charges)}
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell className="text-muted-foreground">
-                                        Previous Balance
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        -
-                                    </TableCell>
-                                    <TableCell className="text-right text-muted-foreground">
-                                        {formatCurrency(bill.previous_balance)}
-                                    </TableCell>
-                                </TableRow>
-                            </TableBody>
-                        </Table>
-                    </div>
-
-                    <div className="flex flex-col gap-8 md:flex-row">
-                        <div className="flex-1">
-                            <h3 className="mb-2 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                Notes
-                            </h3>
-                            <p className="text-sm text-muted-foreground">
-                                Please ensure payment is made by the due date.
-                                Checks should be made payable to Utility
-                                Company.
-                            </p>
-                        </div>
-                        <div className="w-full md:w-1/2 lg:w-1/3">
-                            <div className="space-y-3 rounded-lg bg-muted/50 p-4">
-                                <div className="flex justify-between text-base font-bold">
-                                    <span>Total Amount</span>
-                                    <span>
-                                        {formatCurrency(bill.total_amount)}
-                                    </span>
-                                </div>
-                                <div className="my-2 border-t border-muted-foreground/20" />
-                                <div className="flex justify-between text-lg font-bold text-primary">
-                                    <span>Balance Due</span>
-                                    <span>
-                                        {formatCurrency(bill.current_balance)}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="my-8 border-b" />
-
-                    {/* Payment History Table */}
-                    <div>
-                        <h3 className="mb-4 text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            Payment History
-                        </h3>
-                        {bill.payments && bill.payments.length > 0 ? (
                             <Table>
                                 <TableHeader>
                                     <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Reference</TableHead>
-                                        <TableHead>Method</TableHead>
+                                        <TableHead>Meter</TableHead>
+                                        <TableHead>Previous</TableHead>
+                                        <TableHead>Current</TableHead>
+                                        <TableHead>Reader</TableHead>
+                                        <TableHead className="text-right">
+                                            Usage (m³)
+                                        </TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    <TableRow>
+                                        <TableCell className="font-medium">
+                                            {bill.meter_reading?.meter
+                                                ?.meter_number ?? '—'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {bill.meter_reading
+                                                ?.previous_reading ?? '—'}{' '}
+                                            m³
+                                        </TableCell>
+                                        <TableCell>
+                                            {bill.meter_reading
+                                                ?.current_reading ?? '—'}{' '}
+                                            m³
+                                        </TableCell>
+                                        <TableCell>
+                                            <span className="text-muted-foreground">
+                                                {bill.meter_reading?.reader
+                                                    ?.name ?? '—'}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="text-right font-medium">
+                                            {consumption} m³
+                                        </TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
+                        </section>
+
+                        {/* Charges breakdown */}
+                        <section>
+                            <h3 className="mb-3 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                                Charges breakdown
+                            </h3>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                        <TableHead>Description</TableHead>
+                                        <TableHead className="text-right">
+                                            Rate
+                                        </TableHead>
                                         <TableHead className="text-right">
                                             Amount
                                         </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {bill.payments.map((payment) => (
-                                        <TableRow key={payment.id}>
-                                            <TableCell>
-                                                {formatDate(
-                                                    payment.payment_date,
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                {payment.reference_number ||
-                                                    '-'}
-                                            </TableCell>
-                                            <TableCell className="capitalize">
-                                                {payment.payment_method}
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium text-green-600">
-                                                {formatCurrency(payment.amount)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    <TableRow>
+                                        <TableCell>
+                                            Water usage ({consumption} m³)
+                                        </TableCell>
+                                        <TableCell className="text-right text-muted-foreground">
+                                            {formatCurrency(bill.tariff)}/m³
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {formatCurrency(waterUsageAmount)}
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell>Fixed charges</TableCell>
+                                        <TableCell className="text-right">
+                                            —
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {formatCurrency(bill.fix_charges)}
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="border-t font-semibold">
+                                        <TableCell>Total amount</TableCell>
+                                        <TableCell className="text-right">
+                                            —
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {formatCurrency(currentPeriodTotal)}
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="text-muted-foreground">
+                                            Previous balance
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            —
+                                        </TableCell>
+                                        <TableCell className="text-right text-muted-foreground">
+                                            {formatCurrency(
+                                                bill.previous_balance,
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="border-t-2 font-semibold">
+                                        <TableCell>Total due</TableCell>
+                                        <TableCell className="text-right">
+                                            —
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {formatCurrency(totalDue)}
+                                        </TableCell>
+                                    </TableRow>
                                 </TableBody>
                             </Table>
-                        ) : (
-                            <div className="text-sm text-muted-foreground italic">
-                                No payments recorded yet.
-                            </div>
-                        )}
-                    </div>
+                        </section>
+
+                        {/* Payment history */}
+                        <section>
+                            <h3 className="mb-3 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
+                                Payment history
+                            </h3>
+                            {bill.payments && bill.payments.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Reference</TableHead>
+                                            <TableHead>Method</TableHead>
+                                            <TableHead className="text-right">
+                                                Amount
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {bill.payments.map((payment) => (
+                                            <TableRow key={payment.id}>
+                                                <TableCell>
+                                                    {formatDate(
+                                                        payment.payment_date,
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-muted-foreground">
+                                                    {payment.reference_number ||
+                                                        '—'}
+                                                </TableCell>
+                                                <TableCell className="capitalize">
+                                                    {payment.payment_method}
+                                                </TableCell>
+                                                <TableCell className="text-right font-medium text-green-600">
+                                                    {formatCurrency(
+                                                        payment.amount,
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    No payments recorded yet.
+                                </p>
+                            )}
+                        </section>
+                    </CardContent>
                 </Card>
             </div>
 

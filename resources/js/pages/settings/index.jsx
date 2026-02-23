@@ -28,7 +28,7 @@ export default function SettingsIndex() {
                 {
                     title: 'Profile Information',
                     description:
-                        'Update your account profile information and email address.',
+                        'Update your account profile information.',
                     icon: <User className="h-6 w-6 text-blue-500" />,
                     href: route('profile.edit'),
                 },

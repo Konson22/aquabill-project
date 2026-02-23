@@ -1,13 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Link, usePage } from '@inertiajs/react';
-import {
-    Activity,
-    Banknote,
-    BarChart3,
-    ChevronRight,
-    FileText,
-    Receipt,
-} from 'lucide-react';
+import { Activity, Banknote, BarChart3, ChevronRight } from 'lucide-react';
 import FinanceSection from './sections/finance';
 import HomesSection from './sections/homes-section';
 import MeterSection from './sections/meters-section';
@@ -23,34 +16,27 @@ const QuickAction = ({
 }) => (
     <Link
         href={href}
-        className="group relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-sm backdrop-blur transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+        className="group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-border/60 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none"
     >
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 opacity-70 transition-opacity group-hover:opacity-100">
-            <div className={`h-full w-full ${bgClass}`} />
+        <div className="absolute top-0 left-0 h-full w-1 rounded-r-full bg-gradient-to-b from-transparent via-primary/30 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+        <div className="flex items-start justify-between gap-3">
+            <div
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${bgClass} shadow-sm transition-transform duration-200 group-hover:scale-105`}
+            >
+                <Icon className={`h-5 w-5 ${colorClass}`} />
+            </div>
+            <ChevronRight
+                className="h-5 w-5 shrink-0 text-muted-foreground/50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary"
+                aria-hidden="true"
+            />
         </div>
-        <div className="relative z-10 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-                <div
-                    className={`grid h-12 w-12 place-items-center rounded-2xl ${bgClass} bg-opacity-10 ring-1 ring-inset ring-slate-200/70 transition-transform group-hover:-rotate-3`}
-                >
-                    <Icon className={`h-6 w-6 ${colorClass}`} />
-                </div>
-                <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition-colors group-hover:border-slate-300 group-hover:bg-white group-hover:text-slate-700">
-                    Open
-                    <ChevronRight
-                        className="h-3.5 w-3.5"
-                        aria-hidden="true"
-                    />
-                </span>
-            </div>
-            <div className="space-y-1.5">
-                <h3 className="text-base font-semibold tracking-tight text-slate-900">
-                    {title}
-                </h3>
-                <p className="text-sm leading-relaxed text-slate-500">
-                    {description}
-                </p>
-            </div>
+        <div className="space-y-1">
+            <h3 className="font-semibold tracking-tight text-foreground">
+                {title}
+            </h3>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+                {description}
+            </p>
         </div>
     </Link>
 );
@@ -74,7 +60,7 @@ export default function Dashboard({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <div className="mx-auto min-h-screen max-w-[1600px] space-y-8 pb-8">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <QuickAction
                         href={route('general-report')}
                         icon={BarChart3}
@@ -84,19 +70,11 @@ export default function Dashboard({
                         bgClass="bg-slate-900"
                     />
                     <QuickAction
-                        href={route('bills.report')}
-                        icon={FileText}
-                        title="Billing Report"
-                        description="View billing analytics"
-                        colorClass="text-white"
-                        bgClass="bg-blue-600"
-                    />
-                    <QuickAction
                         href={route('payments.report')}
                         icon={Banknote}
                         title="Payment Report"
                         description="Track revenue streams"
-                        colorClass="text-emerald-600"
+                        colorClass="text-white"
                         bgClass="bg-emerald-600"
                     />
                     <QuickAction
@@ -104,7 +82,7 @@ export default function Dashboard({
                         icon={Activity}
                         title="Reading Report"
                         description="Consumption analysis"
-                        colorClass="text-amber-600"
+                        colorClass="text-white"
                         bgClass="bg-amber-600"
                     />
                 </div>
@@ -112,6 +90,8 @@ export default function Dashboard({
                     stats={stats.bills}
                     performance={stats.billingPerformance}
                     invoices={stats.invoices}
+                    totalBillsAmount={stats.totalBillsAmount}
+                    totalPaymentsAmount={stats.totalPaymentsAmount}
                 />
                 <HomesSection stats={stats.homes} trend={stats.homesTrend} />
                 <MeterSection stats={stats.meters} trend={stats.metersTrend} />

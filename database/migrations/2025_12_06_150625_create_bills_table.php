@@ -16,18 +16,16 @@ return new class extends Migration
             $table->string('bill_number')->unique();
             $table->foreignId('meter_reading_id')->constrained('meter_readings')->onDelete('cascade');
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
-            $table->foreignId('home_id')->constrained('homes')->onDelete('cascade');
             $table->date('billing_period_start');
             $table->date('billing_period_end');
             $table->decimal('tariff', 10, 2)->default(0);
             $table->decimal('fix_charges', 10, 2)->default(0);
+            $table->decimal('amount', 10, 2); // current consumption amount (tariff * water consumption + fix charges)
             $table->decimal('previous_balance', 10, 2)->default(0);
-            $table->decimal('total_amount', 10, 2);
-            $table->decimal('current_balance', 10, 2)->default(0);
             $table->date('due_date');
             $table->enum('status', ['pending', 'fully paid', 'forwarded', 'partial paid', 'balance forwarded'])->default('pending');
             $table->timestamps();
-            
+
             $table->index('meter_reading_id');
             $table->index('customer_id');
             $table->index('bill_number');

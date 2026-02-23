@@ -21,7 +21,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import { Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, Calendar, Mail, Shield, Trash2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Shield, Trash2 } from 'lucide-react';
 
 export default function UserShow({ user }) {
     const { delete: destroy } = useForm();
@@ -144,10 +144,6 @@ export default function UserShow({ user }) {
                         <CardContent>
                             <div className="mt-4 grid gap-4">
                                 <div className="flex items-center gap-3 text-sm">
-                                    <Mail className="h-4 w-4 text-muted-foreground" />
-                                    <span>{user.email}</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-sm">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
                                     <span>
                                         Joined {formatDate(user.created_at)}
@@ -179,14 +175,6 @@ export default function UserShow({ user }) {
                                     </p>
                                     <p className="text-sm font-semibold">
                                         {user.name}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm leading-none font-medium text-muted-foreground">
-                                        Email Address
-                                    </p>
-                                    <p className="text-sm font-semibold">
-                                        {user.email}
                                     </p>
                                 </div>
                                 <div className="space-y-1">

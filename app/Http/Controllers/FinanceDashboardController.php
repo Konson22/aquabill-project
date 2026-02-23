@@ -14,10 +14,10 @@ class FinanceDashboardController extends Controller
 
     public function overview()
     {
-        // 1. Revenue by Zone (Total Billed)
-        $revenueByZone = \App\Models\Zone::join('homes', 'zones.id', '=', 'homes.zone_id')
-            ->join('bills', 'homes.id', '=', 'bills.home_id')
-            ->selectRaw('zones.name, sum(bills.amount) as total')
+        // 1. Revenue by Zone (Total Billed) — total_amount is accessor; use amount + previous_balance
+        $revenueByZone = \App\Models\Zone::join('customers', 'zones.id', '=', 'customers.zone_id')
+            ->join('bills', 'customers.id', '=', 'bills.customer_id')
+            ->selectRaw('zones.name, sum(bills.amount + bills.previous_balance) as total')
             ->groupBy('zones.name')
             ->get()
             ->map(function ($item) {
@@ -27,10 +27,10 @@ class FinanceDashboardController extends Controller
                 ];
             });
 
-        // 2. Revenue by Tariff (Total Billed)
-        $revenueByTariff = \App\Models\Tariff::join('homes', 'tariffs.id', '=', 'homes.tariff_id')
-            ->join('bills', 'homes.id', '=', 'bills.home_id')
-            ->selectRaw('tariffs.name, sum(bills.amount) as total')
+        // 2. Revenue by Tariff (Total Billed) — total_amount is accessor; use amount + previous_balance
+        $revenueByTariff = \App\Models\Tariff::join('customers', 'tariffs.id', '=', 'customers.tariff_id')
+            ->join('bills', 'customers.id', '=', 'bills.customer_id')
+            ->selectRaw('tariffs.name, sum(bills.amount + bills.previous_balance) as total')
             ->groupBy('tariffs.name')
             ->get()
             ->map(function ($item) {
@@ -43,18 +43,18 @@ class FinanceDashboardController extends Controller
         // 3. Debt Aging Report (Based on Due Date of Pending Bills)
         $now = now();
         $agingStats = [
-            '0-30 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial_paid'])
+            '0-30 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])
                 ->where('due_date', '>=', $now->copy()->subDays(30))
-                ->sum('current_balance'),
-            '31-60 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial_paid'])
+                ->get()->sum(fn ($b) => $b->balance),
+            '31-60 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])
                 ->whereBetween('due_date', [$now->copy()->subDays(60), $now->copy()->subDays(31)])
-                ->sum('current_balance'),
-            '61-90 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial_paid'])
+                ->get()->sum(fn ($b) => $b->balance),
+            '61-90 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])
                 ->whereBetween('due_date', [$now->copy()->subDays(90), $now->copy()->subDays(61)])
-                ->sum('current_balance'),
-            '90+ Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial_paid'])
+                ->get()->sum(fn ($b) => $b->balance),
+            '90+ Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])
                 ->where('due_date', '<', $now->copy()->subDays(90))
-                ->sum('current_balance'),
+                ->get()->sum(fn ($b) => $b->balance),
         ];
 
         $agingChartData = [];

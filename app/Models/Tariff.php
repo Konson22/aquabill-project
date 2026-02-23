@@ -26,7 +26,7 @@ class Tariff extends Model
 
     public function homes()
     {
-        return $this->hasMany(Home::class);
+        return $this->hasMany(Customer::class);
     }
 
     public function histories()

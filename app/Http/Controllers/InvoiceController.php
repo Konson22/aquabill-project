@@ -9,7 +9,7 @@ class InvoiceController extends Controller
 {
     public function index(Request $request)
     {
-        $query = \App\Models\Invoice::with(['customer', 'home', 'payments'])
+        $query = \App\Models\Invoice::with('customer')
             ->latest('created_at');
 
         if ($request->filled('search')) {
@@ -23,7 +23,7 @@ class InvoiceController extends Controller
         }
 
         if ($request->filled('tariff')) {
-            $query->whereHas('home', function($q) use ($request) {
+            $query->whereHas('customer', function($q) use ($request) {
                 $q->where('tariff_id', $request->tariff);
             });
         }
@@ -44,24 +44,19 @@ class InvoiceController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'home_id' => 'required|exists:homes,id',
+            'customer_id' => 'required|exists:customers,id',
             'amount' => 'required|numeric|min:0',
             'due_date' => 'required|date',
-            'type' => 'required|string',
             'description' => 'nullable|string',
         ]);
 
-        $home = \App\Models\Home::findOrFail($validated['home_id']);
-
         \App\Models\Invoice::create([
             'invoice_number' => 'INV-' . strtoupper(\Illuminate\Support\Str::random(8)),
-            'customer_id' => $home->customer_id,
-            'home_id' => $home->id,
-            'type' => $validated['type'],
-            'description' => $validated['description'],
+            'customer_id' => $validated['customer_id'],
+            'description' => $validated['description'] ?? null,
             'amount' => $validated['amount'],
             'due_date' => $validated['due_date'],
-            'status' => 'unpaid',
+            'status' => 'pending',
         ]);
 
         return redirect()->back()->with('success', 'Invoice created successfully.');
@@ -69,7 +64,7 @@ class InvoiceController extends Controller
 
     public function show($id)
     {
-        $invoice = \App\Models\Invoice::with(['customer', 'home', 'payments'])->findOrFail($id);
+        $invoice = \App\Models\Invoice::with('customer')->findOrFail($id);
         return Inertia::render('invoices/show', [
             'invoice' => $invoice
         ]);
@@ -77,7 +72,7 @@ class InvoiceController extends Controller
 
     public function print($id)
     {
-        $invoice = \App\Models\Invoice::with(['customer', 'home.zone', 'home.area', 'home.tariff', 'payments'])->findOrFail($id);
+        $invoice = \App\Models\Invoice::with(['customer.zone', 'customer.area', 'customer.tariff', 'payments'])->findOrFail($id);
 
         return Inertia::render('invoices/print-single', [
             'invoice' => $invoice,
@@ -87,7 +82,7 @@ class InvoiceController extends Controller
     public function bulkPrint(Request $request)
     {
         $ids = explode(',', $request->input('ids', ''));
-        $invoices = \App\Models\Invoice::with(['customer', 'home.zone', 'home.area', 'home.tariff', 'payments'])
+        $invoices = \App\Models\Invoice::with(['customer.zone', 'customer.area', 'customer.tariff', 'payments'])
             ->whereIn('id', $ids)
             ->get();
             

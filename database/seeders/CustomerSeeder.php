@@ -4,8 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Area;
 use App\Models\Customer;
-use App\Models\Home;
 use App\Models\Meter;
+use App\Models\MeterReading;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Illuminate\Database\Seeder;
@@ -20,20 +20,19 @@ class CustomerSeeder extends Seeder
     public function run(): void
     {
         $jsonPath = base_path('data/customers_output.json');
-        
+
         if (!File::exists($jsonPath)) {
             $this->command->error("File not found: $jsonPath");
             return;
         }
 
         $customersData = json_decode(File::get($jsonPath), true);
-        
+
         if (!$customersData) {
             $this->command->error("Invalid JSON format in $jsonPath");
             return;
         }
 
-        // Pre-fetch all tariffs and create a mapping
         $tariffs = Tariff::all();
         $tariffMap = [
             'C1' => $tariffs->where('name', 'C1')->first(),
@@ -48,7 +47,7 @@ class CustomerSeeder extends Seeder
             'HOTEL' => $tariffs->where('name', 'HOTEL')->first(),
             'OFFICE' => $tariffs->where('name', 'OFFICE')->first(),
         ];
-        
+
         $defaultTariff = $tariffs->where('name', 'DOMESTIC')->first() ?? $tariffs->first();
         if (!$defaultTariff) {
             $defaultTariff = Tariff::create([
@@ -59,13 +58,15 @@ class CustomerSeeder extends Seeder
             ]);
         }
 
-        $otherZone = Zone::where('name', 'OTHER')->first();
+        $otherZone = Zone::where('name', 'OTHER')->first() ?? Zone::first();
         $otherArea = Area::where('name', 'JUBA TOWN')->first() ?? Area::first();
 
-        // Pre-fetch all areas with their zones
+        if (!$otherZone || !$otherArea) {
+            $this->command->error('At least one Zone and one Area must exist. Run Zone and Area seeders first.');
+            return;
+        }
+
         $allAreas = Area::with('zone')->get();
-        
-        // Find a reader for initial readings
         $reader = \App\Models\User::first();
 
         $this->command->info('Starting customer seeding...');
@@ -73,45 +74,33 @@ class CustomerSeeder extends Seeder
         $bar->start();
 
         foreach ($customersData as $data) {
-            // 1. Find or create Customer
             $name = $data['CUS NAME'] ?? 'Unknown Customer';
             $phone = $data['TEL'] ?? null;
-            
+
             if ($phone) {
-                // Keep only digits and limit length
-                $phone = substr(preg_replace('/[^0-9]/', '', (string)$phone), 0, 15);
+                $phone = substr(preg_replace('/[^0-9]/', '', (string) $phone), 0, 15);
             }
 
-            $customer = Customer::create([
-                'name' => $name,
-                'phone' => $phone,
-            ]);
-
-            // 2. Map Area and Zone based on ADDRESS/BLOCK
             $addressBlock = trim($data['ADDRESS/BLOCK'] ?? '');
             $area = null;
             $zone = null;
 
             if (!empty($addressBlock)) {
-                // Try exact match first
                 $area = $allAreas->where('name', $addressBlock)->first();
-                
+
                 if (!$area) {
-                    // Try clean match (remove quotes)
                     $cleanAddress = str_replace('"', '', $addressBlock);
                     $area = $allAreas->where('name', $cleanAddress)->first();
                 }
 
                 if (!$area) {
-                    // Fuzzy match: check if database area name is in the address string
-                    $area = $allAreas->first(function($a) use ($addressBlock) {
+                    $area = $allAreas->first(function ($a) use ($addressBlock) {
                         return str_contains(Str::upper($addressBlock), Str::upper($a->name));
                     });
                 }
-                
+
                 if (!$area) {
-                    // Fuzzy match inverse: check if address string is in database area name
-                    $area = $allAreas->first(function($a) use ($addressBlock) {
+                    $area = $allAreas->first(function ($a) use ($addressBlock) {
                         return str_contains(Str::upper($a->name), Str::upper($addressBlock));
                     });
                 }
@@ -121,56 +110,44 @@ class CustomerSeeder extends Seeder
                 }
             }
 
-            // Fallback
             if (!$area) {
                 $zone = $otherZone;
                 $area = $otherArea;
             }
 
-            // 3. Determine tariff based on customer type (CUS TYPE = tariff)
-            $cusType = Str::upper(trim((string)($data['CUS TYPE'] ?? '')));
+            $cusType = Str::upper(trim((string) ($data['CUS TYPE'] ?? '')));
             $tariff = $tariffMap[$cusType] ?? $defaultTariff;
 
-            // 4. Create Home
-            $home = Home::create([
-                'customer_id' => $customer->id,
-                'zone_id' => $zone ? $zone->id : ($otherZone ? $otherZone->id : null),
-                'area_id' => $area ? $area->id : ($otherArea ? $otherArea->id : null),
-                'tariff_id' => $tariff->id,
+            $customer = Customer::create([
+                'name' => $name,
+                'phone' => $phone,
+                'zone_id' => $zone->id,
+                'area_id' => $area->id,
+                'tariff_id' => $tariff?->id,
                 'address' => $addressBlock ?: 'No address provided',
                 'plot_number' => (string) ($data['HOUSE /PLOT NO'] ?? ''),
-                'property_type' => $cusType ?: 'Residential',
+                'property_type' => $cusType ?: null,
+                'supply_status' => (isset($data['SUPPLY STATUS']) && Str::upper((string) $data['SUPPLY STATUS']) === 'WORKING') ? 'active' : 'inactive',
             ]);
 
-            // 5. Create Meter (Only use METER NO and leave SERIAL NO)
             $meterNumber = $data['METER NO'] ?? null;
-            
-            // Skip if meter number is missing, zero, or empty
-            if ($meterNumber !== null && $meterNumber !== 0 && $meterNumber !== "0" && $meterNumber !== "") {
-                // Clean meter number
-                $cleanMeterNumber = str_replace([' ', 'TRM'], '', (string)$meterNumber);
-                
-                // Ensure meter number is unique for seeding purposes if it looks like a sequence number
-                // However, the user said "only use METER NO", so if it's already unique in source, great.
-                // If not, we still need it to be unique in DB.
-                // We'll try to use it as is, but if it exists, we'll append customer ID.
+
+            if ($meterNumber !== null && $meterNumber !== 0 && $meterNumber !== '0' && $meterNumber !== '') {
+                $cleanMeterNumber = str_replace([' ', 'TRM'], '', (string) $meterNumber);
                 $exists = Meter::where('meter_number', $cleanMeterNumber)->exists();
                 $finalMeterNumber = $exists ? $cleanMeterNumber . '-' . $customer->id : $cleanMeterNumber;
 
                 $meter = Meter::create([
-                    'home_id' => $home->id,
+                    'customer_id' => $customer->id,
                     'meter_number' => $finalMeterNumber,
-                    'status' => (isset($data['SUPPLY STATUS']) && Str::upper((string)$data['SUPPLY STATUS']) === 'WORKING') ? 'active' : 'inactive',
+                    'status' => (isset($data['SUPPLY STATUS']) && Str::upper((string) $data['SUPPLY STATUS']) === 'WORKING') ? 'active' : 'inactive',
                 ]);
 
-                // 6. Create Initial Reading if available (check if there's any reading field in this JSON)
-                // The snippets didn't show current_reading but it was in the old seeder.
-                // I'll keep the logic but check if property exists.
                 $currentReading = $data['current_reading'] ?? 0;
                 if ($currentReading > 0) {
-                    \App\Models\MeterReading::create([
+                    MeterReading::create([
                         'meter_id' => $meter->id,
-                        'home_id' => $home->id,
+                        'customer_id' => $customer->id,
                         'reading_date' => now()->subDay(),
                         'current_reading' => $currentReading,
                         'previous_reading' => 0,

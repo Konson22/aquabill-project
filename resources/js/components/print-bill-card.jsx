@@ -1,3 +1,4 @@
+import PrintLabelValue from '@/components/print-label-value';
 import { formatCurrency } from '@/lib/utils';
 
 export default function PrintBillCard({ bill }) {
@@ -10,10 +11,10 @@ export default function PrintBillCard({ bill }) {
               })
             : '';
 
-    const home = bill?.home;
-    const tariff = home?.tariff || {};
+    const customer = bill?.customer;
+    const tariff = customer?.tariff || bill?.home?.tariff || {};
     const meterReading = bill?.meter_reading;
-    const grandTotal = Number(bill?.total_amount || 0);
+    const grandTotal = Number(bill?.amount || 0);
     // Calculate consumption
     const consumption =
         meterReading?.current_reading - meterReading?.previous_reading || 0;
@@ -25,10 +26,12 @@ export default function PrintBillCard({ bill }) {
                 {`
                     @media print {
                         .bill-print-root {
-                            font-size: 9px !important;
+                            background-color: #eee !important;
+                            font-size: 10px !important;
+                         
                         }
                         .bill-print-root .bill-print-heading {
-                            font-size: 11px !important;
+                            font-size: 14px !important;
                         }
                         .bill-print-root .text-xs,
                         .bill-print-root .text-sm,
@@ -42,194 +45,130 @@ export default function PrintBillCard({ bill }) {
                     }
                 `}
             </style>
-            <div className="bill-print-root w-full bg-slate-100 p-6 text-base print:text-xs">
-                <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3">
-                    <div className="h-14 w-14 object-contain">
+            <div className="bill-print-root mt-3 mb-4 w-full bg-gray-200 p-3 text-base print:text-xs">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <div className="h-16 w-16">
                         <img
                             className="h-full w-full object-contain"
                             src="/logo.png"
                             alt="Logo"
                         />
                     </div>
-                    <div className="text-center">
-                        <p className="bill-print-heading text-sm font-semibold uppercase tracking-wide text-slate-600 print:text-sm">
-                            South Sudan Urban Water Corporation
+                    <div className="flex flex-1 flex-col items-center text-center">
+                        <p className="bill-print-heading text-lg font-semibold tracking-wide text-slate-600 uppercase print:text-lg">
+                            South Sudan Urban Water Corporation <br /> CE Juba
+                            Station
                         </p>
-                        <p className="text-base font-semibold text-slate-900">
+                        <p className="text-sm font-semibold text-slate-900">
                             Water Bill
                         </p>
-                        <p className="text-sm font-semibold text-red-600">
-                            #{bill?.bill_number}
-                        </p>
+                        <div className="mt-0.5 text-center">
+                            <p className="text-sm font-semibold text-red-600">
+                                #{bill?.bill_number}
+                            </p>
+                        </div>
                     </div>
-                    <div className="h-14 w-14 object-contain">
+                    <div className="h-16 w-16">
                         <img
                             className="h-full w-full object-contain"
                             src="/tape.png"
-                            alt="Logo"
+                            alt="Tape"
                         />
                     </div>
                 </div>
-                <div className="mb-4 grid grid-cols-3 gap-4">
-                    <div className="rounded-xl border border-slate-200 bg-white p-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                            Customer Details
-                        </p>
-                        <div className="mt-3 space-y-2 text-xs">
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Cus Name
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {bill?.customer?.name || '—'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Customer Type
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {tariff?.name || '—'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Zone
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {home?.zone?.name || '—'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Area
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {home?.address || home?.area?.name || '—'}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Meter No
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {meterReading?.meter?.meter_number || '—'}
-                                </span>
-                            </div>
-                        </div>
+
+                <div className="mt-4 flex space-x-6">
+                    <div className="flex-1 space-y-1.5 text-xs">
+                        <PrintLabelValue
+                            label="Name"
+                            value={bill?.customer?.name || '—'}
+                        />
+                        <PrintLabelValue
+                            label="Type"
+                            value={tariff?.name || '—'}
+                        />
+                        <PrintLabelValue
+                            label="Zone"
+                            value={customer?.zone?.name || '—'}
+                        />
+                        <PrintLabelValue
+                            label="Area"
+                            value={
+                                customer?.address || customer?.area?.name || '—'
+                            }
+                        />
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 bg-white p-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                            Reading Details
-                        </p>
-                        <div className="mt-3 space-y-2 text-xs">
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Date
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {formatDateLong(bill?.billing_period_end)}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Previous
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {meterReading?.previous_reading ?? 0}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Current
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {meterReading?.current_reading ?? 0}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Consumption
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {consumption} m³
-                                </span>
-                            </div>
-                        </div>
+                    <div className="flex-1 space-y-1.5 text-xs">
+                        <PrintLabelValue
+                            label="Date"
+                            value={formatDateLong(bill?.billing_period_end)}
+                        />
+                        <PrintLabelValue
+                            label="Meter No"
+                            value={meterReading?.meter?.meter_number || '—'}
+                        />
+                        <PrintLabelValue
+                            label="Previous"
+                            value={meterReading?.previous_reading ?? 0}
+                        />
+                        <PrintLabelValue
+                            label="Current"
+                            value={meterReading?.current_reading ?? 0}
+                        />
+                        <PrintLabelValue
+                            label="Usage"
+                            value={`${consumption} m³`}
+                        />
                     </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-white p-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                            Charges
-                        </p>
-                        <div className="mt-3 space-y-2 text-xs">
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Outstanding
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {formatCurrency(bill?.previous_balance || 0)}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Fixed Charges
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {formatCurrency(bill?.fix_charges || 0)}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Tariff
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {formatCurrency(bill?.tariff || 0)}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-500">
-                                    Volume Charges
-                                </span>
-                                <span className="text-right font-semibold uppercase text-slate-800">
-                                    {formatCurrency(VOLUM_CHARGES || 0)}
-                                </span>
-                            </div>
-                        </div>
+                    <div className="flex-1 space-y-1.5 text-xs">
+                        <PrintLabelValue
+                            label="Outstanding"
+                            value={formatCurrency(bill?.previous_balance || 0)}
+                        />
+                        <PrintLabelValue
+                            label="Fixed"
+                            value={formatCurrency(bill?.fix_charges || 0)}
+                        />
+                        <PrintLabelValue
+                            label="Tariff"
+                            value={formatCurrency(bill?.tariff || 0)}
+                        />
+                        <PrintLabelValue
+                            label="Volume"
+                            value={formatCurrency(VOLUM_CHARGES || 0)}
+                        />
+                        <PrintLabelValue
+                            label="Total"
+                            value={formatCurrency(grandTotal)}
+                            className="border-t border-slate-200 pt-1.5"
+                            valueClassName="normal-case text-slate-900"
+                        />
                     </div>
                 </div>
 
-                <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3 text-xs print:text-xs">
+                <div className="flex items-start justify-between gap-4 pt-4 text-xs print:text-xs">
                     <div>
-                        <div className="text-xs font-semibold text-slate-700">
+                        <div className="mt-10 text-xs font-semibold text-slate-700">
                             {bill?.meterReading?.reader?.name || 'System'}
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
                             Sign: Billing Officer
                         </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Total Bill
-                        </span>
-                        <span className="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
-                            {formatCurrency(grandTotal)}
-                        </span>
-                    </div>
+                    <ul className="list-disc space-y-0.5 text-xs text-slate-600 print:text-xs">
+                        <li>
+                            Make the settlement of water bills monthly within
+                            seven days to avoid disconnection and take care of
+                            your water tap
+                        </li>
+                        <li>
+                            To report to Juba-Station management in case of
+                            damage or enquiry Call: +211929928736 /
+                            +211929928737
+                        </li>
+                    </ul>
                 </div>
-
-                <ul className="mt-4 list-disc space-y-0.5 border-t border-slate-300 pt-3 text-xs text-slate-600 print:text-xs">
-                    <li>
-                        Make the settlement of water bills monthly within seven
-                        days to avoid disconnection and take care of your water
-                        tap
-                    </li>
-                    <li>
-                        To report to Juba-Station management in case of damage
-                        or enquiry Call: +211929928736 / +211929928737
-                    </li>
-                </ul>
             </div>
         </>
     );

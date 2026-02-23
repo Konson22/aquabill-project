@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bill;
+use App\Models\Payment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class BillController extends Controller
 {
     public function index(Request $request)
     {
-        $query = \App\Models\Bill::with(['customer', 'home.zone', 'home.meter', 'meterReading']);
+        $query = \App\Models\Bill::with(['customer.zone', 'customer.meter', 'meterReading.meter'])
+            ->withSum('payments', 'amount');
 
         if ($request->has('search')) {
             $search = $request->input('search');
@@ -18,7 +22,7 @@ class BillController extends Controller
                   ->orWhereHas('customer', function($q) use ($search) {
                       $q->where('name', 'like', "%{$search}%");
                   })
-                  ->orWhereHas('home', function($q) use ($search) {
+                  ->orWhereHas('customer', function($q) use ($search) {
                       $q->where('address', 'like', "%{$search}%")
                         ->orWhereHas('zone', function($q) use ($search) {
                             $q->where('name', 'like', "%{$search}%");
@@ -37,98 +41,15 @@ class BillController extends Controller
         ]);
     }
 
-    public function report(Request $request)
+    public function printingList()
     {
-        $tariffId = $request->input('tariff_id');
-        $zoneId = $request->input('zone_id');
-
-        $applyFilters = function ($query) use ($tariffId, $zoneId) {
-            if ($tariffId) $query->where('homes.tariff_id', $tariffId);
-            if ($zoneId) $query->where('homes.zone_id', $zoneId);
-        };
-
-        // 1. Monthly Performance (Paid vs Unpaid)
-        $monthlyTrend = \App\Models\Bill::query()
-            ->join('homes', 'bills.home_id', '=', 'homes.id')
-            ->selectRaw("DATE_FORMAT(bills.created_at, '%Y-%m') as month")
-            ->selectRaw('SUM(bills.total_amount - bills.current_balance) as paid')
-            ->selectRaw('SUM(bills.current_balance) as unpaid')
-            ->where('bills.created_at', '>=', now()->subMonths(11)->startOfMonth());
-        $applyFilters($monthlyTrend);
-        $monthlyTrend = $monthlyTrend->groupBy('month')->orderBy('month')->get();
-
-        // 2. Bills by Status
-        $billsByStatusQuery = \App\Models\Bill::query()
-            ->join('homes', 'bills.home_id', '=', 'homes.id');
-        $applyFilters($billsByStatusQuery);
-        $billsByStatus = $billsByStatusQuery
-            ->selectRaw('status as name, COUNT(*) as value')
-            ->groupBy('status')
+        $bills = \App\Models\Bill::with(['customer.zone', 'customer.meter', 'meterReading'])
+            ->where('status', 'pending')
+            ->latest()
             ->get();
 
-        // 3. Billing counts by Tariff
-        $billingByTariff = \App\Models\Tariff::query()
-            ->leftJoin('homes', 'tariffs.id', '=', 'homes.tariff_id')
-            ->leftJoin('bills', 'homes.id', '=', 'bills.home_id')
-            ->select('tariffs.name as name')
-            ->selectRaw('COUNT(bills.id) as total')
-            ->selectRaw("SUM(CASE WHEN bills.status = 'fully paid' THEN 1 ELSE 0 END) as paid")
-            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial paid') THEN 1 ELSE 0 END) as unpaid")
-            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial paid') AND bills.due_date < NOW() THEN 1 ELSE 0 END) as overdue")
-            ->when($tariffId, fn($q) => $q->where('tariffs.id', $tariffId))
-            ->when($zoneId, fn($q) => $q->where('homes.zone_id', $zoneId))
-            ->groupBy('tariffs.id', 'tariffs.name')
-            ->get();
-
-        // 4. Billing counts by Zone
-        $billingByZone = \App\Models\Zone::query()
-            ->leftJoin('homes', 'zones.id', '=', 'homes.zone_id')
-            ->leftJoin('bills', 'homes.id', '=', 'bills.home_id')
-            ->select('zones.name as name')
-            ->selectRaw('COUNT(bills.id) as total')
-            ->selectRaw("SUM(CASE WHEN bills.status = 'fully paid' THEN 1 ELSE 0 END) as paid")
-            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial paid') THEN 1 ELSE 0 END) as unpaid")
-            ->selectRaw("SUM(CASE WHEN bills.status IN ('pending', 'partial paid') AND bills.due_date < NOW() THEN 1 ELSE 0 END) as overdue")
-            ->when($tariffId, fn($q) => $q->where('homes.tariff_id', $tariffId))
-            ->when($zoneId, fn($q) => $q->where('zones.id', $zoneId))
-            ->groupBy('zones.id', 'zones.name')
-            ->get();
-
-        // KPIs
-        $kpiQuery = \App\Models\Bill::query()
-            ->join('homes', 'bills.home_id', '=', 'homes.id');
-        $applyFilters($kpiQuery);
-        
-        $totalBilled = (clone $kpiQuery)->sum('total_amount');
-        $totalCollected = (clone $kpiQuery)->sum(\DB::raw('total_amount - current_balance'));
-        $totalOutstanding = (clone $kpiQuery)->sum('current_balance');
-        $collectionRate = $totalBilled > 0 ? ($totalCollected / $totalBilled) * 100 : 0;
-        
-        $allBillsCount = (clone $kpiQuery)->count();
-        $paidBillsCount = (clone $kpiQuery)->where('bills.status', 'fully paid')->count();
-        $unpaidBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial paid'])->count();
-        $overdueBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial paid'])
-            ->where('bills.due_date', '<', now())
-            ->count();
-
-        return Inertia::render('bills/report', [
-            'monthlyTrend' => $monthlyTrend,
-            'billsByStatus' => $billsByStatus,
-            'billingByTariff' => $billingByTariff,
-            'billingByZone' => $billingByZone,
-            'kpis' => [
-                'totalBilled' => $totalBilled,
-                'totalCollected' => $totalCollected,
-                'totalOutstanding' => $totalOutstanding,
-                'collectionRate' => round($collectionRate, 2),
-                'allBillsCount' => $allBillsCount,
-                'paidBillsCount' => $paidBillsCount,
-                'unpaidBillsCount' => $unpaidBillsCount,
-                'overdueBillsCount' => $overdueBillsCount,
-            ],
-            'filters' => $request->only(['tariff_id', 'zone_id']),
-            'tariffs' => \App\Models\Tariff::select('id', 'name')->get(),
-            'zones' => \App\Models\Zone::select('id', 'name')->get(),
+        return Inertia::render('bills/bill-printing-list', [
+            'bills' => $bills,
         ]);
     }
 
@@ -147,13 +68,15 @@ class BillController extends Controller
             fputcsv($file, ['BILLING & COLLECTIONS REPORT - ' . date('Y-m-d')]);
             fputcsv($file, []);
 
-            // Summary
-            $kpiQuery = \App\Models\Bill::query()->join('homes', 'bills.home_id', '=', 'homes.id')
-                ->when($tariffId, fn($q) => $q->where('homes.tariff_id', $tariffId))
-                ->when($zoneId, fn($q) => $q->where('homes.zone_id', $zoneId));
-            
-            $totalBilled = (clone $kpiQuery)->sum('total_amount');
-            $totalCollected = (clone $kpiQuery)->sum(\DB::raw('total_amount - current_balance'));
+            // Summary — collected from payments
+            $kpiQuery = \App\Models\Bill::query()->join('customers', 'bills.customer_id', '=', 'customers.id')
+                ->when($tariffId, fn($q) => $q->where('customers.tariff_id', $tariffId))
+                ->when($zoneId, fn($q) => $q->where('customers.zone_id', $zoneId));
+            $billIds = (clone $kpiQuery)->pluck('bills.id');
+            $totalBilled = (clone $kpiQuery)->selectRaw('SUM(bills.amount + bills.previous_balance) as total')->value('total') ?? 0;
+            $totalCollected = \App\Models\Payment::where('payable_type', \App\Models\Bill::class)
+                ->whereIn('payable_id', $billIds)
+                ->sum('amount');
             $allBillsCount = (clone $kpiQuery)->count();
             $paidBillsCount = (clone $kpiQuery)->where('bills.status', 'fully paid')->count();
             $unpaidBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial paid'])->count();
@@ -170,26 +93,50 @@ class BillController extends Controller
             // Monthly
             fputcsv($file, ['MONTHLY PERFORMANCE']);
             fputcsv($file, ['Month', 'Billed', 'Collected']);
-            $monthlyData = \App\Models\Bill::query()->join('homes', 'bills.home_id', '=', 'homes.id')
-                ->selectRaw("DATE_FORMAT(bills.created_at, '%Y-%m') as month, SUM(total_amount) as billed, SUM(total_amount - current_balance) as collected")
-                ->when($tariffId, fn($q) => $q->where('homes.tariff_id', $tariffId))
-                ->when($zoneId, fn($q) => $q->where('homes.zone_id', $zoneId))
-                ->groupBy('month')->orderBy('month')->get();
-            foreach ($monthlyData as $row) fputcsv($file, [$row->month, $row->billed, $row->collected]);
+            $monthlyData = \App\Models\Bill::query()->join('customers', 'bills.customer_id', '=', 'customers.id')
+                ->selectRaw("DATE_FORMAT(bills.created_at, '%Y-%m') as month, SUM(bills.amount + bills.previous_balance) as billed")
+                ->when($tariffId, fn($q) => $q->where('customers.tariff_id', $tariffId))
+                ->when($zoneId, fn($q) => $q->where('customers.zone_id', $zoneId))
+                ->groupBy('month')->orderBy('month')->get()
+                ->map(function ($row) {
+                    $collected = \App\Models\Payment::where('payable_type', \App\Models\Bill::class)
+                        ->whereRaw("DATE_FORMAT(payment_date, '%Y-%m') = ?", [$row->month])
+                        ->sum('amount');
+                    return [
+                        'month' => $row->month,
+                        'billed' => (float) ($row->billed ?? 0),
+                        'collected' => (float) $collected,
+                    ];
+                });
+            foreach ($monthlyData as $row) fputcsv($file, [$row['month'], $row['billed'], $row['collected']]);
             fputcsv($file, []);
 
             // Zone
             fputcsv($file, ['PERFORMANCE BY ZONE']);
             fputcsv($file, ['Zone Name', 'Billed', 'Collected']);
             $zoneData = \App\Models\Zone::query()
-                ->leftJoin('homes', 'zones.id', '=', 'homes.zone_id')
-                ->leftJoin('bills', 'homes.id', '=', 'bills.home_id')
-                ->select('zones.name as name')
-                ->selectRaw('COALESCE(SUM(bills.total_amount), 0) as billed, COALESCE(SUM(bills.total_amount - bills.current_balance), 0) as collected')
-                ->when($tariffId, fn($q) => $q->where('homes.tariff_id', $tariffId))
+                ->leftJoin('customers', 'zones.id', '=', 'customers.zone_id')
+                ->leftJoin('bills', 'customers.id', '=', 'bills.customer_id')
+                ->select('zones.id', 'zones.name as name')
+                ->selectRaw('COALESCE(SUM(bills.amount + bills.previous_balance), 0) as billed')
+                ->when($tariffId, fn($q) => $q->where('customers.tariff_id', $tariffId))
                 ->when($zoneId, fn($q) => $q->where('zones.id', $zoneId))
-                ->groupBy('zones.id', 'zones.name')->get();
-            foreach ($zoneData as $row) fputcsv($file, [$row->name, $row->billed, $row->collected]);
+                ->groupBy('zones.id', 'zones.name')
+                ->get()
+                ->map(function ($row) {
+                    $zoneBillIds = \App\Models\Bill::join('customers', 'bills.customer_id', '=', 'customers.id')
+                        ->where('customers.zone_id', $row->id)
+                        ->pluck('bills.id');
+                    $collected = \App\Models\Payment::where('payable_type', \App\Models\Bill::class)
+                        ->whereIn('payable_id', $zoneBillIds)
+                        ->sum('amount');
+                    return [
+                        'name' => $row->name,
+                        'billed' => (float) ($row->billed ?? 0),
+                        'collected' => (float) $collected,
+                    ];
+                });
+            foreach ($zoneData as $row) fputcsv($file, [$row['name'], $row['billed'], $row['collected']]);
 
             fclose($file);
         }, 'billing_report_' . date('Y-m-d') . '.csv');
@@ -197,7 +144,9 @@ class BillController extends Controller
 
     public function show($id)
     {
-        $bill = \App\Models\Bill::with(['customer', 'home.tariff', 'home.zone', 'home.area', 'meterReading.meter', 'meterReading.reader', 'payments'])->findOrFail($id);
+        $bill = \App\Models\Bill::with(['customer.tariff', 'customer.zone', 'customer.area', 'meterReading.meter', 'meterReading.reader', 'payments'])
+            ->withSum('payments', 'amount')
+            ->findOrFail($id);
         return Inertia::render('bills/show', [
             'bill' => $bill,
         ]);
@@ -206,7 +155,9 @@ class BillController extends Controller
 
     public function print($id)
     {
-        $bill = \App\Models\Bill::with(['customer', 'home.tariff', 'home.zone', 'home.area', 'meterReading.meter'])->findOrFail($id);
+        $bill = \App\Models\Bill::with(['customer.tariff', 'customer.zone', 'customer.area', 'meterReading.meter'])
+            ->withSum('payments', 'amount')
+            ->findOrFail($id);
         return Inertia::render('bills/print-single', [
             'bill' => $bill,
         ]);
@@ -215,7 +166,8 @@ class BillController extends Controller
     public function bulkPrint(Request $request)
     {
         $ids = explode(',', $request->input('ids', ''));
-        $bills = \App\Models\Bill::with(['customer', 'home.tariff', 'home.zone', 'home.area', 'meterReading.meter'])
+        $bills = \App\Models\Bill::with(['customer.tariff', 'customer.zone', 'customer.area', 'meterReading.meter'])
+            ->withSum('payments', 'amount')
             ->whereIn('id', $ids)
             ->get();
             

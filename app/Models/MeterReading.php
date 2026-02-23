@@ -11,7 +11,7 @@ class MeterReading extends Model
 
     protected $fillable = [
         'meter_id',
-        'home_id',
+        'customer_id',
         'reading_date',
         'current_reading',
         'previous_reading',
@@ -33,9 +33,9 @@ class MeterReading extends Model
         ];
     }
 
-    public function home()
+    public function customer()
     {
-        return $this->belongsTo(Home::class);
+        return $this->belongsTo(Customer::class);
     }
 
     public function meter()
@@ -53,7 +53,25 @@ class MeterReading extends Model
         return $this->hasOne(\App\Models\Bill::class);
     }
 
-    protected $appends = ['image_url'];
+    protected static function booted(): void
+    {
+        static::deleting(function (MeterReading $reading) {
+            $bill = $reading->bill;
+            if ($bill) {
+                $bill->payments()->delete();
+            }
+        });
+    }
+
+    protected $appends = ['image_url', 'home'];
+
+    /** For frontend: home.customer mirrors this reading's customer (API convention). */
+    public function getHomeAttribute(): ?object
+    {
+        return $this->relationLoaded('customer') && $this->customer
+            ? (object) ['customer' => $this->customer]
+            : null;
+    }
 
     public function getImageUrlAttribute(): ?string
     {

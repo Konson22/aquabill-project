@@ -1,11 +1,6 @@
 import { Card } from '@/components/ui/card';
 import { Link } from '@inertiajs/react';
-import {
-    ArrowUpRight,
-    FileBarChart,
-    FilePieChart,
-    FileSpreadsheet,
-} from 'lucide-react';
+import { ArrowUpRight, FileBarChart, FilePieChart } from 'lucide-react';
 
 export default function QuickLinks() {
     const links = [
@@ -30,17 +25,6 @@ export default function QuickLinks() {
             iconColor: 'text-white',
             borderColor: 'hover:border-emerald-300',
             shadowColor: 'group-hover:shadow-emerald-500/25',
-        },
-        {
-            title: 'Billing Reports',
-            description: 'Track billing performance, paid vs unpaid trends.',
-            icon: FileSpreadsheet,
-            href: route('bills.report'),
-            bgColor: 'bg-amber-500',
-            iconBg: 'bg-amber-400/30',
-            iconColor: 'text-white',
-            borderColor: 'hover:border-amber-300',
-            shadowColor: 'group-hover:shadow-amber-500/25',
         },
     ];
 

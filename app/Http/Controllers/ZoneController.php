@@ -3,20 +3,39 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ZoneController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $zones = \App\Models\Zone::withCount(['areas', 'homes'])->paginate(10);
-        
+        $query = \App\Models\Zone::withCount(['areas', 'homes']);
+
+        // Single query for all stats (avoids 3 separate counts + duplicate zones count)
+        $statsRow = DB::selectOne("
+            SELECT
+                (SELECT COUNT(*) FROM zones) as zones_count,
+                (SELECT COUNT(*) FROM areas) as areas_count,
+                (SELECT COUNT(*) FROM customers) as customers_count
+        ");
         $stats = [
-            'zones_count' => \App\Models\Zone::count(),
-            'areas_count' => \App\Models\Area::count(),
-            'customers_count' => \App\Models\Customer::count(),
+            'zones_count' => (int) $statsRow->zones_count,
+            'areas_count' => (int) $statsRow->areas_count,
+            'customers_count' => (int) $statsRow->customers_count,
         ];
+
+        $perPage = 10;
+        $page = (int) $request->input('page', 1);
+        $total = $stats['zones_count'];
+        $zones = $query->forPage($page, $perPage)->get();
+        $zones = new \Illuminate\Pagination\LengthAwarePaginator(
+            $zones,
+            $total,
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         return Inertia::render('zones/index', [
             'zones' => $zones,

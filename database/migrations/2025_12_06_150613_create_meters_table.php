@@ -13,12 +13,12 @@ return new class extends Migration
     {
         Schema::create('meters', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('home_id')->nullable()->constrained('homes')->onDelete('cascade');
+            $table->foreignId('customer_id')->nullable()->constrained('customers')->onDelete('cascade');
             $table->string('meter_number')->unique();
             $table->enum('status', ['active', 'inactive', 'maintenance', 'disconnect', 'damage'])->default('active');
             $table->timestamps();
-            
-            $table->index('home_id');
+
+            $table->index('customer_id');
             $table->index('meter_number');
         });
     }

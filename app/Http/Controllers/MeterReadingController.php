@@ -14,31 +14,51 @@ use Carbon\Carbon;
 
 class MeterReadingController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $meterReadings = \App\Models\MeterReading::with(['meter', 'home.customer', 'reader', 'bill'])
-            ->where(function ($query) {
-                $query->has('bill')->orWhere('is_initial', true);
+        $month = $request->input('month'); // YYYY-MM format
+
+        $query = \App\Models\MeterReading::with(['meter', 'customer', 'reader', 'bill' => fn ($q) => $q->withSum('payments', 'amount')])
+            ->where(function ($q) {
+                $q->has('bill')->orWhere('is_initial', true);
+            });
+
+        if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $query->whereYear('reading_date', substr($month, 0, 4))
+                ->whereMonth('reading_date', (int) substr($month, 5, 2));
+        }
+
+        $meterReadings = $query->latest('reading_date')
+            ->paginate(10)
+            ->withQueryString();
+
+        // Latest reading per meter in a single query (avoids N+1)
+        $latestReadings = DB::table('meter_readings as mr')
+            ->select('mr.meter_id', 'mr.current_reading')
+            ->leftJoin('meter_readings as mr2', function ($join) {
+                $join->on('mr.meter_id', '=', 'mr2.meter_id')
+                    ->whereRaw('(mr.reading_date < mr2.reading_date OR (mr.reading_date = mr2.reading_date AND mr.id < mr2.id))');
             })
-            ->latest('reading_date')
-            ->paginate(10);
-        $meters = \App\Models\Meter::with(['home.customer'])
-            ->whereNotNull('home_id')
-            ->get()
-            ->map(function ($meter) {
-                $lastReading = $meter->readings()->latest('reading_date')->first();
+            ->whereNull('mr2.id')
+            ->pluck('current_reading', 'meter_id');
+
+        $meters = Meter::with('customer:id,name,address')
+            ->whereNotNull('customer_id')
+            ->get(['id', 'meter_number', 'customer_id'])
+            ->map(function ($meter) use ($latestReadings) {
                 return [
                     'id' => $meter->id,
                     'meter_number' => $meter->meter_number,
-                    'customer_name' => $meter->home->customer->name ?? 'Unknown',
-                    'address' => $meter->home->address ?? 'Unknown',
-                    'last_reading' => $lastReading ? $lastReading->current_reading : 0,
+                    'customer_name' => $meter->customer?->name ?? 'Unknown',
+                    'address' => $meter->customer?->address ?? 'Unknown',
+                    'last_reading' => $latestReadings[$meter->id] ?? 0,
                 ];
             });
 
         return Inertia::render('meter-reading/index', [
             'meterReadings' => $meterReadings,
             'meters' => $meters,
+            'filters' => $request->only(['month']),
         ]);
     }
 
@@ -59,27 +79,27 @@ class MeterReadingController extends Controller
         ]);
 
         // Get meter with relationships
-        $meter = Meter::with('home.customer', 'home.tariff')->findOrFail($validated['meter_id']);
-        $home = $meter->home;
+        $meter = Meter::with('customer.tariff')->findOrFail($validated['meter_id']);
+        $customer = $meter->customer;
 
-        // Validate that meter has a home and customer
-        if (!$home || !$home->customer) {
+        // Validate that meter has a customer
+        if (!$customer) {
             return redirect()
                 ->back()
-                ->with('error', 'Meter must be associated with a home and customer.');
+                ->with('error', 'Meter must be associated with a customer.');
         }
 
         // Fetch the latest reading from database to validate against
         $dbLastReading = MeterReading::where('meter_id', $meter->id)
-            ->where('home_id', $home->id)
+            ->where('customer_id', $customer->id)
             ->orderBy('reading_date', 'desc')
             ->orderBy('id', 'desc')
             ->first();
 
-        if ($dbLastReading && $validated['current_reading'] < $dbLastReading->current_reading) {
+        if ($dbLastReading && $validated['current_reading'] <= $dbLastReading->current_reading) {
             return redirect()
                 ->back()
-                ->with('error', "Current reading ({$validated['current_reading']}) cannot be less than the last recorded reading ({$dbLastReading->current_reading}).");
+                ->with('error', "Current reading ({$validated['current_reading']}) must be greater than the last recorded reading ({$dbLastReading->current_reading}).");
         }
 
         // Get previous reading if not provided
@@ -101,7 +121,7 @@ class MeterReadingController extends Controller
             // Create the reading
             $reading = MeterReading::create([
                 'meter_id' => $meter->id,
-                'home_id' => $home->id,
+                'customer_id' => $customer->id,
                 'reading_date' => $validated['reading_date'],
                 'current_reading' => $validated['current_reading'],
                 'previous_reading' => $validated['previous_reading'],
@@ -112,13 +132,13 @@ class MeterReadingController extends Controller
             ]);
 
             // Billing logic
-            $tariff = $home->tariff;
+            $tariff = $customer->tariff;
             $tariffRate = $tariff ? $tariff->price : 0;
             $fixedCharge = $tariff ? $tariff->fixed_charge : 0;
             $consumptionAmount = $consumption * $tariffRate;
             
             // Previous balance from last active bill
-            $lastBill = Bill::where('home_id', $home->id)
+            $lastBill = Bill::where('customer_id', $customer->id)
                 ->where('status', '!=', 'cancelled')
                 ->where('status', '!=', 'forwarded')
                 ->latest('id')
@@ -127,17 +147,18 @@ class MeterReadingController extends Controller
             $previousBalance = 0;
             if ($lastBill) {
                 if ($lastBill->status !== 'fully paid') {
-                    $previousBalance = $lastBill->current_balance;
+                    $previousBalance = $lastBill->balance;
                     $lastBill->update(['status' => 'forwarded']);
                 }
             }
 
             // Ensure any other lingering unpaid bills are also forwarded
-            Bill::where('home_id', $home->id)
+            Bill::where('customer_id', $customer->id)
                 ->whereIn('status', ['pending', 'overdue', 'partial paid'])
                 ->update(['status' => 'forwarded']);
 
-            $totalAmount = $consumptionAmount + $fixedCharge + $previousBalance;
+            $amount = $consumptionAmount + $fixedCharge; // current consumption amount
+            $totalAmount = $amount + $previousBalance;
 
             // Generate unique bill number
             $billCount = Bill::count();
@@ -150,16 +171,14 @@ class MeterReadingController extends Controller
             Bill::create([
                 'bill_number' => $billNumber,
                 'meter_reading_id' => $reading->id,
-                'customer_id' => $home->customer_id,
-                'home_id' => $home->id,
+                'customer_id' => $customer->id,
                 'billing_period_start' => $readingDate->copy()->startOfMonth(),
                 'billing_period_end' => $readingDate->copy()->endOfMonth(),
-                'consumption' => $consumption,
                 'tariff' => $tariffRate,
                 'fix_charges' => $fixedCharge,
-                'total_amount' => $totalAmount,
-                'current_balance' => $totalAmount,
                 'previous_balance' => $previousBalance,
+                'amount' => $amount,
+                'total_amount' => $totalAmount,
                 'due_date' => $readingDate->copy()->addDays(14),
                 'status' => 'pending',
             ]);
@@ -193,7 +212,7 @@ class MeterReadingController extends Controller
             'reading_date' => ['required', 'date'],
         ]);
 
-        $reading = MeterReading::with('bill', 'meter.home.tariff')->findOrFail($id);
+        $reading = MeterReading::with('bill', 'meter.customer.tariff')->findOrFail($id);
 
         try {
             DB::beginTransaction();
@@ -207,21 +226,26 @@ class MeterReadingController extends Controller
 
             // 2. Recalculate consumption
             $newConsumption = max(0, $reading->current_reading - $reading->previous_reading);
-            $reading->update(['consumption' => $newConsumption]);
+            if (\Schema::hasColumn('meter_readings', 'consumption')) {
+                $reading->update(['consumption' => $newConsumption]);
+            }
 
-            // 3. Update Bill if exists
+            // 3. Update linked bill when reading changes (recalculate amount and period)
             if ($reading->bill && $reading->bill->status !== 'fully paid') {
-                 $tariffRate = $reading->meter->home->tariff->price ?? 0;
-                 $fixedCharge = $reading->meter->home->tariff->fixed_charge ?? 0;
-                 $consumptionAmount = $newConsumption * $tariffRate;
-                 $totalAmount = $consumptionAmount + $fixedCharge + $reading->bill->previous_balance;
+                $tariffRate = $reading->meter->customer?->tariff?->price ?? 0;
+                $fixedCharge = $reading->meter->customer?->tariff?->fixed_charge ?? 0;
+                $consumptionAmount = $newConsumption * $tariffRate;
+                $amount = $consumptionAmount + $fixedCharge;
+                $readingDate = Carbon::parse($validated['reading_date']);
 
-                 $reading->bill->update([
-                     'consumption' => $newConsumption, // STORE UNITS
-                     'total_amount' => $totalAmount,
-                     'current_balance' => $totalAmount, // Assuming no partial payments for simplicity of this update
-                     'due_date' => \Carbon\Carbon::parse($validated['reading_date'])->addDays(14),
-                 ]);
+                $reading->bill->update([
+                    'tariff' => $tariffRate,
+                    'fix_charges' => $fixedCharge,
+                    'amount' => $amount,
+                    'billing_period_start' => $readingDate->copy()->startOfMonth(),
+                    'billing_period_end' => $readingDate->copy()->endOfMonth(),
+                    'due_date' => $readingDate->copy()->addDays(14),
+                ]);
             }
 
             DB::commit();
@@ -263,29 +287,33 @@ class MeterReadingController extends Controller
         // Filters
         $tariffId = $request->input('tariff_id');
         $zoneId = $request->input('zone_id');
-
-        // Base query builder for joined tables
-        $baseQuery = \App\Models\MeterReading::query()
-            ->join('meters', 'meter_readings.meter_id', '=', 'meters.id')
-            ->join('homes', 'meters.home_id', '=', 'homes.id');
+        $month = $request->input('month'); // YYYY-MM
 
         // Apply filters callback
-        $applyFilters = function ($query) use ($tariffId, $zoneId) {
+        $applyFilters = function ($query) use ($tariffId, $zoneId, $month) {
             if ($tariffId) {
-                $query->where('homes.tariff_id', $tariffId);
+                $query->where('customers.tariff_id', $tariffId);
             }
             if ($zoneId) {
-                $query->where('homes.zone_id', $zoneId);
+                $query->where('customers.zone_id', $zoneId);
+            }
+            if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
+                $query->whereYear('meter_readings.reading_date', substr($month, 0, 4))
+                    ->whereMonth('meter_readings.reading_date', (int) substr($month, 5, 2));
             }
         };
 
-        // 1. Monthly Consumption Trend (Current Year)
+        $dateRange = ($month && preg_match('/^\d{4}-\d{2}$/', $month))
+            ? [Carbon::parse($month . '-01')->startOfMonth(), Carbon::parse($month . '-01')->endOfMonth()]
+            : [now()->startOfYear(), now()->endOfYear()];
+
+        // 1. Monthly Consumption Trend
         $trendQuery = \App\Models\MeterReading::query()
             ->join('meters', 'meter_readings.meter_id', '=', 'meters.id')
-            ->join('homes', 'meters.home_id', '=', 'homes.id')
+            ->join('customers', 'meters.customer_id', '=', 'customers.id')
             ->selectRaw("DATE_FORMAT(meter_readings.reading_date, '%Y-%m') as month, SUM(GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))) as total")
-            ->whereBetween('meter_readings.reading_date', [now()->startOfYear(), now()->endOfYear()]);
-        
+            ->whereBetween('meter_readings.reading_date', $dateRange);
+
         $applyFilters($trendQuery);
 
         $rawTrend = $trendQuery
@@ -295,21 +323,30 @@ class MeterReadingController extends Controller
             ->keyBy('month');
             
         $monthlyConsumption = collect();
-        $startOfYear = now()->startOfYear();
-        for ($i = 0; $i < 12; $i++) {
-             $date = $startOfYear->copy()->addMonths($i);
-             $monthKey = $date->format('Y-m');
-             $monthlyConsumption->push([
-                 'name' => $date->format('M Y'),
-                 'total' => isset($rawTrend[$monthKey]) ? (float) $rawTrend[$monthKey]->total : 0,
-             ]);
+        if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $date = Carbon::parse($month . '-01');
+            $monthKey = $date->format('Y-m');
+            $monthlyConsumption->push([
+                'name' => $date->format('M Y'),
+                'total' => isset($rawTrend[$monthKey]) ? (float) $rawTrend[$monthKey]->total : 0,
+            ]);
+        } else {
+            $startOfYear = now()->startOfYear();
+            for ($i = 0; $i < 12; $i++) {
+                $date = $startOfYear->copy()->addMonths($i);
+                $monthKey = $date->format('Y-m');
+                $monthlyConsumption->push([
+                    'name' => $date->format('M Y'),
+                    'total' => isset($rawTrend[$monthKey]) ? (float) $rawTrend[$monthKey]->total : 0,
+                ]);
+            }
         }
 
         // 2. Readings by Tariff
         $readingsByTariffQuery = \App\Models\MeterReading::query()
             ->join('meters', 'meter_readings.meter_id', '=', 'meters.id')
-            ->join('homes', 'meters.home_id', '=', 'homes.id')
-            ->join('tariffs', 'homes.tariff_id', '=', 'tariffs.id')
+            ->join('customers', 'meters.customer_id', '=', 'customers.id')
+            ->join('tariffs', 'customers.tariff_id', '=', 'tariffs.id')
             ->selectRaw('tariffs.name as name, COUNT(*) as value');
         
         $applyFilters($readingsByTariffQuery);
@@ -323,8 +360,8 @@ class MeterReadingController extends Controller
 
         // By Tariff (All tariffs with 0 if no data)
         $consumptionByTariff = \App\Models\Tariff::query()
-            ->leftJoin('homes', 'tariffs.id', '=', 'homes.tariff_id')
-            ->leftJoin('meters', 'homes.id', '=', 'meters.home_id')
+            ->leftJoin('customers', 'tariffs.id', '=', 'customers.tariff_id')
+            ->leftJoin('meters', 'customers.id', '=', 'meters.customer_id')
             ->leftJoin('meter_readings', 'meters.id', '=', 'meter_readings.meter_id')
             ->select('tariffs.name as name')
             ->selectRaw('COALESCE(SUM(GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))), 0) as value');
@@ -334,7 +371,11 @@ class MeterReadingController extends Controller
             $consumptionByTariff->where('tariffs.id', $tariffId);
         }
         if ($zoneId) {
-            $consumptionByTariff->where('homes.zone_id', $zoneId);
+            $consumptionByTariff->where('customers.zone_id', $zoneId);
+        }
+        if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $consumptionByTariff->whereYear('meter_readings.reading_date', substr($month, 0, 4))
+                ->whereMonth('meter_readings.reading_date', (int) substr($month, 5, 2));
         }
 
         $consumptionByTariff = $consumptionByTariff
@@ -345,8 +386,8 @@ class MeterReadingController extends Controller
         // By Area
         $consumptionByAreaQuery = \App\Models\MeterReading::query()
             ->join('meters', 'meter_readings.meter_id', '=', 'meters.id')
-            ->join('homes', 'meters.home_id', '=', 'homes.id')
-            ->join('areas', 'homes.area_id', '=', 'areas.id')
+            ->join('customers', 'meters.customer_id', '=', 'customers.id')
+            ->join('areas', 'customers.area_id', '=', 'areas.id')
             ->selectRaw('areas.name as name')
             ->selectRaw($consumptionCalculator);
 
@@ -360,13 +401,13 @@ class MeterReadingController extends Controller
         // By Zone
         // By Zone (All zones with 0 if no data)
         $consumptionByZone = \App\Models\Zone::query()
-            ->leftJoin('homes', function($join) use ($tariffId) {
-                $join->on('zones.id', '=', 'homes.zone_id');
+            ->leftJoin('customers', function($join) use ($tariffId) {
+                $join->on('zones.id', '=', 'customers.zone_id');
                 if ($tariffId) {
-                    $join->where('homes.tariff_id', $tariffId);
+                    $join->where('customers.tariff_id', $tariffId);
                 }
             })
-            ->leftJoin('meters', 'homes.id', '=', 'meters.home_id')
+            ->leftJoin('meters', 'customers.id', '=', 'meters.customer_id')
             ->leftJoin('meter_readings', 'meters.id', '=', 'meter_readings.meter_id')
             ->select('zones.name as name')
             ->selectRaw('COALESCE(SUM(GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))), 0) as value');
@@ -390,7 +431,7 @@ class MeterReadingController extends Controller
         // 4. KPIs
         $kpiQuery = \App\Models\MeterReading::query()
             ->join('meters', 'meter_readings.meter_id', '=', 'meters.id')
-            ->join('homes', 'meters.home_id', '=', 'homes.id');
+            ->join('customers', 'meters.customer_id', '=', 'customers.id');
         
         $applyFilters($kpiQuery);
 
@@ -398,15 +439,15 @@ class MeterReadingController extends Controller
         $totalConsumption = $kpiQuery->sum(\DB::raw('GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))'));
         $avgConsumption = $kpiQuery->avg(\DB::raw('GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))'));
 
-        $overdueQuery = MeterReading::with(['meter', 'home.customer'])
+        $overdueQuery = MeterReading::with(['meter', 'customer'])
             ->whereDate('reading_date', '<', now()->subMonth())
             ->when($tariffId, function ($query) use ($tariffId) {
-                $query->whereHas('home', function ($q) use ($tariffId) {
+                $query->whereHas('customer', function ($q) use ($tariffId) {
                     $q->where('tariff_id', $tariffId);
                 });
             })
             ->when($zoneId, function ($query) use ($zoneId) {
-                $query->whereHas('home', function ($q) use ($zoneId) {
+                $query->whereHas('customer', function ($q) use ($zoneId) {
                     $q->where('zone_id', $zoneId);
                 });
             })
@@ -420,7 +461,7 @@ class MeterReadingController extends Controller
                     'id' => $reading->id,
                     'reading_date' => $reading->reading_date,
                     'meter_number' => $reading->meter->meter_number ?? '—',
-                    'customer_name' => $reading->home->customer->name ?? 'Unknown',
+                    'customer_name' => $reading->customer?->name ?? 'Unknown',
                 ];
             });
 
@@ -434,7 +475,7 @@ class MeterReadingController extends Controller
             'totalConsumption' => $totalConsumption,
             'avgConsumption' => $avgConsumption,
             'overdueReadings' => $overdueReadings,
-            'filters' => $request->only(['tariff_id', 'zone_id']),
+            'filters' => $request->only(['tariff_id', 'zone_id', 'month']),
             'tariffs' => \App\Models\Tariff::select('id', 'name')->get(),
             'zones' => \App\Models\Zone::select('id', 'name')->get(),
         ]);
@@ -457,33 +498,33 @@ class MeterReadingController extends Controller
             // 1. Monthly Data (Current Year)
             $monthlyData = \App\Models\MeterReading::query()
                 ->join('meters', 'meter_readings.meter_id', '=', 'meters.id')
-                ->join('homes', 'meters.home_id', '=', 'homes.id')
+                ->join('customers', 'meters.customer_id', '=', 'customers.id')
                 ->selectRaw("DATE_FORMAT(meter_readings.reading_date, '%Y-%m') as month, SUM(GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))) as total")
                 ->whereBetween('meter_readings.reading_date', [now()->startOfYear(), now()->endOfYear()])
-                ->when($tariffId, fn($q) => $q->where('homes.tariff_id', $tariffId))
-                ->when($zoneId, fn($q) => $q->where('homes.zone_id', $zoneId))
+                ->when($tariffId, fn($q) => $q->where('customers.tariff_id', $tariffId))
+                ->when($zoneId, fn($q) => $q->where('customers.zone_id', $zoneId))
                 ->groupBy('month')->orderBy('month')->get();
 
             // 2. Tariff Data (Include all tariffs with 0 if no readings)
             $tariffData = \App\Models\Tariff::query()
-                ->leftJoin('homes', 'tariffs.id', '=', 'homes.tariff_id')
-                ->leftJoin('meters', 'homes.id', '=', 'meters.home_id')
+                ->leftJoin('customers', 'tariffs.id', '=', 'customers.tariff_id')
+                ->leftJoin('meters', 'customers.id', '=', 'meters.customer_id')
                 ->leftJoin('meter_readings', 'meters.id', '=', 'meter_readings.meter_id')
                 ->select('tariffs.name as name')
                 ->selectRaw('COALESCE(SUM(GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))), 0) as value')
                 ->when($tariffId, fn($q) => $q->where('tariffs.id', $tariffId))
-                ->when($zoneId, fn($q) => $q->where('homes.zone_id', $zoneId))
+                ->when($zoneId, fn($q) => $q->where('customers.zone_id', $zoneId))
                 ->groupBy('tariffs.id', 'tariffs.name')->orderByDesc('value')->get();
 
             // 3. Zone Data (Include all zones with 0 if no readings)
             $zoneData = \App\Models\Zone::query()
-                ->leftJoin('homes', function($join) use ($tariffId) {
-                    $join->on('zones.id', '=', 'homes.zone_id');
+                ->leftJoin('customers', function($join) use ($tariffId) {
+                    $join->on('zones.id', '=', 'customers.zone_id');
                     if ($tariffId) {
-                        $join->where('homes.tariff_id', $tariffId);
+                        $join->where('customers.tariff_id', $tariffId);
                     }
                 })
-                ->leftJoin('meters', 'homes.id', '=', 'meters.home_id')
+                ->leftJoin('meters', 'customers.id', '=', 'meters.customer_id')
                 ->leftJoin('meter_readings', 'meters.id', '=', 'meter_readings.meter_id')
                 ->select('zones.name as name')
                 ->selectRaw('COALESCE(SUM(GREATEST(0, meter_readings.current_reading - COALESCE(meter_readings.previous_reading, 0))), 0) as value')
@@ -521,7 +562,7 @@ class MeterReadingController extends Controller
 
     public function show($id)
     {
-        $meterReading = MeterReading::with(['meter.home.customer', 'reader', 'bill'])
+        $meterReading = MeterReading::with(['meter.home', 'reader', 'bill'])
             ->findOrFail($id);
 
         if ($meterReading->image) {

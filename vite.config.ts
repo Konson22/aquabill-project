@@ -25,10 +25,10 @@ export default defineConfig({
         jsx: 'automatic',
     },
     server: {
-        host: '127.0.0.1',
-        // host: '10.243.188.43',
+        host: '192.168.20.55',
         port: 5173,
         strictPort: true,
         cors: true,
+        origin: 'http://192.168.20.55:5173',
     },
 });

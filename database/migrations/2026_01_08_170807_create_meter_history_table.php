@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('meter_history', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('home_id')->constrained()->onDelete('cascade');
             $table->foreignId('meter_id')->constrained()->onDelete('cascade');
             $table->decimal('final_reading', 10, 2)->nullable();
             $table->decimal('total_consumption', 10, 2)->default(0);

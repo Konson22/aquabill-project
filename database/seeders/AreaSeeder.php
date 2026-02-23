@@ -15,13 +15,6 @@ class AreaSeeder extends Seeder
     public function run(): void
     {
         $zonesData = [
-            'ATLABARA' => [
-                'ATLABARA A',
-                'ATLABARA A KATOR',
-                'ATLABARA B',
-                'ATLABARA C',
-                'ATLABARA/KELI BALA'
-            ],
             'HOSPITAL ZONE' => [
                 'HAI CINEMA',
                 'HAI GABAT',
@@ -43,15 +36,7 @@ class AreaSeeder extends Seeder
                 'HAI MUNUKI BLK',
                 'HAI NIMIRA TALATA'
             ],
-            'NYAKURON' => [
-                'HAI NIMIRA TALATA',
-                'HAI NYAKURON',
-                'HAI NYAKURON EAST',
-                'HAI NYAKURON NORTH',
-                'HAI NYAKURON SOUTH EAST',
-                'HAI NYAKURON WEST',
-                'HAI NYAKURON-MIJIKI'
-            ],
+            'NYAKURON' => [],
             'JUBA UNIVERSITY ZONE' => [
                 'HAI KOSTI',
                 'HAI MALAKA MIJIKI',
@@ -62,7 +47,12 @@ class AreaSeeder extends Seeder
                 'HAI MUNUKI BLK A',
                 'HAI NEEM',
                 'HAI THOURA EAST',
-                'HAI THOURA WEST'
+                'HAI THOURA WEST',
+                'ATLABARA A',
+                'ATLABARA A KATOR',
+                'ATLABARA B',
+                'ATLABARA C',
+                'ATLABARA/KELI BALA'
             ],
             'KATOR' => [
                 'HAI KASTOR WEST',

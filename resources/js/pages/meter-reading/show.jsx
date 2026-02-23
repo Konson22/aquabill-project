@@ -59,8 +59,7 @@ export default function Show({ meterReading }) {
                                 Customer
                             </span>
                             <p className="text-base font-semibold">
-                                {meterReading.meter?.home?.customer?.name ??
-                                    'Unknown'}
+                                {meterReading.meter?.home?.name ?? 'Unknown'}
                             </p>
                         </div>
                     </div>

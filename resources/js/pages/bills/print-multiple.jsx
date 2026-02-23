@@ -2,26 +2,41 @@ import PrintBillCard from '@/components/print-bill-card';
 import { Head } from '@inertiajs/react';
 import { useEffect } from 'react';
 
-export default function PrintMultipleBills({ bills }) {
+export default function PrintMultiple({ bills }) {
     useEffect(() => {
         // Auto-print when component loads
-        if (bills.length > 0) {
-            setTimeout(() => {
-                window.print();
-            }, 500);
-        }
-    }, [bills]);
+        window.print();
+    }, []);
 
     return (
         <>
-            <Head title="Print Bills" />
-            <div className="min-h-screen bg-white p-0 print:p-0">
-                {bills.map((bill, index) => (
-                    <div key={bill.id} className="print:block">
+            <Head title={`Print Bills #${bills?.length || ''}`} />
+            <style>
+                {`
+                    @media print {
+                        @page {
+                            size: A4;
+                            margin: 8mm;
+                        }
+                        .print-bill-page {
+                            background: white !important;
+                            padding: 0 !important;
+                        }
+                        .print-bill-item {
+                            page-break-inside: avoid !important;
+                            break-inside: avoid !important;
+                        }
+                        .print-bill-item:nth-of-type(3n) {
+                            page-break-after: always !important;
+                            break-after: page !important;
+                        }
+                    }
+                `}
+            </style>
+            <div className="print-bill-page min-h-screen bg-gray-100 p-4">
+                {bills.map((bill) => (
+                    <div className="print-bill-item" key={bill.id}>
                         <PrintBillCard bill={bill} />
-                        {/* Optional page break logic if needed, but PrintBillCard aims to fit 3 per page. 
-                            If we want to force breaks every 3 items, we can do that here. 
-                        */}
                     </div>
                 ))}
             </div>

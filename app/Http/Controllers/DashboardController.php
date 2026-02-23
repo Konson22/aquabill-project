@@ -6,7 +6,6 @@ use Inertia\Inertia;
 
 use App\Models\Bill;
 use App\Models\Customer;
-use App\Models\Home;
 use App\Models\Invoice;
 use App\Models\Meter;
 use App\Models\MeterReading;
@@ -14,6 +13,7 @@ use App\Models\Payment;
 use App\Models\Tariff;
 use App\Models\User;
 use App\Models\Zone;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -24,11 +24,11 @@ class DashboardController extends Controller
 
         if ($user->department === 'finance') {
             // 1. Core Financial KPIs
-            $totalCollected = Payment::sum('amount');
-            $collectedToday = Payment::whereDate('payment_date', now())->sum('amount');
-            
-            $pendingBillAmount = Bill::whereIn('status', ['pending', 'partial paid'])->sum('current_balance');
-            $pendingInvoiceAmount = Invoice::where('status', 'pending')->sum('amount');
+            $totalCollected = \App\Models\Payment::sum('amount');
+            $collectedToday = \App\Models\Payment::whereDate('payment_date', now())->sum('amount');
+
+            $pendingBillAmount = Bill::whereIn('status', ['pending', 'partial paid'])->get()->sum(fn ($b) => $b->balance);
+            $pendingInvoiceAmount = Invoice::where('status', 'pending')->get()->sum(fn ($i) => $i->balance);
             $totalPending = $pendingBillAmount + $pendingInvoiceAmount;
 
             // 2. Bills Breakdown
@@ -45,10 +45,12 @@ class DashboardController extends Controller
                 'amount' => $pendingBillAmount
             ];
             
-            // Calculate Performance
-            $billingPerformance = $billStats['total'] > 0 
-            ? ($billStats['fully_paid'] / $billStats['total']) * 100 
-            : 0;
+            // Billing performance = total payment amount / total bills amount
+            $totalBillsAmount = (float) Bill::selectRaw('SUM(amount + COALESCE(previous_balance, 0)) as total')->value('total');
+            $totalPaymentsAmount = (float) Payment::where('payable_type', Bill::class)->sum('amount');
+            $billingPerformance = $totalBillsAmount > 0
+                ? ($totalPaymentsAmount / $totalBillsAmount) * 100
+                : 0;
 
             // 3. Invoices Breakdown
             $invoiceStats = [
@@ -64,7 +66,8 @@ class DashboardController extends Controller
             $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             
             foreach ($months as $index => $monthName) {
-                $sum = Payment::whereMonth('payment_date', $index + 1)
+                $sum = Payment::where('payable_type', Bill::class)
+                    ->whereMonth('payment_date', $index + 1)
                     ->whereYear('payment_date', now()->year)
                     ->sum('amount');
                 $revenueTrend[] = [
@@ -84,7 +87,7 @@ class DashboardController extends Controller
                     return [
                         'id' => $bill->id,
                         'customer' => $bill->customer ? $bill->customer->name : 'N/A',
-                        'amount' => $bill->current_balance,
+                        'amount' => $bill->balance,
                         'due_date' => $bill->due_date->format('M d, Y'),
                         'days_overdue' => now()->diffInDays($bill->due_date),
                     ];
@@ -111,11 +114,11 @@ class DashboardController extends Controller
         // Admin Dashboard Data
         
         // 1. Total Revenue
-        $totalRevenue = Payment::sum('amount');
-        $revenueLastMonth = Payment::whereMonth('payment_date', now()->subMonth()->month)
+        $totalRevenue = \App\Models\Payment::sum('amount');
+        $revenueLastMonth = \App\Models\Payment::whereMonth('payment_date', now()->subMonth()->month)
             ->whereYear('payment_date', now()->subMonth()->year)
             ->sum('amount');
-        $revenueThisMonth = Payment::whereMonth('payment_date', now()->month)
+        $revenueThisMonth = \App\Models\Payment::whereMonth('payment_date', now()->month)
             ->whereYear('payment_date', now()->year)
             ->sum('amount');
             
@@ -124,88 +127,132 @@ class DashboardController extends Controller
             $revenueTrend = (($revenueThisMonth - $revenueLastMonth) / $revenueLastMonth) * 100;
         }
 
-        // 2. Meters Stats
+        // 2. Meters Stats (single query)
+        $metersCounts = Meter::selectRaw("
+            COUNT(*) as total,
+            SUM(status = 'active') as active,
+            SUM(status = 'inactive') as inactive,
+            SUM(status = 'maintenance') as maintenance,
+            SUM(status IN ('disconnected', 'disconnect')) as disconnected,
+            SUM(status = 'damage') as damage
+        ")->first();
         $metersStats = [
-            'total' => Meter::count(),
-            'active' => Meter::where('status', 'active')->count(),
-            'inactive' => Meter::where('status', 'inactive')->count(),
-            'maintenance' => Meter::where('status', 'maintenance')->count(),
-            'disconnected' => Meter::where('status', 'disconnected')->orWhere('status', 'disconnect')->count(),
-            'damage' => Meter::where('status', 'damage')->count(),
+            'total' => (int) ($metersCounts->total ?? 0),
+            'active' => (int) ($metersCounts->active ?? 0),
+            'inactive' => (int) ($metersCounts->inactive ?? 0),
+            'maintenance' => (int) ($metersCounts->maintenance ?? 0),
+            'disconnected' => (int) ($metersCounts->disconnected ?? 0),
+            'damage' => (int) ($metersCounts->damage ?? 0),
         ];
-        
-        $metersLastMonth = Meter::whereDate('created_at', '<', now()->startOfMonth())->count();
-        $newMetersThisMonth = Meter::whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->count();
+
+        $metersMonthCounts = Meter::selectRaw("
+            SUM(created_at < ?) as last_month,
+            SUM(MONTH(created_at) = ? AND YEAR(created_at) = ?) as this_month
+        ", [now()->startOfMonth(), now()->month, now()->year])->first();
+        $metersLastMonth = (int) ($metersMonthCounts->last_month ?? 0);
+        $newMetersThisMonth = (int) ($metersMonthCounts->this_month ?? 0);
         $metersTrend = $metersLastMonth > 0 ? ($newMetersThisMonth / $metersLastMonth) * 100 : 0; 
 
-        // 3. Water Usage Breakdown by Category (Current Year)
-        $tariffs = Tariff::all();
-        $usageByCategory = $tariffs->map(function($tariff, $index) {
-            $totalUsage = MeterReading::join('homes', 'meter_readings.home_id', '=', 'homes.id')
-                ->where('homes.tariff_id', $tariff->id)
-                ->whereYear('reading_date', now()->year)
-                ->sum(DB::raw('current_reading - previous_reading'));
+        // 3. Water Usage by Tariff & Zone (2 queries instead of N)
+        $year = now()->year;
+        $usageByTariff = MeterReading::join('customers', 'meter_readings.customer_id', '=', 'customers.id')
+            ->whereYear('meter_readings.reading_date', $year)
+            ->select('customers.tariff_id')
+            ->selectRaw('SUM(meter_readings.current_reading - meter_readings.previous_reading) as total')
+            ->groupBy('customers.tariff_id')
+            ->pluck('total', 'tariff_id');
 
-            $colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
-            
+        $usageByZoneRaw = MeterReading::join('customers', 'meter_readings.customer_id', '=', 'customers.id')
+            ->whereYear('meter_readings.reading_date', $year)
+            ->select('customers.zone_id')
+            ->selectRaw('SUM(meter_readings.current_reading - meter_readings.previous_reading) as total')
+            ->groupBy('customers.zone_id')
+            ->pluck('total', 'zone_id');
+
+        $tariffs = Tariff::all();
+        $colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
+        $usageByCategory = $tariffs->map(function ($tariff, $index) use ($usageByTariff, $colors) {
             return [
                 'name' => $tariff->name,
-                'value' => round((float) $totalUsage, 2),
-                'fill' => $colors[$index % count($colors)]
+                'value' => round((float) ($usageByTariff[$tariff->id] ?? 0), 2),
+                'fill' => $colors[$index % count($colors)],
             ];
         });
 
-        // 3.1 Water Usage by Zone (Current Year)
         $zones = Zone::all();
-        $usageByZone = $zones->map(function($zone, $index) {
-            $totalUsage = MeterReading::join('homes', 'meter_readings.home_id', '=', 'homes.id')
-                ->where('homes.zone_id', $zone->id)
-                ->whereYear('reading_date', now()->year)
-                ->sum(DB::raw('current_reading - previous_reading'));
-
-            $colors = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
-            
+        $usageByZone = $zones->map(function ($zone, $index) use ($usageByZoneRaw, $colors) {
             return [
                 'name' => $zone->name,
-                'value' => round((float) $totalUsage, 2),
-                'fill' => $colors[$index % count($colors)]
+                'value' => round((float) ($usageByZoneRaw[$zone->id] ?? 0), 2),
+                'fill' => $colors[$index % count($colors)],
             ];
         });
        
-        // 4. Homes Stats
+        // 4. Customers (connections) Stats (single query)
+        $customersCounts = Customer::selectRaw("
+            COUNT(*) as total,
+            SUM(supply_status = 'active') as active,
+            SUM(supply_status = 'suspended') as suspended,
+            SUM(supply_status = 'disconnect') as disconnected
+        ")->first();
         $homesStats = [
-            'total' => Home::count(),
-            'active' => Home::where('supply_status', 'active')->count(),
-            'suspended' => Home::where('supply_status', 'suspended')->count(),
-            'disconnected' => Home::where('supply_status', 'disconnect')->count(),
+            'total' => (int) ($customersCounts->total ?? 0),
+            'active' => (int) ($customersCounts->active ?? 0),
+            'suspended' => (int) ($customersCounts->suspended ?? 0),
+            'disconnected' => (int) ($customersCounts->disconnected ?? 0),
         ];
 
-        $homesLastMonth = Home::whereDate('created_at', '<', now()->startOfMonth())->count();
-        $newHomesThisMonth = Home::whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->count();
+        $homesMonthCounts = Customer::selectRaw("
+            SUM(created_at < ?) as last_month,
+            SUM(MONTH(created_at) = ? AND YEAR(created_at) = ?) as this_month
+        ", [now()->startOfMonth(), now()->month, now()->year])->first();
+        $homesLastMonth = (int) ($homesMonthCounts->last_month ?? 0);
+        $newHomesThisMonth = (int) ($homesMonthCounts->this_month ?? 0);
         $homesTrend = $homesLastMonth > 0 ? ($newHomesThisMonth / $homesLastMonth) * 100 : 0;
 
         // 4. Active Now
         $activeNow = User::where('updated_at', '>=', now()->subMinutes(60))->count();
 
-        // 5. Invoices & Bills Stats
-        $billsStats = [
-            'total' => Bill::count(),
-            'pending' => Bill::where('status', 'pending')->count(),
-            'fully_paid' => Bill::where('status', 'fully paid')->count(),
-            'partial_paid' => Bill::where('status', 'partial paid')->count(),
-            'forwarded' => Bill::where('status', 'forwarded')->count(),
-            'balance_forwarded' => Bill::where('status', 'balance forwarded')->count(),
+        // 4.1 Invoice Stats (single query)
+        $invoiceCounts = Invoice::selectRaw("
+            COUNT(*) as total,
+            SUM(status = 'paid') as paid,
+            SUM(status = 'pending') as unpaid
+        ")->first();
+        $invoiceStats = [
+            'total' => (int) ($invoiceCounts->total ?? 0),
+            'paid' => (int) ($invoiceCounts->paid ?? 0),
+            'unpaid' => (int) ($invoiceCounts->unpaid ?? 0),
         ];
-        
-        $pendingBillsAmount = Bill::whereIn('status', ['pending', 'partial paid'])->sum('current_balance'); 
-        
-        $overdueBillsCount = Bill::whereIn('status', ['pending', 'partial paid'])
-             ->where('due_date', '<', now())
-             ->count();
+
+        // 5. Bills Stats (single query for counts)
+        $billsCounts = Bill::selectRaw("
+            COUNT(*) as total,
+            SUM(status = 'pending') as pending,
+            SUM(status = 'fully paid') as fully_paid,
+            SUM(status = 'partial paid') as partial_paid,
+            SUM(status = 'forwarded') as forwarded,
+            SUM(status = 'balance forwarded') as balance_forwarded,
+            SUM(CASE WHEN status IN ('pending', 'partial paid') AND due_date < ? THEN 1 ELSE 0 END) as overdue_count
+        ", [now()])->first();
+        $billsStats = [
+            'total' => (int) ($billsCounts->total ?? 0),
+            'pending' => (int) ($billsCounts->pending ?? 0),
+            'fully_paid' => (int) ($billsCounts->fully_paid ?? 0),
+            'partial_paid' => (int) ($billsCounts->partial_paid ?? 0),
+            'forwarded' => (int) ($billsCounts->forwarded ?? 0),
+            'balance_forwarded' => (int) ($billsCounts->balance_forwarded ?? 0),
+        ];
+        $overdueBillsCount = (int) ($billsCounts->overdue_count ?? 0);
+
+        $pendingBillsAmount = Bill::whereIn('status', ['pending', 'partial paid'])->get()->sum(fn ($b) => $b->balance);
+
+        // Total bills amount (amount + previous_balance) vs total payments (amount_paid) for billing performance
+        $totalBillsAmount = (float) Bill::selectRaw('SUM(amount + COALESCE(previous_balance, 0)) as total')->value('total');
+        $totalPaymentsAmount = (float) Payment::where('payable_type', Bill::class)->sum('amount');
+        $billingPerformance = $totalBillsAmount > 0
+            ? ($totalPaymentsAmount / $totalBillsAmount) * 100
+            : 0;
         
         // 6. Tariffs
         $activeTariffsCount = Tariff::count(); 
@@ -219,31 +266,29 @@ class DashboardController extends Controller
             ->selectRaw('SUM(current_reading - previous_reading) as total')
             ->value('total') ?? 0;
 
-        // 8. Water Usage Overview Chart Data (m³)
+        // 8. Water Usage Overview Chart Data (3 queries instead of 36)
+        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        $usageByMonth = MeterReading::whereYear('reading_date', $year)
+            ->selectRaw('MONTH(reading_date) as month, SUM(current_reading - previous_reading) as total')
+            ->groupBy('month')
+            ->pluck('total', 'month');
+        $billsByMonth = Bill::whereYear('created_at', $year)
+            ->selectRaw('MONTH(created_at) as month, COUNT(*) as total')
+            ->groupBy('month')
+            ->pluck('total', 'month');
+        $paymentsByMonth = Payment::whereYear('payment_date', $year)
+            ->selectRaw('MONTH(payment_date) as month, SUM(amount) as total')
+            ->groupBy('month')
+            ->pluck('total', 'month');
+
         $usageChartData = [];
         $billsChartData = [];
         $paymentChartData = [];
-        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        
         foreach ($months as $index => $monthName) {
-            // Usage data
-            $usageSum = MeterReading::whereMonth('reading_date', $index + 1)
-                ->whereYear('reading_date', now()->year)
-                ->selectRaw('SUM(current_reading - previous_reading) as total')
-                ->value('total') ?? 0;
-            $usageChartData[] = ['name' => $monthName, 'total' => round($usageSum, 2)];
-
-            // Bills generated data
-            $billsCount = Bill::whereMonth('created_at', $index + 1)
-                ->whereYear('created_at', now()->year)
-                ->count();
-            $billsChartData[] = ['name' => $monthName, 'total' => $billsCount];
-
-            // Payment collected data
-            $paymentSum = Payment::whereMonth('payment_date', $index + 1)
-                ->whereYear('payment_date', now()->year)
-                ->sum('amount');
-            $paymentChartData[] = ['name' => $monthName, 'total' => round($paymentSum, 2)];
+            $m = $index + 1;
+            $usageChartData[] = ['name' => $monthName, 'total' => round((float) ($usageByMonth[$m] ?? 0), 2)];
+            $billsChartData[] = ['name' => $monthName, 'total' => (int) ($billsByMonth[$m] ?? 0)];
+            $paymentChartData[] = ['name' => $monthName, 'total' => round((float) ($paymentsByMonth[$m] ?? 0), 2)];
         }
 
         // 9. Overdue Readings (No reading in > 30 days) - simplified logic
@@ -252,15 +297,15 @@ class DashboardController extends Controller
             ->whereDoesntHave('readings', function($query) {
                 $query->where('reading_date', '>=', now()->subDays(30));
             })
-            ->with('home.customer')
+            ->with('customer')
             ->take(5)
             ->get()
             ->map(function($meter) {
                  return [
-                    'serial_number' => $meter->meter_number, // Updated to correct column name if needed, assuming 'meter_number' based on model fillable
-                    'customer' => $meter->home && $meter->home->customer ? $meter->home->customer->name : 'N/A',
+                    'serial_number' => $meter->meter_number,
+                    'customer' => $meter->customer?->name ?? 'N/A',
                     'last_reading_date' => $meter->last_reading_date ?? 'Never',
-                    'location' => $meter->home ? $meter->home->address : 'N/A'
+                    'location' => $meter->customer?->address ?? 'N/A'
                  ];
             });
 
@@ -276,15 +321,11 @@ class DashboardController extends Controller
                     'id' => $bill->id,
                     'bill_number' => $bill->bill_number,
                     'customer' => $bill->customer ? $bill->customer->name : 'N/A',
-                    'amount' => $bill->current_balance,
+                    'amount' => $bill->balance,
                     'due_date' => $bill->due_date,
                     'status' => $bill->status
                 ];
             });
-
-        $billingPerformance = $billsStats['total'] > 0 
-            ? ($billsStats['fully_paid'] / $billsStats['total']) * 100 
-            : 0;
 
         return Inertia::render('dashboard-admin/index', [
             'stats' => [
@@ -296,12 +337,10 @@ class DashboardController extends Controller
                 'homesTrend' => round($homesTrend, 1),
                 'activeNow' => $activeNow,
                 'bills' => $billsStats, // Grouped
-                'invoices' => [
-                    'total' => Invoice::count(),
-                    'paid' => Invoice::where('status', 'paid')->count(),
-                    'unpaid' => Invoice::where('status', 'pending')->count(),
-                ],
+                'invoices' => $invoiceStats,
                 'billingPerformance' => round($billingPerformance, 1),
+                'totalBillsAmount' => round($totalBillsAmount, 2),
+                'totalPaymentsAmount' => round($totalPaymentsAmount, 2),
                 'pendingBillsAmount' => $pendingBillsAmount,
                 'overdueBillsCount' => $overdueBillsCount,
                 'activeTariffsCount' => $activeTariffsCount,
@@ -318,26 +357,81 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function generalReport()
+    public function generalReport(Request $request)
     {
-        $summary = [
-            'customers' => Customer::count(),
-            'homes' => Home::count(),
-            'meters' => Meter::count(),
-            'consumption' => round(
-                MeterReading::whereYear('reading_date', now()->year)
-                    ->selectRaw('SUM(current_reading - previous_reading) as total')
-                    ->value('total') ?? 0,
-                2
-            ),
-        ];
+        $month = $request->input('month');
+        $monthYear = null;
+        $monthNumber = null;
+        if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
+            [$monthYear, $monthNumber] = array_map('intval', explode('-', $month));
+        }
 
-        $overdueBillsCount = Bill::whereIn('status', ['pending', 'partial paid'])
+        $billQuery = Bill::query();
+        if ($monthYear && $monthNumber) {
+            $billQuery->whereYear('created_at', $monthYear)
+                ->whereMonth('created_at', $monthNumber);
+        }
+
+        $totalBills = (clone $billQuery)->count();
+        $paidBills = (clone $billQuery)->where('status', 'fully paid')->count();
+        $unpaidBills = (clone $billQuery)->whereIn('status', ['pending', 'partial paid'])->count();
+
+        $paymentQuery = \App\Models\Payment::query();
+        if ($monthYear && $monthNumber) {
+            $paymentQuery->whereYear('payment_date', $monthYear)->whereMonth('payment_date', $monthNumber);
+        }
+        $totalPaidAmount = $paymentQuery->sum('amount');
+
+        $outstandingAmount = (clone $billQuery)
+            ->whereIn('status', ['pending', 'partial paid'])
+            ->get()->sum(fn ($b) => $b->balance);
+
+        $readingQuery = MeterReading::query();
+        if ($monthYear && $monthNumber) {
+            $readingQuery->whereYear('reading_date', $monthYear)
+                ->whereMonth('reading_date', $monthNumber);
+        } else {
+            $readingQuery->whereYear('reading_date', now()->year);
+        }
+
+        $totalConsumption = round(
+            $readingQuery->selectRaw('SUM(current_reading - previous_reading) as total')
+                ->value('total') ?? 0,
+            2
+        );
+
+        $paymentRate = ($totalPaidAmount + $outstandingAmount) > 0
+            ? ($totalPaidAmount / ($totalPaidAmount + $outstandingAmount)) * 100
+            : 0;
+
+        $usageByZone = Zone::all()->map(function ($zone) use ($monthYear, $monthNumber) {
+            $usageQuery = MeterReading::join('customers', 'meter_readings.customer_id', '=', 'customers.id')
+                ->where('customers.zone_id', $zone->id)
+                ->selectRaw('SUM(current_reading - previous_reading) as total');
+
+            if ($monthYear && $monthNumber) {
+                $usageQuery->whereYear('reading_date', $monthYear)
+                    ->whereMonth('reading_date', $monthNumber);
+            } else {
+                $usageQuery->whereYear('reading_date', now()->year);
+            }
+
+            $totalUsage = $usageQuery->value('total') ?? 0;
+
+            return [
+                'name' => $zone->name,
+                'value' => round((float) $totalUsage, 2),
+            ];
+        });
+
+        $overdueBillsCount = (clone $billQuery)
+            ->whereIn('status', ['pending', 'partial paid'])
             ->where('due_date', '<', now())
             ->count();
-        $overdueBillsAmount = Bill::whereIn('status', ['pending', 'partial paid'])
+        $overdueBillsAmount = (clone $billQuery)
+            ->whereIn('status', ['pending', 'partial paid'])
             ->where('due_date', '<', now())
-            ->sum('current_balance');
+            ->get()->sum(fn ($b) => $b->balance);
 
         $overdueReadingsCount = Meter::where('status', 'active')
             ->whereDoesntHave('readings', function ($query) {
@@ -345,8 +439,8 @@ class DashboardController extends Controller
             })
             ->count();
 
-        $billsTotal = Bill::count();
-        $fullyPaidBills = Bill::where('status', 'fully paid')->count();
+        $billsTotal = (clone $billQuery)->count();
+        $fullyPaidBills = (clone $billQuery)->where('status', 'fully paid')->count();
         $collectionRate = $billsTotal > 0 ? ($fullyPaidBills / $billsTotal) * 100 : 0;
 
         $highlights = [
@@ -368,8 +462,18 @@ class DashboardController extends Controller
         ];
 
         return Inertia::render('dashboard-admin/general-report', [
-            'stats' => $summary,
+            'stats' => [
+                'totalBills' => $totalBills,
+                'paidBills' => $paidBills,
+                'unpaidBills' => $unpaidBills,
+                'totalPaidAmount' => round($totalPaidAmount, 2),
+                'outstandingAmount' => round($outstandingAmount, 2),
+                'totalConsumption' => $totalConsumption,
+                'paymentRate' => round($paymentRate, 1),
+            ],
+            'usageByZone' => $usageByZone,
             'highlights' => $highlights,
+            'filters' => $request->only(['month']),
         ]);
     }
 }

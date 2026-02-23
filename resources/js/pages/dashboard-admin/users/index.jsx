@@ -67,7 +67,6 @@ export default function Users({ users }) {
 
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
-        email: '',
         password: '',
         password_confirmation: '',
         department: 'admin',
@@ -154,20 +153,6 @@ export default function Users({ users }) {
                                         placeholder="e.g. John Doe"
                                     />
                                     <InputError message={errors.name} />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email Address</Label>
-                                    <Input
-                                        id="email"
-                                        type="email"
-                                        value={data.email}
-                                        onChange={(e) =>
-                                            setData('email', e.target.value)
-                                        }
-                                        placeholder="e.g. john@example.com"
-                                    />
-                                    <InputError message={errors.email} />
                                 </div>
 
                                 <div className="space-y-2">
@@ -286,8 +271,8 @@ export default function Users({ users }) {
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span>{user.name}</span>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {user.email}
+                                                    <span className="text-xs text-muted-foreground capitalize">
+                                                        {user.department}
                                                     </span>
                                                 </div>
                                             </div>

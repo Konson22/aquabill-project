@@ -14,7 +14,6 @@ class ZoneSeeder extends Seeder
     public function run(): void
     {
         $zones = [
-            'ATLABARA',
             'HOSPITAL ZONE',
             'JEBEL ZONE',
             'NYAKURON',

@@ -9,7 +9,21 @@ import {
     Receipt,
 } from 'lucide-react';
 
-export default function FinanceSection({ stats, performance, invoices }) {
+function formatCurrency(value) {
+    if (value == null || Number.isNaN(value)) return '—';
+    return new Intl.NumberFormat(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+}
+
+export default function FinanceSection({
+    stats,
+    performance,
+    invoices,
+    totalBillsAmount = 0,
+    totalPaymentsAmount = 0,
+}) {
     if (!stats || !invoices) return null;
 
     const items = [
@@ -156,23 +170,35 @@ export default function FinanceSection({ stats, performance, invoices }) {
                             <div
                                 className="absolute inset-0 rounded-full border-8 border-emerald-500 transition-all duration-1000 ease-out"
                                 style={{
-                                    clipPath: `inset(0 0 ${100 - performance}% 0)`,
+                                    clipPath: `inset(0 0 ${100 - Math.min(100, Math.max(0, Number(performance) || 0))}% 0)`,
                                 }}
                             />
                             <div className="flex flex-col items-center text-center">
                                 <span className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                                    {performance}%
+                                    {Math.min(
+                                        100,
+                                        Math.max(0, Number(performance) || 0),
+                                    ).toFixed(1)}
+                                    %
                                 </span>
                                 <span className="text-xs text-slate-500">
-                                    Bills Collected
+                                    Amount collected vs billed
                                 </span>
                             </div>
                         </div>
-                        <div className="mt-6 flex w-full items-center justify-between text-sm text-slate-500">
-                            <span>Total Bills Issued</span>
-                            <span className="font-semibold text-slate-900 dark:text-slate-100">
-                                {stats.total}
-                            </span>
+                        <div className="mt-6 w-full space-y-2 text-sm text-slate-500">
+                            <div className="flex items-center justify-between">
+                                <span>Total bills amount</span>
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                    {formatCurrency(totalBillsAmount)}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span>Payments collected</span>
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">
+                                    {formatCurrency(totalPaymentsAmount)}
+                                </span>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

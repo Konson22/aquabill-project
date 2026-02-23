@@ -33,7 +33,6 @@ import { formatCurrency } from '@/lib/utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertCircle,
-    BarChart3,
     Calendar,
     CheckCircle,
     CreditCard,
@@ -98,11 +97,27 @@ export default function Bills({ bills, filters }) {
         }
     };
 
+    const getBillTotal = (bill) => {
+        if (bill == null) return 0;
+        const total =
+            bill.total_amount ??
+            Number(bill.amount) + Number(bill.previous_balance ?? 0);
+        return Number(total);
+    };
+
+    const getBillBalance = (bill) => {
+        if (bill == null) return 0;
+        const total = getBillTotal(bill);
+        const paid = Number(bill.amount_paid ?? 0);
+        return Math.max(0, total - paid);
+    };
+
     const handlePayClick = (bill) => {
         setPaymentBill(bill);
+        const balance = getBillBalance(bill);
         setPayData({
             bill_id: bill.id,
-            amount: bill.current_balance,
+            amount: balance > 0 ? String(balance) : '',
             payment_date: new Date().toISOString().split('T')[0],
             payment_method: 'cash',
             reference_number: '',
@@ -155,9 +170,9 @@ export default function Bills({ bills, filters }) {
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" asChild className="gap-2">
-                            <Link href={route('bills.report')}>
-                                <BarChart3 className="h-4 w-4" />
-                                View Reports
+                            <Link href={route('bills.printing-list')}>
+                                <Printer className="h-4 w-4" />
+                                Pending Bills
                             </Link>
                         </Button>
                     </div>
@@ -187,7 +202,7 @@ export default function Bills({ bills, filters }) {
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
                                     <TableHead className="w-[120px]">
-                                        Bill ID
+                                        Reading ID
                                     </TableHead>
                                     <TableHead>Customer</TableHead>
 
@@ -201,7 +216,7 @@ export default function Bills({ bills, filters }) {
                                         Amount
                                     </TableHead>
                                     <TableHead className="text-right">
-                                        Curr. Balance
+                                        Total Amount
                                     </TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead className="text-right">
@@ -225,7 +240,9 @@ export default function Bills({ bills, filters }) {
                                                     className="flex items-center gap-1 text-primary hover:underline"
                                                 >
                                                     <FileText className="h-3 w-3" />
-                                                    {bill.bill_number}
+                                                    {bill.meter_reading_id ??
+                                                        bill.meterReading?.id ??
+                                                        '-'}
                                                 </Link>
                                             </TableCell>
                                             <TableCell>
@@ -239,13 +256,18 @@ export default function Bills({ bills, filters }) {
 
                                             <TableCell>
                                                 <div className="flex items-center gap-1 font-mono text-sm">
-                                                    {bill.home?.meter ? (
+                                                    {(bill.meterReading?.meter
+                                                        ?.meter_number ??
+                                                    bill.customer?.meter
+                                                        ?.meter_number) ? (
                                                         <>
                                                             <Zap className="h-3 w-3 text-amber-500" />
-                                                            {
-                                                                bill.home.meter
-                                                                    .meter_number
-                                                            }
+                                                            {bill.meterReading
+                                                                ?.meter
+                                                                ?.meter_number ??
+                                                                bill.customer
+                                                                    ?.meter
+                                                                    ?.meter_number}
                                                         </>
                                                     ) : (
                                                         <span className="text-muted-foreground">
@@ -276,20 +298,14 @@ export default function Bills({ bills, filters }) {
                                             <TableCell className="text-right">
                                                 <span className="font-medium">
                                                     {formatCurrency(
-                                                        bill.total_amount,
+                                                        bill.amount,
                                                     )}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <span
-                                                    className={`text-sm font-medium ${
-                                                        bill.current_balance > 0
-                                                            ? 'text-red-600'
-                                                            : 'text-green-600'
-                                                    }`}
-                                                >
+                                                <span className="font-medium">
                                                     {formatCurrency(
-                                                        bill.current_balance,
+                                                        getBillTotal(bill),
                                                     )}
                                                 </span>
                                             </TableCell>
@@ -516,7 +532,7 @@ export default function Bills({ bills, filters }) {
                         <DialogDescription>
                             Enter payment details for bill{' '}
                             <span className="font-mono font-medium text-foreground">
-                                {paymentBill?.bill_number}
+                                {paymentBill?.bill_number ?? paymentBill?.id}
                             </span>
                             .
                         </DialogDescription>
@@ -532,7 +548,7 @@ export default function Bills({ bills, filters }) {
                                         </span>
                                         <div className="font-medium">
                                             {formatCurrency(
-                                                paymentBill.total_amount,
+                                                getBillTotal(paymentBill),
                                             )}
                                         </div>
                                     </div>
@@ -544,7 +560,9 @@ export default function Bills({ bills, filters }) {
                                             {formatCurrency(
                                                 Math.max(
                                                     0,
-                                                    paymentBill.current_balance -
+                                                    getBillBalance(
+                                                        paymentBill,
+                                                    ) -
                                                         (parseFloat(
                                                             payData.amount,
                                                         ) || 0),
@@ -566,18 +584,25 @@ export default function Bills({ bills, filters }) {
                                         id="amount"
                                         type="number"
                                         step="0.01"
-                                        max={paymentBill?.current_balance}
+                                        min="0"
+                                        max={
+                                            paymentBill
+                                                ? getBillBalance(paymentBill)
+                                                : undefined
+                                        }
                                         value={payData.amount}
                                         onChange={(e) => {
                                             const val = e.target.value;
+                                            const maxVal = paymentBill
+                                                ? getBillBalance(paymentBill)
+                                                : 0;
                                             if (
-                                                paymentBill &&
-                                                parseFloat(val) >
-                                                    paymentBill.current_balance
+                                                val !== '' &&
+                                                parseFloat(val) > maxVal
                                             ) {
                                                 setPayData(
                                                     'amount',
-                                                    paymentBill.current_balance,
+                                                    String(maxVal),
                                                 );
                                             } else {
                                                 setPayData('amount', val);

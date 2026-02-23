@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Home;
+use App\Models\Customer;
 use App\Models\Zone;
 use App\Models\Area;
 use App\Models\Tariff;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+/**
+ * "Homes" list and CRUD – now backed by Customer (one customer = one connection).
+ */
 class HomeController extends Controller
 {
     public function search(Request $request)
@@ -19,29 +22,27 @@ class HomeController extends Controller
             return response()->json([]);
         }
 
-        $homes = Home::query()
-            ->with(['customer:id,name', 'meter:id,meter_number']) // Optimized loading
-            ->where(function($q) use ($search) {
+        $customers = Customer::query()
+            ->with(['meter:id,meter_number'])
+            ->where(function ($q) use ($search) {
                 $q->where('address', 'like', "%{$search}%")
-                  ->orWhere('plot_number', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function ($q2) use ($search) {
-                      $q2->where('name', 'like', "%{$search}%");
-                  })
-                  ->orWhereHas('meter', function ($q) use ($search) {
-                      $q->where('meter_number', 'like', "%{$search}%");
-                  });
+                    ->orWhere('plot_number', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhereHas('meter', function ($q) use ($search) {
+                        $q->where('meter_number', 'like', "%{$search}%");
+                    });
             })
             ->limit(10)
-            ->get(['id', 'address', 'plot_number', 'customer_id']);
+            ->get(['id', 'name', 'address', 'plot_number']);
 
-        $results = $homes->map(function ($home) {
+        $results = $customers->map(function ($customer) {
             return [
-                'id' => $home->id,
-                'label' => "{$home->address} - " . ($home->customer->name ?? 'No Customer'),
-                'value' => $home->id,
-                'customer_name' => $home->customer->name ?? null,
-                'plot_number' => $home->plot_number,
-                'meter_number' => $home->meter->meter_number ?? null,
+                'id' => $customer->id,
+                'label' => ($customer->address ?? $customer->name) . ' - ' . $customer->name,
+                'value' => $customer->id,
+                'customer_name' => $customer->name,
+                'plot_number' => $customer->plot_number,
+                'meter_number' => $customer->meter?->meter_number ?? null,
             ];
         });
 
@@ -50,29 +51,21 @@ class HomeController extends Controller
 
     public function index(Request $request)
     {
-        $homes = Home::query()
-            ->with(['customer', 'meter', 'zone', 'area', 'tariff', 'latestReading'])
+        $homes = Customer::query()
+            ->with(['meter', 'zone', 'area', 'tariff', 'latestReading'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('address', 'like', "%{$search}%")
                         ->orWhere('plot_number', 'like', "%{$search}%")
-                        ->orWhereHas('customer', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        })
+                        ->orWhere('name', 'like', "%{$search}%")
                         ->orWhereHas('meter', function ($q) use ($search) {
                             $q->where('meter_number', 'like', "%{$search}%");
                         });
                 });
             })
-            ->when($request->zone_id, function ($query, $zoneId) {
-                $query->where('zone_id', $zoneId);
-            })
-            ->when($request->area_id, function ($query, $areaId) {
-                $query->where('area_id', $areaId);
-            })
-            ->when($request->tariff_id, function ($query, $tariffId) {
-                $query->where('tariff_id', $tariffId);
-            })
+            ->when($request->zone_id, fn ($q, $v) => $q->where('zone_id', $v))
+            ->when($request->area_id, fn ($q, $v) => $q->where('area_id', $v))
+            ->when($request->tariff_id, fn ($q, $v) => $q->where('tariff_id', $v))
             ->latest()
             ->paginate(10)
             ->withQueryString();
@@ -81,48 +74,39 @@ class HomeController extends Controller
             'homes' => $homes,
             'filters' => $request->only(['search', 'zone_id', 'area_id', 'tariff_id']),
             'zones' => Zone::select('id', 'name')->get(),
-            'areas' => Area::select('id', 'name')->get(), // Assuming Area model exists and has name
+            'areas' => Area::select('id', 'name')->get(),
             'tariffs' => Tariff::select('id', 'name')->get(),
             'summary' => [
-                'total_homes' => Home::count(),
-                'with_meters' => Home::has('meter')->count(),
-                'with_customers' => Home::has('customer')->count(),
+                'total_homes' => Customer::count(),
+                'with_meters' => Customer::has('meter')->count(),
+                'with_customers' => Customer::count(),
             ],
         ]);
     }
+
     public function export(Request $request)
     {
-        $filename = 'homes-export-' . date('Y-m-d') . '.csv';
-
-        $homes = Home::query()
-            ->with(['customer', 'meter', 'zone', 'area', 'tariff', 'latestReading'])
+        $homes = Customer::query()
+            ->with(['meter', 'zone', 'area', 'tariff', 'latestReading'])
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('address', 'like', "%{$search}%")
                         ->orWhere('plot_number', 'like', "%{$search}%")
-                        ->orWhereHas('customer', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        })
+                        ->orWhere('name', 'like', "%{$search}%")
                         ->orWhereHas('meter', function ($q) use ($search) {
                             $q->where('meter_number', 'like', "%{$search}%");
                         });
                 });
             })
-            ->when($request->zone_id, function ($query, $zoneId) {
-                $query->where('zone_id', $zoneId);
-            })
-            ->when($request->area_id, function ($query, $areaId) {
-                $query->where('area_id', $areaId);
-            })
-            ->when($request->tariff_id, function ($query, $tariffId) {
-                $query->where('tariff_id', $tariffId);
-            })
+            ->when($request->zone_id, fn ($q, $v) => $q->where('zone_id', $v))
+            ->when($request->area_id, fn ($q, $v) => $q->where('area_id', $v))
+            ->when($request->tariff_id, fn ($q, $v) => $q->where('tariff_id', $v))
             ->latest()
             ->get();
 
         $headers = [
             "Content-type" => "text/csv",
-            "Content-Disposition" => "attachment; filename=$filename",
+            "Content-Disposition" => "attachment; filename=homes-export-" . date('Y-m-d') . ".csv",
             "Pragma" => "no-cache",
             "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
             "Expires" => "0"
@@ -134,19 +118,17 @@ class HomeController extends Controller
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
-            foreach ($homes as $home) {
-                $row = [
-                    $home->id,
-                    $home->address,
-                    $home->plot_number,
-                    $home->customer ? $home->customer->name : 'N/A',
-                    $home->zone ? $home->zone->name : 'N/A',
-                    $home->area ? $home->area->name : 'N/A',
-                    $home->tariff ? $home->tariff->name : 'N/A',
-                    $home->meter ? $home->meter->meter_number : 'N/A',
-                ];
-
-                fputcsv($file, $row);
+            foreach ($homes as $row) {
+                fputcsv($file, [
+                    $row->id,
+                    $row->address ?? '',
+                    $row->plot_number ?? '',
+                    $row->name,
+                    $row->zone?->name ?? 'N/A',
+                    $row->area?->name ?? 'N/A',
+                    $row->tariff?->name ?? 'N/A',
+                    $row->meter?->meter_number ?? 'N/A',
+                ]);
             }
 
             fclose($file);
@@ -166,33 +148,39 @@ class HomeController extends Controller
             'tariff_id' => 'required|exists:tariffs,id',
         ]);
 
-        Home::create($validated);
+        $customer = Customer::findOrFail($validated['customer_id']);
+        $customer->update([
+            'address' => $validated['address'],
+            'plot_number' => $validated['plot_number'],
+            'zone_id' => $validated['zone_id'],
+            'area_id' => $validated['area_id'],
+            'tariff_id' => $validated['tariff_id'],
+        ]);
 
-        return redirect()->back()->with('success', 'Home created successfully.');
+        return redirect()->back()->with('success', 'Connection updated successfully.');
     }
 
-    public function show(Home $home)
+    public function show(Customer $home)
     {
-        return redirect()->route('customers.home', $home);
+        return redirect()->route('customers.home', $home->id);
     }
 
-    public function edit(Home $home)
+    public function edit(Customer $home)
     {
         return Inertia::render('homes/edit', [
-            'home' => $home->load(['customer', 'zone', 'area', 'tariff']),
-            'customers' => \App\Models\Customer::select('id', 'name')->get(),
+            'home' => $home->load(['zone', 'area', 'tariff']),
+            'customers' => Customer::select('id', 'name')->get(),
             'zones' => Zone::select('id', 'name')->get(),
             'areas' => Area::select('id', 'name')->get(),
             'tariffs' => Tariff::select('id', 'name')->get(),
         ]);
     }
 
-    public function update(Request $request, Home $home)
+    public function update(Request $request, Customer $home)
     {
         $validated = $request->validate([
             'address' => 'required|string|max:255',
             'plot_number' => 'required|string|max:50',
-            'customer_id' => 'required|exists:customers,id',
             'zone_id' => 'required|exists:zones,id',
             'area_id' => 'required|exists:areas,id',
             'tariff_id' => 'required|exists:tariffs,id',
@@ -200,13 +188,13 @@ class HomeController extends Controller
 
         $home->update($validated);
 
-        return redirect()->route('homes.index')->with('success', 'Home updated successfully.');
+        return redirect()->route('homes.index')->with('success', 'Connection updated successfully.');
     }
 
-    public function destroy(Home $home)
+    public function destroy(Customer $home)
     {
         $home->delete();
 
-        return redirect()->back()->with('success', 'Home deleted successfully.');
+        return redirect()->back()->with('success', 'Connection deleted successfully.');
     }
 }

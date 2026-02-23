@@ -34,8 +34,9 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('docs/system-documentation');
     })->name('docs.system');
 
-    // Dashboards
-    Route::get('/api/h/search', [HomeController::class, 'search'])->name('homes.search');
+    // Search (customer search used by invoice modal; homes.search kept for backward compatibility)
+    Route::get('/api/h/search', [CustomerController::class, 'search'])->name('homes.search');
+    Route::get('/api/customers/search', [CustomerController::class, 'search'])->name('customers.search');
     Route::get('/api/m/search', [MeterController::class, 'search'])->name('meters.search');
     // Admin Routes
     Route::middleware(['department:admin'])->group(function () {
@@ -54,7 +55,7 @@ Route::middleware(['auth'])->group(function () {
         
         // Bills
         Route::get('bills', [BillController::class, 'index'])->name('bills');
-        Route::get('bills/report', [BillController::class, 'report'])->name('bills.report');
+        Route::get('bills/printing-list', [BillController::class, 'printingList'])->name('bills.printing-list');
         Route::get('bills/bulk-print', [BillController::class, 'bulkPrint'])->name('bills.bulk-print');
         Route::get('bills/export', [BillController::class, 'export'])->name('bills.export');
         Route::get('bills/{id}', [BillController::class, 'show'])->name('bills.show');
@@ -126,20 +127,19 @@ Route::middleware(['auth'])->group(function () {
         Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
         Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
         Route::get('customers/create', [CustomerController::class, 'create'])->name('customers.create');
-        Route::get('customers/homes/{home}', [CustomerController::class, 'home'])->name('customers.home');
+        Route::get('customers/homes/{id}', [CustomerController::class, 'home'])->name('customers.home');
         Route::get('customers/{id}', [CustomerController::class, 'show'])->name('customers.show');
         Route::get('customers/{id}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('customers/{id}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('customers/{id}', [CustomerController::class, 'destroy'])->name('customers.destroy');
         
-        // Homes
-        Route::get('homes', [HomeController::class, 'index'])->name('homes.index');
-        Route::get('homes/export', [HomeController::class, 'export'])->name('homes.export');
-        Route::post('homes', [HomeController::class, 'store'])->name('homes.store');
-        Route::get('homes/{home}', [HomeController::class, 'show'])->name('homes.show');
-        Route::get('homes/{home}/edit', [HomeController::class, 'edit'])->name('homes.edit');
-        Route::put('homes/{home}', [HomeController::class, 'update'])->name('homes.update');
-        Route::delete('homes/{home}', [HomeController::class, 'destroy'])->name('homes.destroy');
+        // Homes (merged into customers: same controller, old URLs still work)
+        Route::get('homes', [CustomerController::class, 'index'])->name('homes.index');
+        Route::get('homes/export', [CustomerController::class, 'export'])->name('homes.export');
+        Route::get('homes/{id}', [CustomerController::class, 'show'])->name('homes.show');
+        Route::get('homes/{id}/edit', [CustomerController::class, 'edit'])->name('homes.edit');
+        Route::put('homes/{id}', [CustomerController::class, 'update'])->name('homes.update');
+        Route::delete('homes/{id}', [CustomerController::class, 'destroy'])->name('homes.destroy');
         Route::get('homes/{home}/meter/assign', [MeterController::class, 'assign'])->name('meters.assign');
     });
 

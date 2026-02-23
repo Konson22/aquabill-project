@@ -13,7 +13,6 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     Calendar,
-    Mail,
     MapPin,
     Phone,
     Settings,
@@ -93,8 +92,8 @@ export default function ProfileIndex() {
                                             {user.department || 'Staff'}
                                         </Badge>
                                         <span className="flex items-center gap-1">
-                                            <Mail className="h-3.5 w-3.5" />
-                                            {user.email}
+                                            <User className="h-3.5 w-3.5" />
+                                            {user.name}
                                         </span>
                                     </div>
                                 </div>

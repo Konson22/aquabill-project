@@ -12,8 +12,6 @@ class Invoice extends Model
     protected $fillable = [
         'invoice_number',
         'customer_id',
-        'home_id',
-        'type',
         'description',
         'amount',
         'due_date',
@@ -28,19 +26,40 @@ class Invoice extends Model
         ];
     }
 
+    /**
+     * Get total amount paid from payments.
+     */
+    public function getAmountPaidAttribute(): float
+    {
+        return (float) $this->payments()->sum('amount');
+    }
+
+    /**
+     * Get balance (amount - amount_paid).
+     */
+    public function getBalanceAttribute(): float
+    {
+        return (float) $this->amount - $this->amount_paid;
+    }
+
+    /**
+     * Get balance after (same as balance for compatibility).
+     */
+    public function getBalanceAfterAttribute(): float
+    {
+        return $this->balance;
+    }
+
     public function customer()
     {
         return $this->belongsTo(Customer::class);
     }
 
-    public function home()
-    {
-        return $this->belongsTo(Home::class);
-    }
-
+    /**
+     * Get all payments for this invoice.
+     */
     public function payments()
     {
         return $this->morphMany(Payment::class, 'payable');
     }
 }
-

@@ -3,114 +3,69 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class CustomerController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Lists customers (with address/meter) for API compatibility.
      */
     public function index(Request $request)
     {
-        $customers = \App\Models\Customer::query()
-            ->when($request->search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('email', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
+        try {
+            $query = Customer::query()
+                ->has('meter')
+                ->with([
+                    'meter',
+                    'zone',
+                    'area',
+                    'tariff',
+                    'latestReading',
+                ]);
+
+            $user = $request->user();
+            if ($user && $user->zone_id !== null) {
+                $query->where('zone_id', $user->zone_id);
+            }
+
+            $customers = $query->latest()
+                ->get()
+                ->map(function ($customer) {
+                    return [
+                        'home_id' => $customer->id,
+                        'address' => $customer->address,
+                        'plot_number' => $customer->plot_number,
+                        'customer_name' => $customer->name,
+                        'meter' => $customer->meter ? [
+                            'id' => $customer->meter->id,
+                            'meter_number' => $customer->meter->meter_number,
+                            'status' => $customer->meter->status,
+                        ] : null,
+                        'zone' => $customer->zone?->name,
+                        'area' => $customer->area?->name,
+                        'tariff' => [
+                            'name' => $customer->tariff?->name ?? 'N/A',
+                            'price' => $customer->tariff?->price ?? 0,
+                            'fixed_charge' => $customer->tariff?->fixed_charge ?? 0,
+                        ],
+                        'latest_reading' => [
+                            'current_reading' => $customer->latestReading?->current_reading ?? 0,
+                            'reading_date' => $customer->latestReading?->reading_date ?? 'N/A',
+                        ],
+                    ];
                 });
-            })
-            ->withCount('homes')
-            ->latest()
-            ->paginate(10);
-
-        return response()->json($customers);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
-            'email' => 'nullable|email|max:255',
-            'address' => 'nullable|string|max:255',
-            'plot_number' => 'nullable|string|max:50',
-            'zone_id' => 'nullable|exists:zones,id',
-            'area_id' => 'nullable|exists:areas,id',
-            'tariff_id' => 'nullable|exists:tariffs,id',
-            'meter_id' => 'nullable|exists:meters,id',
-            'installation_fee' => 'nullable|numeric|min:0',
-        ]);
-
-        $customer = \App\Models\Customer::create([
-            'name' => $validated['name'],
-            'phone' => $validated['phone'],
-            'email' => $validated['email'] ?? null,
-        ]);
-
-        if (!empty($validated['address']) || !empty($validated['plot_number'])) {
-            $home = $customer->homes()->create([
-                'address' => $validated['address'],
-                'plot_number' => $validated['plot_number'],
-                'zone_id' => $validated['zone_id'],
-                'area_id' => $validated['area_id'],
-                'tariff_id' => $validated['tariff_id'],
+        } catch (\Throwable $e) {
+            Log::error('Failed to load customers (homes API)', [
+                'error' => $e->getMessage(),
             ]);
 
-            if (!empty($validated['meter_id'])) {
-                $meter = \App\Models\Meter::find($validated['meter_id']);
-                if ($meter) {
-                    $meter->update([
-                        'home_id' => $home->id,
-                        'status' => 'active',
-                    ]);
-                    $home->update([
-                        'meter_install_date' => now()
-                    ]);
-                }
-            }
+            return response()->json([
+                'message' => 'Failed to load data.',
+            ], 500);
         }
 
-        return response()->json($customer->load('homes.meter'), 201);
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        $customer = \App\Models\Customer::with('homes.meter')->findOrFail($id);
-        return response()->json($customer);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|max:20',
-            'email' => 'nullable|email|max:255',
-        ]);
-
-        $customer = \App\Models\Customer::findOrFail($id);
-        $customer->update($validated);
-
-        return response()->json($customer);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        $customer = \App\Models\Customer::findOrFail($id);
-        $customer->delete();
-
-        return response()->json(null, 204);
+        return response()->json($customers);
     }
 }
