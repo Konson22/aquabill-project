@@ -7,8 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import { store } from '@/routes/login';
-import { request as forgotPassword } from '@/routes/password';
-import { Form, Head, Link } from '@inertiajs/react';
+import { Form, Head } from '@inertiajs/react';
 import { CheckCircle2, ChevronDown, Lock, User } from 'lucide-react';
 
 export default function Login({ status, users = [] }) {
@@ -72,20 +71,12 @@ export default function Login({ status, users = [] }) {
                             </div>
 
                             <div className="grid gap-2">
-                                <div className="flex items-center justify-between">
-                                    <Label
-                                        htmlFor="password"
-                                        className="text-sm font-semibold text-white/90"
-                                    >
-                                        Password
-                                    </Label>
-                                    <Link
-                                        href={forgotPassword().url}
-                                        className="text-xs font-medium text-white/60 transition-colors hover:text-white hover:underline"
-                                    >
-                                        Forgot password?
-                                    </Link>
-                                </div>
+                                <Label
+                                    htmlFor="password"
+                                    className="text-sm font-semibold text-white/90"
+                                >
+                                    Password
+                                </Label>
                                 <div className="relative">
                                     <Lock className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-white/50" />
                                     <Input
