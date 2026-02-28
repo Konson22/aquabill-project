@@ -17,34 +17,17 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Admin User',
                 'department' => 'admin',
-                'password' => 'Konsonak@github2',
+                'password' => '123',
             ],
-            [
-                'name' => 'Admin User 2',
-                'department' => 'admin',
-                'password' => 'Konsonak@github2',
-            ],
-            // Finance department - 2 users
             [
                 'name' => 'Finance User',
                 'department' => 'finance',
-                'password' => 'Konsonak@github2',
+                'password' => '123',
             ],
-            [
-                'name' => 'Finance User 2',
-                'department' => 'finance',
-                'password' => 'Konsonak@github2',
-            ],
-            // Meters department - 2 users
             [
                 'name' => 'Meters User',
                 'department' => 'meters',
-                'password' => 'Konsonak@github2',
-            ],
-            [
-                'name' => 'Meters User 2',
-                'department' => 'meters',
-                'password' => 'Konsonak@github2',
+                'password' => '123',
             ],
         ];
 

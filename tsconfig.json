@@ -122,7 +122,6 @@
         "resources/js/pages/settings/appearance.jsx",
         "resources/js/lib/utils.js",
         "resources/js/layouts/auth/auth-split-layout.jsx",
-        "resources/js/layouts/auth/auth-simple-layout.jsx",
         "resources/js/layouts/app/app-header-layout.jsx",
         "resources/js/layouts/app/app-sidebar-layout.jsx",
         "resources/js/layouts/auth/auth-card-layout.jsx",

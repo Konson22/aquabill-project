@@ -26,7 +26,7 @@ export default function Login({ status, users = [] }) {
                 {({ processing, errors }) => (
                     <>
                         {status && (
-                            <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+                            <Alert className="border-green-200 bg-green-50 text-green-800">
                                 <CheckCircle2 className="h-4 w-4" />
                                 <AlertDescription>{status}</AlertDescription>
                             </Alert>
@@ -36,13 +36,13 @@ export default function Login({ status, users = [] }) {
                             <div className="grid gap-2">
                                 <Label
                                     htmlFor="user"
-                                    className="text-sm font-semibold text-white/90"
+                                    className="text-sm font-semibold text-slate-700"
                                 >
                                     User
                                 </Label>
                                 <div className="relative">
-                                    <User className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 pointer-events-none text-white/50" />
-                                    <ChevronDown className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 pointer-events-none text-white/50" />
+                                    <User className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 pointer-events-none text-slate-400" />
+                                    <ChevronDown className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 pointer-events-none text-slate-400" />
                                     <select
                                         id="user"
                                         name="name"
@@ -50,17 +50,16 @@ export default function Login({ status, users = [] }) {
                                         autoFocus
                                         tabIndex={1}
                                         autoComplete="username"
-                                        className={`h-12 w-full rounded-md border bg-white/10 pl-9 pr-10 text-white focus:ring-2 focus:ring-white/30 focus:border-white/30 outline-none appearance-none cursor-pointer ${errors.name ? 'border-destructive focus:ring-destructive' : 'border-white/20'}`}
-                                        style={{ colorScheme: 'dark' }}
+                                        className={`h-12 w-full rounded-md border bg-white pl-9 pr-10 text-slate-900 shadow-sm focus:ring-2 focus:ring-slate-300 focus:border-slate-300 outline-none appearance-none cursor-pointer ${errors.name ? 'border-destructive focus:ring-destructive' : 'border-slate-200'}`}
                                     >
-                                        <option value="" className="bg-gray-900 text-white">
+                                        <option value="" className="bg-white text-slate-900">
                                             Select user
                                         </option>
                                         {users.map((user) => (
                                             <option
                                                 key={user.id}
                                                 value={user.name}
-                                                className="bg-gray-900 text-white"
+                                                className="bg-white text-slate-900"
                                             >
                                                 {user.name}
                                             </option>
@@ -73,12 +72,12 @@ export default function Login({ status, users = [] }) {
                             <div className="grid gap-2">
                                 <Label
                                     htmlFor="password"
-                                    className="text-sm font-semibold text-white/90"
+                                    className="text-sm font-semibold text-slate-700"
                                 >
                                     Password
                                 </Label>
                                 <div className="relative">
-                                    <Lock className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-white/50" />
+                                    <Lock className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
                                     <Input
                                         id="password"
                                         type="password"
@@ -87,7 +86,7 @@ export default function Login({ status, users = [] }) {
                                         tabIndex={2}
                                         autoComplete="current-password"
                                         placeholder="Enter your password"
-                                        className={`border-white/20 bg-white/10 pl-9 text-white placeholder:text-white/40 focus-visible:ring-white/30 ${errors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                        className={`border-slate-200 bg-white pl-9 text-slate-900 placeholder:text-slate-400 shadow-sm focus-visible:ring-slate-300 ${errors.password ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                                     />
                                 </div>
                                 <InputError message={errors.password} />
@@ -98,11 +97,11 @@ export default function Login({ status, users = [] }) {
                                     id="remember"
                                     name="remember"
                                     tabIndex={3}
-                                    className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-blue-600"
+                                    className="border-slate-300 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white"
                                 />
                                 <Label
                                     htmlFor="remember"
-                                    className="cursor-pointer text-sm font-medium text-white/70"
+                                    className="cursor-pointer text-sm font-medium text-slate-600"
                                 >
                                     Remember me for 30 days
                                 </Label>
@@ -110,7 +109,7 @@ export default function Login({ status, users = [] }) {
 
                             <Button
                                 type="submit"
-                                className="mt-2 w-full bg-white py-6 text-lg font-bold text-blue-600 shadow-xl hover:bg-white/90"
+                                className="mt-2 w-full bg-blue-600 py-6 text-lg font-bold text-white shadow-lg hover:bg-blue-700"
                                 size="lg"
                                 tabIndex={4}
                                 disabled={processing}
@@ -118,7 +117,7 @@ export default function Login({ status, users = [] }) {
                             >
                                 {processing ? (
                                     <>
-                                        <Spinner className="mr-2 text-blue-600" />
+                                        <Spinner className="mr-2 text-white" />
                                         Signing in...
                                     </>
                                 ) : (

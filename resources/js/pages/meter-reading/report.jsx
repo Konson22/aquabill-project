@@ -24,8 +24,6 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { Download, Droplets, Filter, Hash, TrendingUp, X } from 'lucide-react';
 import {
-    Bar,
-    BarChart,
     CartesianGrid,
     Cell,
     Line,
@@ -166,18 +164,17 @@ export default function MeterReadingReport({
         return acc;
     }, {});
 
-    const monthlyConsumptionData =
-        monthlyConsumption.length === 1
-            ? monthlyConsumption.map((item) => ({
-                  name: item.name ?? item.month ?? '—',
-                  total: Number(item.total || item.value || 0),
-              }))
-            : monthOrder.map((name, index) => ({
-                  name,
-                  total: monthlyConsumptionMap[index] || 0,
-              }));
+    const monthlyConsumptionData = monthOrder.map((name, index) => ({
+        name,
+        total: monthlyConsumptionMap[index] ?? 0,
+    }));
 
     const tariffTotal = consumptionByTariff.reduce(
+        (sum, item) => sum + Number(item.value || 0),
+        0,
+    );
+
+    const zoneTotal = consumptionByZone.reduce(
         (sum, item) => sum + Number(item.value || 0),
         0,
     );
@@ -340,7 +337,7 @@ export default function MeterReadingReport({
                 </div>
 
                 {/* KPI Cards */}
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     <Card className="overflow-hidden border border-border bg-card shadow-sm transition-colors hover:border-primary/20">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                             <CardTitle className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -392,24 +389,6 @@ export default function MeterReadingReport({
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 Per reading
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card className="overflow-hidden border border-border bg-card shadow-sm transition-colors hover:border-primary/20">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                            <CardTitle className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                                Active Tariffs
-                            </CardTitle>
-                            <div className="rounded-xl bg-violet-500/10 p-2">
-                                <Droplets className="h-4 w-4 text-violet-600 dark:text-violet-400" />
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {tariffs.length}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Tariff plans
                             </p>
                         </CardContent>
                     </Card>
@@ -482,29 +461,47 @@ export default function MeterReadingReport({
                                 config={zoneConfig}
                                 className="h-[260px] w-full"
                             >
-                                <BarChart data={consumptionByZone}>
-                                    <CartesianGrid
-                                        strokeDasharray="3 3"
-                                        vertical={false}
-                                    />
-                                    <XAxis
-                                        dataKey="name"
-                                        stroke="hsl(var(--muted-foreground))"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                    />
-                                    <YAxis
-                                        stroke="#94a3b8"
-                                        fontSize={12}
-                                        tickLine={false}
-                                        axisLine={false}
-                                        tickFormatter={(value) => `${value} m³`}
-                                    />
+                                <PieChart>
                                     <ChartTooltip
-                                        content={<ChartTooltipContent />}
+                                        content={
+                                            <ChartTooltipContent
+                                                formatter={(value, name) => {
+                                                    const pct =
+                                                        zoneTotal > 0
+                                                            ? ((value / zoneTotal) * 100).toFixed(1)
+                                                            : '0';
+                                                    return (
+                                                        <div className="flex flex-1 justify-between items-center gap-4">
+                                                            <span className="text-muted-foreground">
+                                                                {name}
+                                                            </span>
+                                                            <div className="text-right">
+                                                                <span className="font-mono font-medium">
+                                                                    {Number(value).toLocaleString()} m³
+                                                                </span>
+                                                                <span className="ml-2 text-muted-foreground">
+                                                                    ({pct}%)
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }}
+                                            />
+                                        }
                                     />
-                                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                                    <Pie
+                                        data={consumptionByZone.map(
+                                            (item) => ({
+                                                name: item.name,
+                                                value: Number(item.value || 0),
+                                            }),
+                                        )}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        innerRadius={70}
+                                        outerRadius={100}
+                                        paddingAngle={2}
+                                    >
                                         {consumptionByZone.map(
                                             (entry, index) => (
                                                 <Cell
@@ -521,8 +518,8 @@ export default function MeterReadingReport({
                                                 />
                                             ),
                                         )}
-                                    </Bar>
-                                </BarChart>
+                                    </Pie>
+                                </PieChart>
                             </ChartContainer>
                         </CardContent>
                     </Card>
