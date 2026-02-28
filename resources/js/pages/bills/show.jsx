@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/utils';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import {
     Calendar,
     CreditCard,
@@ -34,6 +34,8 @@ import { useState } from 'react';
 
 export default function BillShow({ bill }) {
     const [payOpen, setPayOpen] = useState(false);
+    const department = usePage().props.auth?.user?.department;
+    const canPrintOrEdit = department !== 'finance';
 
     // Consumption from meter reading (bill has no consumption column)
     const consumption =
@@ -122,16 +124,18 @@ export default function BillShow({ bill }) {
                                 Record Payment
                             </Button>
                         )}
-                        <Button variant="outline" asChild>
-                            <a
-                                href={route('bills.print', bill.id)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                <Printer className="mr-2 h-4 w-4" />
-                                Print
-                            </a>
-                        </Button>
+                        {canPrintOrEdit && (
+                            <Button variant="outline" asChild>
+                                <a
+                                    href={route('bills.print', bill.id)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <Printer className="mr-2 h-4 w-4" />
+                                    Print
+                                </a>
+                            </Button>
+                        )}
                     </div>
                 </div>
 

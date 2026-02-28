@@ -1,1 +1,0 @@
-import{j as o}from"./app-DrILltsX.js";import{c as r}from"./compiler-runtime-BOU1w6mF.js";/* empty css            */function a(){const e=r.c(1);let t;return e[0]===Symbol.for("react.memo_cache_sentinel")?(t=o.jsx("div",{children:"user-manual-documentation"}),e[0]=t):t=e[0],t}export{a as default};

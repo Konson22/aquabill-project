@@ -43,6 +43,22 @@ class PaymentController extends Controller
                 });
             })
             ->when($request->filled('month'), fn($q) => $q->whereRaw("DATE_FORMAT(payment_date, '%Y-%m') = ?", [$request->month]))
+            ->when($request->filled('status') && $request->status !== 'all', function ($q) use ($request) {
+                $status = $request->status;
+                if ($status === 'fully_paid') {
+                    $q->where(function ($query) {
+                        $query->whereHasMorph('payable', [Bill::class], fn($q) => $q->where('status', 'fully paid'))
+                            ->orWhereHasMorph('payable', [Invoice::class], fn($q) => $q->where('status', 'paid'));
+                    });
+                } elseif ($status === 'partial_paid') {
+                    $q->whereHasMorph('payable', [Bill::class], fn($q) => $q->where('status', 'partial paid'));
+                } elseif ($status === 'pending') {
+                    $q->where(function ($query) {
+                        $query->whereHasMorph('payable', [Bill::class], fn($q) => $q->where('status', 'pending'))
+                            ->orWhereHasMorph('payable', [Invoice::class], fn($q) => $q->where('status', 'pending'));
+                    });
+                }
+            })
             ->orderByDesc('payment_date');
 
         $payments = $paymentQuery->paginate(10);
@@ -56,7 +72,7 @@ class PaymentController extends Controller
 
         return Inertia::render('payments/index', [
             'payments' => $payments,
-            'filters' => $request->only(['search', 'area_id', 'zone_id', 'month']),
+            'filters' => $request->only(['search', 'area_id', 'zone_id', 'month', 'status']),
             'zones' => \App\Models\Zone::all(),
             'areas' => \App\Models\Area::all(),
             'stats' => $stats,
@@ -65,7 +81,8 @@ class PaymentController extends Controller
 
     public function export(Request $request)
     {
-        $filename = 'payments-export-' . date('Y-m-d') . '.csv';
+        $asExcel = $request->input('format') === 'xlsx';
+        $filename = 'payments-export-' . date('Y-m-d') . ($asExcel ? '.xls' : '.csv');
 
         $payments = Payment::with(['payable.customer', 'payable.customer.tariff', 'receivedBy'])
             ->when($request->filled('search'), function ($q) use ($request) {
@@ -104,7 +121,7 @@ class PaymentController extends Controller
         }
 
         $headers = [
-            "Content-type" => "text/csv",
+            'Content-type' => $asExcel ? 'application/vnd.ms-excel; charset=UTF-8' : 'text/csv',
             "Content-Disposition" => "attachment; filename=$filename",
             "Pragma" => "no-cache",
             "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
@@ -116,8 +133,11 @@ class PaymentController extends Controller
         $totalInvoices = 0;
         $tariffTotals = [];
 
-        $callback = function () use ($rows, $columns, &$totalBills, &$totalInvoices, &$tariffTotals) {
+        $callback = function () use ($rows, $columns, &$totalBills, &$totalInvoices, &$tariffTotals, $asExcel) {
             $file = fopen('php://output', 'w');
+            if ($asExcel) {
+                fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            }
             fputcsv($file, $columns);
 
             foreach ($rows as $row) {
@@ -161,7 +181,19 @@ class PaymentController extends Controller
 
     public function report(Request $request)
     {
-        // Bills KPIs: totalBilled = sum of bill amount, totalCollected = sum of payments, totalUnpaid = totalBilled - totalCollected
+        $tariffId = $request->get('tariff_id');
+        $zoneId = $request->get('zone_id');
+        $month = $request->get('month');
+        $customerScope = function ($q) use ($tariffId, $zoneId) {
+            if ($tariffId) {
+                $q->where('tariff_id', $tariffId);
+            }
+            if ($zoneId) {
+                $q->where('zone_id', $zoneId);
+            }
+        };
+
+        // Bills KPIs: always full data (no filter) — filter applies only to Settlement trend card
         $billsKpisRaw = Bill::query()
             ->selectRaw('COUNT(*) as total_count')
             ->selectRaw("SUM(CASE WHEN status IN ('fully paid', 'forwarded', 'partial paid', 'balance forwarded') THEN 1 ELSE 0 END) as paid_count")
@@ -207,9 +239,10 @@ class PaymentController extends Controller
             ['name' => 'Invoice', 'value' => $invoicePaymentsTotal],
         ]);
 
-        // Tariff revenue: single grouped query per metric (replaces N+1 per tariff)
+        // Tariff revenue: only month filter (for Tariff breakdown card)
         $tariffBilled = Bill::query()
             ->join('customers', 'bills.customer_id', '=', 'customers.id')
+            ->when($month, fn ($q) => $q->whereRaw("DATE_FORMAT(bills.created_at, '%Y-%m') = ?", [$month]))
             ->selectRaw('COALESCE(customers.tariff_id, -1) as tariff_id')
             ->selectRaw('COALESCE(SUM(bills.amount), 0) as total_billed')
             ->groupBy('customers.tariff_id')
@@ -219,6 +252,7 @@ class PaymentController extends Controller
         $tariffCollected = DB::table('payments')
             ->join('bills', fn ($j) => $j->on('payments.payable_id', '=', 'bills.id')->where('payments.payable_type', '=', Bill::class))
             ->join('customers', 'bills.customer_id', '=', 'customers.id')
+            ->when($month, fn ($q) => $q->whereRaw("DATE_FORMAT(payments.payment_date, '%Y-%m') = ?", [$month]))
             ->selectRaw('COALESCE(customers.tariff_id, -1) as tariff_id')
             ->selectRaw('COALESCE(SUM(payments.amount), 0) as collected')
             ->groupBy('customers.tariff_id')
@@ -253,10 +287,11 @@ class PaymentController extends Controller
             ]);
         }
 
-        // Zone revenue: 2 grouped queries (replaces N+1 per zone + Bill balance accessor)
+        // Zone revenue: only month filter (for Tariff breakdown card)
         $zoneBilled = DB::table('zones')
             ->leftJoin('customers', 'zones.id', '=', 'customers.zone_id')
             ->leftJoin('bills', 'customers.id', '=', 'bills.customer_id')
+            ->when($month, fn ($q) => $q->whereRaw("DATE_FORMAT(bills.created_at, '%Y-%m') = ?", [$month]))
             ->select('zones.id', 'zones.name')
             ->selectRaw('COALESCE(SUM(bills.amount + bills.previous_balance), 0) as total_billed')
             ->groupBy('zones.id', 'zones.name')
@@ -266,6 +301,7 @@ class PaymentController extends Controller
         $zoneCollected = DB::table('payments')
             ->join('bills', fn ($j) => $j->on('payments.payable_id', '=', 'bills.id')->where('payments.payable_type', '=', Bill::class))
             ->join('customers', 'bills.customer_id', '=', 'customers.id')
+            ->when($month, fn ($q) => $q->whereRaw("DATE_FORMAT(payments.payment_date, '%Y-%m') = ?", [$month]))
             ->select('customers.zone_id as id')
             ->selectRaw('COALESCE(SUM(payments.amount), 0) as collected')
             ->groupBy('customers.zone_id')
@@ -288,12 +324,14 @@ class PaymentController extends Controller
             ->selectRaw("DATE_FORMAT(payment_date, '%Y-%m') as month")
             ->selectRaw('SUM(amount) as paid')
             ->where('payment_date', '>=', now()->subMonths(11)->startOfMonth())
+            ->when($tariffId || $zoneId, fn ($q) => $q->where('payable_type', Bill::class)->whereIn('payable_id', Bill::query()->whereHas('customer', $customerScope)->select('id')))
             ->groupBy('month')
             ->orderBy('month')
             ->get()
             ->keyBy('month');
 
         $monthlyBilledBills = Bill::query()
+            ->when($tariffId || $zoneId, fn ($q) => $q->whereHas('customer', $customerScope))
             ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month")
             ->selectRaw('SUM(amount + previous_balance) as billed')
             ->where('created_at', '>=', now()->subMonths(11)->startOfMonth())
@@ -322,7 +360,11 @@ class PaymentController extends Controller
         }
         $monthlyTrend = $months;
 
+        $zones = \App\Models\Zone::orderBy('name')->get(['id', 'name']);
+        $tariffsList = \App\Models\Tariff::orderBy('name')->get(['id', 'name']);
+
         return Inertia::render('payments/report', [
+            'filters' => $request->only(['tariff_id', 'zone_id', 'month']),
             'revenueByType' => $revenueByType,
             'tariffRevenue' => $tariffRevenue,
             'zoneRevenue' => $zoneRevenue,
@@ -330,6 +372,8 @@ class PaymentController extends Controller
             'billKpis' => $billKpis,
             'invoiceKpis' => $invoiceKpis,
             'totalRevenue' => $billPaymentsTotal + $invoicePaymentsTotal,
+            'tariffs' => $tariffsList,
+            'zones' => $zones,
         ]);
     }
 

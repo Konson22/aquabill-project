@@ -1,4 +1,3 @@
-import CreateInvoiceModal from '@/components/invoices/create-invoice-modal';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -42,7 +41,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/utils';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { CreditCard, Eye, Plus, Printer, Search, Trash2 } from 'lucide-react';
+import { CreditCard, Eye, Printer, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Invoices({ invoices, filters = {}, tariffs = [] }) {
@@ -168,14 +167,6 @@ export default function Invoices({ invoices, filters = {}, tariffs = [] }) {
             <div className="mb-4 flex flex-row items-center justify-between gap-4 space-y-0">
                 <div className="flex items-center gap-4">
                     <h3 className="text-2xl font-bold">Invoices</h3>
-                    <CreateInvoiceModal
-                        trigger={
-                            <Button size="sm" className="gap-2">
-                                <Plus className="h-4 w-4" />
-                                New Invoice
-                            </Button>
-                        }
-                    />
                     {selected.size > 0 && (
                         <Button
                             variant="default"

@@ -9,13 +9,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -328,42 +322,6 @@ export default function Zones({
                             )}
                         </TableBody>
                     </Table>
-
-                    <CardFooter className="flex items-center justify-between border-t p-4">
-                        <div className="text-sm text-muted-foreground">
-                            Showing {zones.from || 0} to {zones.to || 0} of{' '}
-                            {zones.total} results
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            {zones.links &&
-                                zones.links.map((link, index) => (
-                                    <Button
-                                        key={index}
-                                        variant={
-                                            link.active ? 'default' : 'outline'
-                                        }
-                                        size="sm"
-                                        disabled={!link.url}
-                                        asChild={!!link.url}
-                                    >
-                                        {link.url ? (
-                                            <Link
-                                                href={link.url}
-                                                dangerouslySetInnerHTML={{
-                                                    __html: link.label,
-                                                }}
-                                            />
-                                        ) : (
-                                            <span
-                                                dangerouslySetInnerHTML={{
-                                                    __html: link.label,
-                                                }}
-                                            />
-                                        )}
-                                    </Button>
-                                ))}
-                        </div>
-                    </CardFooter>
                 </CardContent>
             </Card>
 

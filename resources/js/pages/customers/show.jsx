@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     CreditCard,
@@ -27,6 +27,9 @@ import {
 } from './components';
 
 export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
+    const department = usePage().props.auth?.user?.department;
+    const canEdit = department !== 'finance';
+
     const accountSummary = useMemo(() => {
         const bills = customer.bills || [];
         const invoices = customer.invoices || [];
@@ -184,14 +187,19 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
 
                         {/* Right: Actions */}
                         <div className="flex flex-wrap items-center gap-2 border-t p-5 md:border-t-0">
-                            <Button variant="outline" size="sm" asChild>
-                                <Link
-                                    href={route('customers.edit', customer.id)}
-                                >
-                                    <Pencil className="mr-2 h-3.5 w-3.5" />
-                                    Edit
-                                </Link>
-                            </Button>
+                            {canEdit && (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link
+                                        href={route(
+                                            'customers.edit',
+                                            customer.id,
+                                        )}
+                                    >
+                                        <Pencil className="mr-2 h-3.5 w-3.5" />
+                                        Edit
+                                    </Link>
+                                </Button>
+                            )}
                             <CreateInvoiceModal
                                 trigger={
                                     <Button size="sm" variant="secondary">
@@ -206,21 +214,26 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
                                     meter: customer.meter,
                                 }}
                             />
-                            {(!customer.meter ||
-                                (customer.meters &&
-                                    customer.meters.length === 0)) && (
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link
-                                        href={route(
-                                            'meters.assign',
-                                            customer.id,
-                                        )}
+                            {canEdit &&
+                                (!customer.meter ||
+                                    (customer.meters &&
+                                        customer.meters.length === 0)) && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        asChild
                                     >
-                                        <Gauge className="mr-2 h-3 w-3" />
-                                        Assign Meter
-                                    </Link>
-                                </Button>
-                            )}
+                                        <Link
+                                            href={route(
+                                                'meters.assign',
+                                                customer.id,
+                                            )}
+                                        >
+                                            <Gauge className="mr-2 h-3 w-3" />
+                                            Assign Meter
+                                        </Link>
+                                    </Button>
+                                )}
                         </div>
                     </div>
 
@@ -325,7 +338,10 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
                             />
                         </TabsContent>
                         <TabsContent value="meter" className="p-6">
-                            <MeterTab customer={customer} />
+                            <MeterTab
+                                customer={customer}
+                                canEdit={canEdit}
+                            />
                         </TabsContent>
                         <TabsContent value="readings" className="p-6">
                             <ReadingsTab
@@ -335,10 +351,16 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
                             />
                         </TabsContent>
                         <TabsContent value="bills" className="p-6">
-                            <BillsTab allBills={allBills} />
+                            <BillsTab
+                                allBills={allBills}
+                                canEdit={canEdit}
+                            />
                         </TabsContent>
                         <TabsContent value="invoices" className="p-6">
-                            <InvoicesTab allInvoices={allInvoices} />
+                            <InvoicesTab
+                                allInvoices={allInvoices}
+                                canEdit={canEdit}
+                            />
                         </TabsContent>
                         <TabsContent value="payments" className="p-6">
                             <PaymentsTab allPayments={allPayments} />

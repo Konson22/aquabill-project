@@ -20,6 +20,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Table,
     TableBody,
     TableCell,
@@ -30,7 +37,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/utils';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     Calendar,
@@ -40,16 +47,35 @@ import {
     FileText,
     MoreHorizontal,
     Printer,
+    Search,
     Trash2,
     Zap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-export default function Bills({ bills, filters }) {
+const MONTH_OPTIONS = (() => {
+    const opts = [{ value: 'all', label: 'All months' }];
+    const now = new Date();
+    for (let i = 0; i < 24; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        opts.push({
+            value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+            label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        });
+    }
+    return opts;
+})();
+
+export default function Bills({ bills, filters, tariffs = [] }) {
     const { delete: destroy } = useForm();
+    const department = usePage().props.auth?.user?.department;
+    const canPrintOrDelete = department !== 'finance';
     const [payOpen, setPayOpen] = useState(false);
     const [paymentBill, setPaymentBill] = useState(null);
     const [search, setSearch] = useState(filters.search || '');
+    const [status, setStatus] = useState(filters.status || 'all');
+    const [month, setMonth] = useState(filters.month || 'all');
+    const [tariffId, setTariffId] = useState(filters.tariff_id || 'all');
 
     const {
         data: payData,
@@ -69,21 +95,25 @@ export default function Bills({ bills, filters }) {
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (search !== (filters.search || '')) {
-                router.get(
-                    route('bills'),
-                    { search: search },
-                    {
-                        preserveState: true,
-                        preserveScroll: true,
-                        replace: true,
-                    },
-                );
-            }
-        }, 500);
+            const query = {};
+            if (search) query.search = search;
+            if (status && status !== 'all') query.status = status;
+            if (month && month !== 'all') query.month = month;
+            if (tariffId && tariffId !== 'all') query.tariff_id = tariffId;
+            const sameSearch = (filters.search || '') === search;
+            const sameStatus = (filters.status || 'all') === status;
+            const sameMonth = (filters.month || 'all') === month;
+            const sameTariff = (filters.tariff_id || 'all') === tariffId;
+            if (sameSearch && sameStatus && sameMonth && sameTariff) return;
+            router.get(route('bills'), query, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            });
+        }, search ? 500 : 0);
 
         return () => clearTimeout(timer);
-    }, [search]);
+    }, [search, status, month, tariffId]);
 
     const handleDelete = (id) => {
         if (
@@ -157,43 +187,87 @@ export default function Bills({ bills, filters }) {
             <Head title="Bills" />
 
             <div className="flex flex-col gap-6">
-                {/* Header Section */}
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                            Billing Management
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Generate bills, track payments, and manage
-                            outstanding balances.
-                        </p>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-2">
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" asChild className="gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Select value={month} onValueChange={setMonth}>
+                            <SelectTrigger className="h-9 w-[160px] bg-background">
+                                <SelectValue placeholder="Month" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {MONTH_OPTIONS.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={tariffId} onValueChange={setTariffId}>
+                            <SelectTrigger className="h-9 w-[160px] bg-background">
+                                <SelectValue placeholder="Tariff" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All tariffs</SelectItem>
+                                {tariffs.map((t) => (
+                                    <SelectItem key={t.id} value={String(t.id)}>
+                                        {t.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={status} onValueChange={setStatus}>
+                            <SelectTrigger className="h-9 w-[160px] bg-background">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All statuses</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="partial paid">Partial paid</SelectItem>
+                                <SelectItem value="fully paid">Fully paid</SelectItem>
+                                <SelectItem value="forwarded">Forwarded</SelectItem>
+                                <SelectItem value="balance forwarded">Balance forwarded</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Button
+                            variant="outline"
+                            asChild
+                            className="gap-2 border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:text-emerald-900"
+                        >
+                            <a
+                                href={route('bills.export') + '?format=xlsx'}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <FileText className="h-4 w-4" />
+                                Export Excel
+                            </a>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            asChild
+                            className="gap-2 border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 hover:text-sky-900"
+                        >
                             <Link href={route('bills.printing-list')}>
                                 <Printer className="h-4 w-4" />
-                                Pending Bills
+                                Print Bill List
                             </Link>
                         </Button>
                     </div>
                 </div>
 
-                {/* Results Table */}
-                <Card className="flex flex-1 flex-col overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2">
-                        <div className="flex gap-2">
-                            <Link href={route('bills.export')}>
-                                <Button variant="outline" className="gap-2">
-                                    <FileText className="h-4 w-4" />
-                                    Export CSV
-                                </Button>
-                            </Link>
-                        </div>
-                        <div className="relative w-full max-w-md">
+                <Card className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border/80 shadow-sm">
+                    <div className="flex flex-col gap-4 border-b border-border/60 px-5 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                        <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                            Billing Management
+                        </h2>
+                        <div className="relative w-[500px]  sm:flex-none">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 placeholder="Search bills..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
+                                className="h-10 w-full bg-gray-50 pl-9"
                             />
                         </div>
                     </div>
@@ -397,42 +471,48 @@ export default function Bills({ bills, filters }) {
                                                                 </DropdownMenuItem>
                                                             )}
 
-                                                            <DropdownMenuItem
-                                                                asChild
-                                                            >
-                                                                <a
-                                                                    href={route(
-                                                                        'bills.print',
-                                                                        bill.id,
-                                                                    )}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
+                                                            {canPrintOrDelete && (
+                                                                <DropdownMenuItem
+                                                                    asChild
                                                                 >
-                                                                    <Printer className="mr-2 h-4 w-4" />
-                                                                    Print Bill
-                                                                </a>
-                                                            </DropdownMenuItem>
+                                                                    <a
+                                                                        href={route(
+                                                                            'bills.print',
+                                                                            bill.id,
+                                                                        )}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                    >
+                                                                        <Printer className="mr-2 h-4 w-4" />
+                                                                        Print Bill
+                                                                    </a>
+                                                                </DropdownMenuItem>
+                                                            )}
 
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    handleDelete(
-                                                                        bill.id,
-                                                                    )
-                                                                }
-                                                                disabled={[
-                                                                    'fully paid',
-                                                                    'forwarded',
-                                                                    'partial paid',
-                                                                    'balance forwarded',
-                                                                ].includes(
-                                                                    bill.status,
-                                                                )}
-                                                                className="text-red-600 focus:text-red-600"
-                                                            >
-                                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                                Delete
-                                                            </DropdownMenuItem>
+                                                            {canPrintOrDelete && (
+                                                                <>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem
+                                                                        onClick={() =>
+                                                                            handleDelete(
+                                                                                bill.id
+                                                                            )
+                                                                        }
+                                                                        disabled={[
+                                                                            'fully paid',
+                                                                            'forwarded',
+                                                                            'partial paid',
+                                                                            'balance forwarded',
+                                                                        ].includes(
+                                                                            bill.status,
+                                                                        )}
+                                                                        className="text-red-600 focus:text-red-600"
+                                                                    >
+                                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                                        Delete
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </div>

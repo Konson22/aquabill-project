@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bill;
+use App\Models\Invoice;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -10,6 +13,34 @@ class FinanceDashboardController extends Controller
     public function index()
     {
         return Inertia::render('dashboard-finance/index');
+    }
+
+    /**
+     * Finance hub: recent bills, payments, invoices for the finance index page.
+     */
+    public function hub(Request $request)
+    {
+        $bills = Bill::with(['customer', 'meterReading.meter'])
+            ->withSum('payments', 'amount')
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        $payments = Payment::with(['payable.customer', 'receivedBy'])
+            ->orderByDesc('payment_date')
+            ->limit(10)
+            ->get();
+
+        $invoices = Invoice::with('customer')
+            ->latest('created_at')
+            ->limit(10)
+            ->get();
+
+        return Inertia::render('finance/index', [
+            'bills' => $bills,
+            'payments' => $payments,
+            'invoices' => $invoices,
+        ]);
     }
 
     public function overview()

@@ -17,7 +17,7 @@ import {
 import { Link, router } from '@inertiajs/react';
 import { Calendar, Gauge, RefreshCw } from 'lucide-react';
 
-export default function MeterTab({ customer }) {
+export default function MeterTab({ customer, canEdit = true }) {
     const lastReading =
         customer?.meter?.latest_reading?.current_reading ??
         customer?.meter?.readings?.[0]?.current_reading;
@@ -86,59 +86,68 @@ export default function MeterTab({ customer }) {
                                     <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                         Status
                                     </p>
-                                    <Select
-                                        value={
-                                            customer.meter.status ?? 'active'
-                                        }
-                                        onValueChange={(value) => {
-                                            router.put(
-                                                route(
-                                                    'meters.update',
-                                                    customer.meter.id,
-                                                ),
-                                                { status: value },
-                                                { preserveScroll: true },
-                                            );
-                                        }}
-                                    >
-                                        <SelectTrigger className="h-9 w-[140px] border-0 bg-transparent p-0 shadow-none focus-visible:ring-0">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="active">
-                                                Active
-                                            </SelectItem>
-                                            <SelectItem value="inactive">
-                                                Inactive
-                                            </SelectItem>
-                                            <SelectItem value="maintenance">
-                                                Maintenance
-                                            </SelectItem>
-                                            <SelectItem value="damage">
-                                                Damaged
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    {canEdit ? (
+                                        <Select
+                                            value={
+                                                customer.meter.status ??
+                                                'active'
+                                            }
+                                            onValueChange={(value) => {
+                                                router.put(
+                                                    route(
+                                                        'meters.update',
+                                                        customer.meter.id,
+                                                    ),
+                                                    { status: value },
+                                                    { preserveScroll: true },
+                                                );
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-9 w-[140px] border-0 bg-transparent p-0 shadow-none focus-visible:ring-0">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="active">
+                                                    Active
+                                                </SelectItem>
+                                                <SelectItem value="inactive">
+                                                    Inactive
+                                                </SelectItem>
+                                                <SelectItem value="maintenance">
+                                                    Maintenance
+                                                </SelectItem>
+                                                <SelectItem value="damage">
+                                                    Damaged
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <p className="font-medium capitalize">
+                                            {customer.meter.status ?? 'active'}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
-                            <div className="flex items-end sm:col-span-2 lg:col-span-1">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    asChild
-                                    className="w-full sm:w-auto"
-                                >
-                                    <Link
-                                        href={route(
-                                            'meters.assign',
-                                            customer.id,
-                                        )}
+                            {canEdit && (
+                                <div className="flex items-end sm:col-span-2 lg:col-span-1">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        asChild
+                                        className="w-full sm:w-auto"
                                     >
-                                        <RefreshCw className="mr-2 h-3.5 w-3.5" />
-                                        Replace meter
-                                    </Link>
-                                </Button>
-                            </div>
+                                        <Link
+                                            href={route(
+                                                'meters.assign',
+                                                customer.id,
+                                            )}
+                                        >
+                                            <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                                            Replace meter
+                                        </Link>
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                         <div className="border-t bg-muted/30 px-6 py-3">
                             <p className="text-xs text-muted-foreground">
@@ -172,12 +181,14 @@ export default function MeterTab({ customer }) {
                         Assign a meter to this customer to track consumption and
                         billing.
                     </p>
-                    <Button variant="default" size="sm" asChild>
-                        <Link href={route('meters.assign', customer.id)}>
-                            <Gauge className="mr-2 h-3.5 w-3.5" />
-                            Assign meter
-                        </Link>
-                    </Button>
+                    {canEdit && (
+                        <Button variant="default" size="sm" asChild>
+                            <Link href={route('meters.assign', customer.id)}>
+                                <Gauge className="mr-2 h-3.5 w-3.5" />
+                                Assign meter
+                            </Link>
+                        </Button>
+                    )}
                 </div>
             )}
 

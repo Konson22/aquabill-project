@@ -1,12 +1,19 @@
 import PrintBillCard from '@/components/print-bill-card';
-import { Head } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
 
 export default function PrintMultiple({ bills }) {
+    const department = usePage().props.auth?.user?.department;
+
     useEffect(() => {
-        // Auto-print when component loads
+        if (department === 'finance') {
+            router.visit(route('bills'));
+            return;
+        }
         window.print();
-    }, []);
+    }, [department]);
+
+    if (department === 'finance') return null;
 
     return (
         <>

@@ -196,7 +196,7 @@ export default function MeterReadings({ meterReadings, meters, filters = {} }) {
     };
 
     const filteredReadings = meterReadings.data.filter((reading) => {
-        if (reading.is_initial !== true) return false;
+        if (reading.is_initial !== false) return false;
         if (!search.trim()) return true;
         const term = search.toLowerCase();
         return (
@@ -215,40 +215,46 @@ export default function MeterReadings({ meterReadings, meters, filters = {} }) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Meter Readings" />
-            <div className="flex flex-col gap-6 pb-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            <div className="flex flex-col gap-8 pb-10">
+                {/* Page header */}
+                <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
                             Meter Readings
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Track meter readings and consumption updates.
+                            Track readings and consumption by meter.
                         </p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <Button
-                            variant="outline"
-                            asChild
-                            className="h-11 gap-2"
-                        >
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Select value={month} onValueChange={setMonth}>
+                            <SelectTrigger className="h-9 w-[180px] bg-background">
+                                <SelectValue placeholder="All months" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {MONTH_OPTIONS.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button variant="outline" size="sm" asChild className="gap-2">
                             <Link href={route('meter-readings.report')}>
                                 <Activity className="h-4 w-4" />
                                 Reports
                             </Link>
                         </Button>
                         {auth.user?.department === 'admin' && (
-                            <Button
-                                onClick={handleAddOpen}
-                                className="h-11 gap-2"
-                            >
+                            <Button size="sm" onClick={handleAddOpen} className="gap-2">
                                 <Plus className="h-4 w-4" />
                                 Add Reading
                             </Button>
                         )}
                         <Dialog open={open} onOpenChange={handleDialogClose}>
-                            <DialogContent className="sm:max-w-[425px]">
-                                <DialogHeader>
-                                    <DialogTitle>
+                            <DialogContent className="gap-0 p-0 sm:max-w-[420px]">
+                                <DialogHeader className="border-b px-6 py-4">
+                                    <DialogTitle className="text-base">
                                         {editingId
                                             ? 'Edit Reading'
                                             : 'Add Meter Reading'}
@@ -256,7 +262,7 @@ export default function MeterReadings({ meterReadings, meters, filters = {} }) {
                                 </DialogHeader>
                                 <form
                                     onSubmit={submitReading}
-                                    className="grid gap-4 py-4"
+                                    className="grid gap-4 px-6 py-5"
                                 >
                                     <div className="grid gap-2">
                                         <Label htmlFor="meter">Meter</Label>
@@ -466,9 +472,10 @@ export default function MeterReadings({ meterReadings, meters, filters = {} }) {
                                             </span>
                                         )}
                                     </div>
-                                    <DialogFooter>
+                                    <DialogFooter className="border-t px-6 py-4">
                                         <Button
                                             type="submit"
+                                            size="sm"
                                             disabled={
                                                 processing ||
                                                 (selectedMeter &&
@@ -491,94 +498,66 @@ export default function MeterReadings({ meterReadings, meters, filters = {} }) {
                             </DialogContent>
                         </Dialog>
                     </div>
-                </div>
+                </header>
 
-                <Card className="overflow-hidden border shadow-sm">
-                    <div className="flex flex-col gap-5 border-b bg-muted/30 px-4 py-4 lg:flex-row lg:items-end">
-                        <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 lg:max-w-2xl">
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
-                                    Search
-                                </Label>
-                                <div className="relative">
-                                    <Search className="absolute top-2.5 left-3 h-4 w-4 text-muted-foreground/50" />
-                                    <Input
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        placeholder="Meter, customer, or bill number..."
-                                        className="h-9 pl-9"
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-muted-foreground uppercase">
-                                    Month
-                                </Label>
-                                <Select value={month} onValueChange={setMonth}>
-                                    <SelectTrigger className="h-9">
-                                        <SelectValue placeholder="All months" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {MONTH_OPTIONS.map((opt) => (
-                                            <SelectItem
-                                                key={opt.value}
-                                                value={opt.value}
-                                            >
-                                                {opt.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        {(search || (month && month !== 'all')) && (
-                            <Button
-                                variant="ghost"
-                                onClick={clearFilters}
-                                className="h-9 gap-2 text-muted-foreground"
-                            >
-                                <X className="h-4 w-4" />
-                                Clear
-                            </Button>
-                        )}
-                    </div>
-                    <div className="flex items-center justify-between border-b bg-muted/20 px-4 py-3">
-                        <h2 className="flex items-center gap-2 text-sm font-semibold">
-                            Reading History
-                            <Badge variant="outline" className="font-mono">
+                {/* Readings card */}
+                <Card className="overflow-hidden rounded-xl border border-border/80 shadow-sm">
+                    <div className="flex flex-col gap-4 border-b border-border/60  px-5 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                            Reading history
+                            <Badge variant="secondary" className="font-mono text-xs">
                                 {meterReadings.total ?? 0}
                             </Badge>
                         </h2>
+                        <div className="flex min-w-0 flex-1 items-center gap-2 sm:justify-end sm:pl-4">
+                            <div className="relative min-w-0 flex-1 sm:max-w-sm">
+                                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Meter, customer, or bill number..."
+                                    className="h-12 w-full bg-gray-50 pl-9"
+                                />
+                            </div>
+                            {(search || (month && month !== 'all')) && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={clearFilters}
+                                    className="shrink-0 gap-1.5 text-muted-foreground hover:text-foreground"
+                                >
+                                    <X className="h-4 w-4" />
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex-1 overflow-auto">
+                    <div className="overflow-x-auto">
                         <Table>
-                            <TableHeader className="sticky top-0 z-10 bg-muted/50">
-                                <TableRow>
-                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                        Meter Serial
+                            <TableHeader>
+                                <TableRow className="border-border/60 hover:bg-transparent">
+                                    <TableHead className="w-0 whitespace-nowrap text-xs font-medium text-muted-foreground">
+                                        Meter
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                        Customer name
+                                    <TableHead className="text-xs font-medium text-muted-foreground">
+                                        Customer
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                    <TableHead className="text-xs font-medium text-muted-foreground">
                                         Date
                                     </TableHead>
-
-                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                    <TableHead className="text-xs font-medium text-muted-foreground">
                                         Prev
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                    <TableHead className="text-xs font-medium text-muted-foreground">
                                         Curr
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                    <TableHead className="text-xs font-medium text-muted-foreground">
                                         Usage
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                    <TableHead className="text-xs font-medium text-muted-foreground">
                                         Bill
                                     </TableHead>
-                                    <TableHead className="text-right text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                    <TableHead className="w-0 text-right text-xs font-medium text-muted-foreground">
                                         Actions
                                     </TableHead>
                                 </TableRow>
@@ -588,129 +567,84 @@ export default function MeterReadings({ meterReadings, meters, filters = {} }) {
                                     filteredReadings.map((reading) => (
                                         <TableRow
                                             key={reading.id}
-                                            className="hover:bg-muted/50"
+                                            className="border-border/40 hover:bg-muted/40"
                                         >
-                                            <TableCell className="">
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="font-mono"
-                                                >
-                                                    {reading.meter
-                                                        ?.meter_number || '-'}
+                                            <TableCell className="whitespace-nowrap py-3">
+                                                <Badge variant="secondary" className="font-mono text-xs">
+                                                    {reading.meter?.meter_number || '-'}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>
-                                                {reading.customer?.name ||
-                                                    'Unknown'}
+                                            <TableCell className="py-3 text-sm">
+                                                {reading.customer?.name || 'Unknown'}
                                             </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    {formatDate(
-                                                        reading.reading_date,
-                                                    )}
+                                            <TableCell className="whitespace-nowrap py-3">
+                                                <div className="flex items-center gap-1.5 text-sm">
+                                                    {formatDate(reading.reading_date)}
                                                     {reading.image && (
                                                         <Camera className="h-3.5 w-3.5 text-muted-foreground" />
                                                     )}
                                                 </div>
                                             </TableCell>
-
-                                            <TableCell className="text-muted-foreground">
+                                            <TableCell className="py-3 font-mono text-sm text-muted-foreground">
                                                 {reading.previous_reading}
                                             </TableCell>
-                                            <TableCell className="font-bold">
+                                            <TableCell className="py-3 font-mono text-sm font-medium">
                                                 {reading.current_reading}
                                             </TableCell>
-                                            <TableCell className="font-medium">
+                                            <TableCell className="py-3 font-mono text-sm">
                                                 {(
-                                                    parseFloat(
-                                                        reading.current_reading,
-                                                    ) -
-                                                    parseFloat(
-                                                        reading.previous_reading,
-                                                    )
+                                                    parseFloat(reading.current_reading) -
+                                                    parseFloat(reading.previous_reading)
                                                 ).toFixed(2)}
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="py-3">
                                                 {reading.bill ? (
                                                     <Link
-                                                        href={route(
-                                                            'bills.show',
-                                                            reading.bill.id,
-                                                        )}
-                                                        className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                                                        href={route('bills.show', reading.bill.id)}
+                                                        className="text-sm font-medium text-primary hover:underline"
                                                     >
-                                                        {
-                                                            reading.bill
-                                                                .bill_number
-                                                        }
+                                                        {reading.bill.bill_number}
                                                     </Link>
                                                 ) : (
-                                                    <span className="text-muted-foreground">
-                                                        -
-                                                    </span>
+                                                    <span className="text-muted-foreground">—</span>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-1">
+                                            <TableCell className="py-3 text-right">
+                                                <div className="flex justify-end gap-0.5">
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
                                                         asChild
-                                                        title="View Details"
+                                                        title="View"
                                                         className="h-8 w-8"
                                                     >
-                                                        <Link
-                                                            href={route(
-                                                                'meter-readings.show',
-                                                                reading.id,
-                                                            )}
-                                                        >
+                                                        <Link href={route('meter-readings.show', reading.id)}>
                                                             <Eye className="h-4 w-4" />
                                                         </Link>
                                                     </Button>
-                                                    {auth.user?.department ===
-                                                        'admin' &&
-                                                        (!reading.bill ||
-                                                            reading.bill
-                                                                .status ===
-                                                                'pending') && (
-                                                            <>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    onClick={() =>
-                                                                        handleEdit(
-                                                                            reading,
-                                                                        )
-                                                                    }
-                                                                    title="Edit"
-                                                                    className="h-8 w-8"
-                                                                >
-                                                                    <Pencil className="h-4 w-4" />
-                                                                </Button>
-                                                            </>
+                                                    {auth.user?.department === 'admin' &&
+                                                        (!reading.bill || reading.bill.status === 'pending') && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => handleEdit(reading)}
+                                                                title="Edit"
+                                                                className="h-8 w-8"
+                                                            >
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
                                                         )}
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        onClick={() =>
-                                                            handleDelete(
-                                                                reading.id,
-                                                            )
-                                                        }
+                                                        onClick={() => handleDelete(reading.id)}
                                                         disabled={
                                                             reading.bill &&
-                                                            [
-                                                                'fully paid',
-                                                                'forwarded',
-                                                                'partial paid',
-                                                                'balance forwarded',
-                                                            ].includes(
-                                                                reading.bill
-                                                                    .status,
+                                                            ['fully paid', 'forwarded', 'partial paid', 'balance forwarded'].includes(
+                                                                reading.bill.status,
                                                             )
                                                         }
-                                                        className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                        className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                                         title="Delete"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
@@ -723,7 +657,7 @@ export default function MeterReadings({ meterReadings, meters, filters = {} }) {
                                     <TableRow>
                                         <TableCell
                                             colSpan={8}
-                                            className="h-32 text-center text-sm text-slate-500"
+                                            className="h-40 text-center text-sm text-muted-foreground"
                                         >
                                             No meter readings found.
                                         </TableCell>
@@ -732,66 +666,34 @@ export default function MeterReadings({ meterReadings, meters, filters = {} }) {
                             </TableBody>
                         </Table>
                     </div>
-
-                    {/* Pagination */}
-                    <div className="border-t bg-muted/5 p-4">
-                        <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="text-xs font-medium text-muted-foreground">
-                                Showing{' '}
-                                <span className="font-medium">
-                                    {meterReadings.from || 0}
-                                </span>{' '}
-                                to{' '}
-                                <span className="font-medium">
-                                    {meterReadings.to || 0}
-                                </span>{' '}
-                                of{' '}
-                                <span className="font-medium">
-                                    {meterReadings.total}
-                                </span>{' '}
-                                results
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                                {meterReadings.links &&
-                                    meterReadings.links.map((link, index) => {
-                                        const label = link.label
-                                            .replace('&laquo; Previous', 'Prev')
-                                            .replace('Next &raquo;', 'Next');
-                                        return (
-                                            <Button
-                                                key={index}
-                                                variant={
-                                                    link.active
-                                                        ? 'default'
-                                                        : 'outline'
-                                                }
-                                                size="sm"
-                                                disabled={!link.url}
-                                                asChild={!!link.url}
-                                                className={
-                                                    !link.url
-                                                        ? 'cursor-default opacity-50'
-                                                        : ''
-                                                }
-                                            >
-                                                {link.url ? (
-                                                    <Link
-                                                        href={link.url}
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: label,
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <span
-                                                        dangerouslySetInnerHTML={{
-                                                            __html: label,
-                                                        }}
-                                                    />
-                                                )}
-                                            </Button>
-                                        );
-                                    })}
-                            </div>
+                    <div className="flex flex-col gap-3 border-t border-border/60 bg-muted/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs text-muted-foreground">
+                            Showing <span className="font-medium text-foreground">{meterReadings.from ?? 0}</span> to{' '}
+                            <span className="font-medium text-foreground">{meterReadings.to ?? 0}</span> of{' '}
+                            <span className="font-medium text-foreground">{meterReadings.total ?? 0}</span> results
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {meterReadings.links?.map((link, index) => {
+                                const label = link.label
+                                    .replace('&laquo; Previous', 'Prev')
+                                    .replace('Next &raquo;', 'Next');
+                                return (
+                                    <Button
+                                        key={index}
+                                        variant={link.active ? 'default' : 'outline'}
+                                        size="sm"
+                                        disabled={!link.url}
+                                        asChild={!!link.url}
+                                        className={!link.url ? 'pointer-events-none opacity-50' : 'min-w-9'}
+                                    >
+                                        {link.url ? (
+                                            <Link href={link.url} dangerouslySetInnerHTML={{ __html: label }} />
+                                        ) : (
+                                            <span dangerouslySetInnerHTML={{ __html: label }} />
+                                        )}
+                                    </Button>
+                                );
+                            })}
                         </div>
                     </div>
                 </Card>

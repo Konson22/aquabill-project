@@ -34,6 +34,10 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('docs/system-documentation');
     })->name('docs.system');
 
+    Route::get('docs/user-manual', function () {
+        return Inertia::render('documentation/index');
+    })->name('docs.user-manual');
+
     // Search (customer search used by invoice modal; homes.search kept for backward compatibility)
     Route::get('/api/h/search', [CustomerController::class, 'search'])->name('homes.search');
     Route::get('/api/customers/search', [CustomerController::class, 'search'])->name('customers.search');
@@ -49,8 +53,12 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     });
 
+    // Finance hub: accessible by both admin and finance
+    Route::middleware(['department:admin,finance'])->group(function () {
+        Route::get('finance', [FinanceDashboardController::class, 'hub'])->name('finance');
+    });
+
     Route::middleware(['department:finance'])->group(function () {
-        // Route::get('finance/dashboard', [FinanceDashboardController::class, 'index'])->name('finance');
         Route::get('finance/overview', [FinanceDashboardController::class, 'overview'])->name('finance.overview');
         
         // Bills

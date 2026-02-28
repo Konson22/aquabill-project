@@ -127,7 +127,7 @@ class CustomerSeeder extends Seeder
                 'address' => $addressBlock ?: 'No address provided',
                 'plot_number' => (string) ($data['HOUSE /PLOT NO'] ?? ''),
                 'property_type' => $cusType ?: null,
-                'supply_status' => (isset($data['SUPPLY STATUS']) && Str::upper((string) $data['SUPPLY STATUS']) === 'WORKING') ? 'active' : 'inactive',
+                'supply_status' => 'active',
             ]);
 
             $meterNumber = $data['METER NO'] ?? null;
@@ -140,7 +140,7 @@ class CustomerSeeder extends Seeder
                 $meter = Meter::create([
                     'customer_id' => $customer->id,
                     'meter_number' => $finalMeterNumber,
-                    'status' => (isset($data['SUPPLY STATUS']) && Str::upper((string) $data['SUPPLY STATUS']) === 'WORKING') ? 'active' : 'inactive',
+                    'status' => 'active',
                 ]);
 
                 $currentReading = $data['current_reading'] ?? 0;

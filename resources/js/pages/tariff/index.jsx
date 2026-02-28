@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -313,41 +313,6 @@ export default function Tariffs({ tariffs }) {
                         </TableBody>
                     </Table>
                 </CardContent>
-                <CardFooter className="flex items-center justify-between border-t p-4">
-                    <div className="text-sm text-muted-foreground">
-                        Showing {tariffs.from || 0} to {tariffs.to || 0} of{' '}
-                        {tariffs.total} results
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        {tariffs.links &&
-                            tariffs.links.map((link, index) => (
-                                <Button
-                                    key={index}
-                                    variant={
-                                        link.active ? 'default' : 'outline'
-                                    }
-                                    size="sm"
-                                    disabled={!link.url}
-                                    asChild={!!link.url}
-                                >
-                                    {link.url ? (
-                                        <Link
-                                            href={link.url}
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    ) : (
-                                        <span
-                                            dangerouslySetInnerHTML={{
-                                                __html: link.label,
-                                            }}
-                                        />
-                                    )}
-                                </Button>
-                            ))}
-                    </div>
-                </CardFooter>
             </Card>
         </AppLayout>
     );

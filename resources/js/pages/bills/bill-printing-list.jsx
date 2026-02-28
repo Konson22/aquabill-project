@@ -12,11 +12,13 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { formatCurrency } from '@/lib/utils';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowLeft, Calendar, FileText, Printer, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 export default function BillPrintingList({ bills }) {
+    const department = usePage().props.auth?.user?.department;
+    const canPrint = department !== 'finance';
     const billItems = Array.isArray(bills) ? bills : bills?.data || [];
     const pendingBills = billItems.filter((bill) => bill.status === 'pending');
     const [selectedIds, setSelectedIds] = useState([]);
@@ -150,27 +152,29 @@ export default function BillPrintingList({ bills }) {
                                 ))}
                             </select>
                         </div>
-                        <Button
-                            className="h-10 gap-2"
-                            asChild={!!printAllUrl}
-                            disabled={!printAllUrl}
-                        >
-                            {printAllUrl ? (
-                                <a
-                                    href={printAllUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    <Printer className="h-4 w-4" />
-                                    Print All
-                                </a>
-                            ) : (
-                                <span>
-                                    <Printer className="h-4 w-4" />
-                                    Print All
-                                </span>
-                            )}
-                        </Button>
+                        {canPrint && (
+                            <Button
+                                className="h-10 gap-2"
+                                asChild={!!printAllUrl}
+                                disabled={!printAllUrl}
+                            >
+                                {printAllUrl ? (
+                                    <a
+                                        href={printAllUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        <Printer className="h-4 w-4" />
+                                        Print All
+                                    </a>
+                                ) : (
+                                    <span>
+                                        <Printer className="h-4 w-4" />
+                                        Print All
+                                    </span>
+                                )}
+                            </Button>
+                        )}
                     </div>
                </div>
 
@@ -224,9 +228,11 @@ export default function BillPrintingList({ bills }) {
                                         Balance
                                     </TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">
-                                        Actions
-                                    </TableHead>
+                                    {canPrint && (
+                                        <TableHead className="text-right">
+                                            Actions
+                                        </TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -321,32 +327,34 @@ export default function BillPrintingList({ bills }) {
                                                     pending
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    asChild
-                                                    className="gap-2"
-                                                >
-                                                    <a
-                                                        href={route(
-                                                            'bills.print',
-                                                            bill.id,
-                                                        )}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
+                                            {canPrint && (
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        asChild
+                                                        className="gap-2"
                                                     >
-                                                        <Printer className="h-4 w-4" />
-                                                        Print
-                                                    </a>
-                                                </Button>
-                                            </TableCell>
+                                                        <a
+                                                            href={route(
+                                                                'bills.print',
+                                                                bill.id,
+                                                            )}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            <Printer className="h-4 w-4" />
+                                                            Print
+                                                        </a>
+                                                    </Button>
+                                                </TableCell>
+                                            )}
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
                                         <TableCell
-                                            colSpan={9}
+                                            colSpan={canPrint ? 9 : 8}
                                             className="h-32 text-center text-muted-foreground"
                                         >
                                             <div className="flex flex-col items-center justify-center gap-2">

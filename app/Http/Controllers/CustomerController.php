@@ -46,7 +46,7 @@ class CustomerController extends Controller
             ])
             ->withCount('meters')
             ->latest()
-            ->paginate(30)
+            ->paginate(100)
             ->withQueryString();
 
         [$zones, $areas, $tariffs] = Cache::remember('customers_index_filters', self::FILTER_CACHE_TTL, function () {

@@ -34,10 +34,23 @@ class BillController extends Controller
             });
         }
 
+        if ($request->filled('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('month')) {
+            $query->whereRaw("DATE_FORMAT(bills.created_at, '%Y-%m') = ?", [$request->month]);
+        }
+
+        if ($request->filled('tariff_id') && $request->tariff_id !== 'all') {
+            $query->whereHas('customer', fn ($q) => $q->where('tariff_id', $request->tariff_id));
+        }
+
         $bills = $query->latest()->paginate(10)->withQueryString();
         return Inertia::render('bills/index', [
             'bills' => $bills,
-            'filters' => $request->only(['search']),
+            'filters' => $request->only(['search', 'status', 'month', 'tariff_id']),
+            'tariffs' => \App\Models\Tariff::orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -57,9 +70,13 @@ class BillController extends Controller
     {
         $tariffId = $request->input('tariff_id');
         $zoneId = $request->input('zone_id');
+        $asExcel = $request->input('format') === 'xlsx';
 
         if ($tariffId === 'all') $tariffId = null;
         if ($zoneId === 'all') $zoneId = null;
+
+        $filename = 'billing_report_' . date('Y-m-d') . ($asExcel ? '.xls' : '.csv');
+        $headers = $asExcel ? ['Content-Type' => 'application/vnd.ms-excel; charset=UTF-8'] : [];
 
         return response()->streamDownload(function () use ($tariffId, $zoneId) {
             $file = fopen('php://output', 'w');
@@ -139,7 +156,7 @@ class BillController extends Controller
             foreach ($zoneData as $row) fputcsv($file, [$row['name'], $row['billed'], $row['collected']]);
 
             fclose($file);
-        }, 'billing_report_' . date('Y-m-d') . '.csv');
+        }, $filename, $headers);
     }
 
     public function show($id)

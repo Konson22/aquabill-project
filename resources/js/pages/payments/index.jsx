@@ -44,6 +44,7 @@ import {
     Eye,
     FileSpreadsheet,
     MoreHorizontal,
+    Search,
     Trash2,
     X,
 } from 'lucide-react';
@@ -57,6 +58,7 @@ export default function Payments({
 }) {
     const [search, setSearch] = useState(filters.search || '');
     const [month, setMonth] = useState(filters.month || '');
+    const [status, setStatus] = useState(filters.status || 'all');
     const [deleteId, setDeleteId] = useState(null);
     const { delete: destroy } = useForm();
 
@@ -79,6 +81,7 @@ export default function Payments({
             const query = {};
             if (search) query.search = search;
             if (month) query.month = month;
+            if (status && status !== 'all') query.status = status;
 
             router.get(route('payments'), query, {
                 preserveState: true,
@@ -88,11 +91,12 @@ export default function Payments({
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [search, month]);
+    }, [search, month, status]);
 
     const clearFilters = () => {
         setSearch('');
         setMonth('');
+        setStatus('all');
     };
 
     const breadcrumbs = [
@@ -126,28 +130,59 @@ export default function Payments({
     };
 
     const last12Months = getLast12Months();
-    const hasFilters = search || month;
+    const hasFilters = search || month || (status && status !== 'all');
+
+    const STATUS_OPTIONS = [
+        { value: 'all', label: 'All statuses' },
+        { value: 'fully_paid', label: 'Fully paid' },
+        { value: 'partial_paid', label: 'Partial paid' },
+        { value: 'pending', label: 'Pending' },
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payments" />
 
             <div className="p flex flex-col gap-6">
-                {/* Header & Controls Section */}
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                            Payments
-                        </h1>
-                    </div>
-                    <div className="flex items-center gap-2">
+                {/* Controls */}
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Select
+                            value={month || 'all'}
+                            onValueChange={(value) =>
+                                setMonth(value === 'all' ? '' : value)
+                            }
+                        >
+                            <SelectTrigger className="h-9 w-[160px] bg-background">
+                                <SelectValue placeholder="All months" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All months</SelectItem>
+                                {last12Months.map((m) => (
+                                    <SelectItem key={m.value} value={m.value}>
+                                        {m.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={status} onValueChange={setStatus}>
+                            <SelectTrigger className="h-9 w-[160px] bg-background">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {STATUS_OPTIONS.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                         {hasFilters && (
                             <Button
                                 variant="ghost"
                                 size="md"
                                 onClick={clearFilters}
                                 title="Clear filters"
-                                className="h-8 px-2 lg:px-3"
+                                className="h-9 px-2 lg:px-3"
                             >
                                 <X className="mr-2 h-4 w-4" />
                                 Clear Filters
@@ -158,18 +193,21 @@ export default function Payments({
                         <Button
                             variant="outline"
                             asChild
-                            title="Export CSV"
+                            title="Export Excel"
                             className="gap-2"
                         >
                             <a
                                 href={
                                     route('payments.export') +
-                                    window.location.search
+                                    (window.location.search
+                                        ? window.location.search + '&'
+                                        : '?') +
+                                    'format=xlsx'
                                 }
                             >
                                 <FileSpreadsheet className="h-4 w-4" />
                                 <span className="hidden sm:inline">
-                                    Export CSV
+                                    Export Excel
                                 </span>
                             </a>
                         </Button>
@@ -186,42 +224,21 @@ export default function Payments({
                                 </span>
                             </Link>
                         </Button>
-                    </div>
                 </div>
 
                 <Card className="flex flex-1 flex-col overflow-hidden">
-                    <div className="flex items-center justify-end px-5">
-                        <div className=""></div>
-                        <div className="flex">
+                    <div className="flex flex-col gap-4 border-b border-border/60 px-5 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                        <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                            Payments
+                        </h2>
+                        <div className="relative w-[500px] sm:flex-none">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 placeholder="Search payments..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="mr-3 w-[450px] bg-background"
+                                className="h-12 w-full bg-gray-50 pl-9"
                             />
-                            <Select
-                                value={month || 'all'}
-                                onValueChange={(value) =>
-                                    setMonth(value === 'all' ? '' : value)
-                                }
-                            >
-                                <SelectTrigger className="w-full sm:w-[160px]">
-                                    <SelectValue placeholder="All Months" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Months
-                                    </SelectItem>
-                                    {last12Months.map((m) => (
-                                        <SelectItem
-                                            key={m.value}
-                                            value={m.value}
-                                        >
-                                            {m.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
                         </div>
                     </div>
                     <div className="overflow-x-auto">
@@ -234,10 +251,10 @@ export default function Payments({
                                     </TableHead>
                                     <TableHead>Bill No</TableHead>
                                     <TableHead>Customer</TableHead>
+                                    <TableHead>Meter No</TableHead>
                                     <TableHead>Total Amount</TableHead>
                                     <TableHead>Amount Paid</TableHead>
                                     <TableHead>Balance</TableHead>
-                                    <TableHead>Meter No</TableHead>
                                     <TableHead>Date</TableHead>
                                     <TableHead className="text-right">
                                         Actions
@@ -311,6 +328,17 @@ export default function Payments({
                                                 </div>
                                             </TableCell>
                                             <TableCell>
+                                                <span className="font-mono text-sm text-muted-foreground">
+                                                    {payment.payable?.customer
+                                                        ?.meter?.meter_number ??
+                                                        payment.payable
+                                                            ?.meter_reading
+                                                            ?.meter
+                                                            ?.meter_number ??
+                                                        '—'}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell>
                                                 <span className="font-medium">
                                                     {formatCurrency(
                                                         payment.payable
@@ -337,18 +365,6 @@ export default function Payments({
                                                         payment?.balance_after ??
                                                             0,
                                                     )}
-                                                </span>
-                                            </TableCell>
-
-                                            <TableCell>
-                                                <span className="font-mono text-sm text-muted-foreground">
-                                                    {payment.payable?.customer
-                                                        ?.meter?.meter_number ??
-                                                        payment.payable
-                                                            ?.meter_reading
-                                                            ?.meter
-                                                            ?.meter_number ??
-                                                        '—'}
                                                 </span>
                                             </TableCell>
                                             <TableCell>

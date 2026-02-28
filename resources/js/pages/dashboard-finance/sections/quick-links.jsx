@@ -1,6 +1,11 @@
 import { Card } from '@/components/ui/card';
 import { Link } from '@inertiajs/react';
-import { ArrowUpRight, FileBarChart, FilePieChart } from 'lucide-react';
+import {
+    ArrowUpRight,
+    FileBarChart,
+    FilePieChart,
+    ClipboardList,
+} from 'lucide-react';
 
 export default function QuickLinks() {
     const links = [
@@ -26,6 +31,7 @@ export default function QuickLinks() {
             borderColor: 'hover:border-emerald-300',
             shadowColor: 'group-hover:shadow-emerald-500/25',
         },
+      
     ];
 
     return (
@@ -36,7 +42,7 @@ export default function QuickLinks() {
                 </h3>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
                 {links.map((link) => (
                     <Link key={link.title} href={link.href} className="group">
                         <Card

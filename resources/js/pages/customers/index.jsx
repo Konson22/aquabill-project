@@ -51,7 +51,6 @@ import {
     Pencil,
     Plus,
     Search,
-    SlidersHorizontal,
     Trash2,
     X,
 } from 'lucide-react';
@@ -291,7 +290,7 @@ export default function Customers({
                                     <DropdownMenuLabel>
                                         Actions
                                     </DropdownMenuLabel>
-                                    {hasMeters && (
+                                    {hasMeters && department !== 'finance' && (
                                         <DropdownMenuItem
                                             onClick={() =>
                                                 openReadingModal(customer)
@@ -374,30 +373,59 @@ export default function Customers({
             <Head title="Customer Directory" />
 
             <div className="flex h-auto flex-col gap-6 pb-8">
-                <Card className="overflow-hidden border shadow-sm">
-                    <div className="flex flex-col gap-4 px-4 pt-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                                Customers
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                Manage your customers and their service
-                                connections.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex justify-end items-center gap-3 px-5 pb-4">
+                          
+                            <Select value={tariffId} onValueChange={setTariffId}>
+                                <SelectTrigger className="h-9 w-[160px] bg-background">
+                                    <SelectValue placeholder="Tariff" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Tariffs</SelectItem>
+                                    {tariffs?.map((tariff) => (
+                                        <SelectItem key={tariff.id} value={tariff.id.toString()}>
+                                            {tariff.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={zoneId} onValueChange={setZoneId}>
+                                <SelectTrigger className="h-9 w-[160px] bg-background">
+                                    <SelectValue placeholder="Zone" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Zones</SelectItem>
+                                    {zones?.map((zone) => (
+                                        <SelectItem key={zone.id} value={zone.id.toString()}>
+                                            {zone.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={areaId} onValueChange={setAreaId}>
+                                <SelectTrigger className="h-9 w-[160px] bg-background">
+                                    <SelectValue placeholder="Area" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Areas</SelectItem>
+                                    {areas?.map((area) => (
+                                        <SelectItem key={area.id} value={area.id.toString()}>
+                                            {area.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <Button
                                 variant="outline"
                                 onClick={exportToExcel}
-                                className="h-11 gap-2 border-emerald-200 bg-emerald-50/30 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                                className="h-9 gap-2 border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 hover:text-emerald-900"
                             >
                                 <Download className="h-4 w-4" />
-                                <span>Export Data</span>
+                                Export Data
                             </Button>
                             {department === 'admin' && (
                                 <Button
                                     asChild
-                                    className="h-11 gap-2 px-6 shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
+                                    className="h-9 gap-2"
                                 >
                                     <Link href={route('customers.create')}>
                                         <Plus className="h-4 w-4" />
@@ -405,152 +433,7 @@ export default function Customers({
                                     </Link>
                                 </Button>
                             )}
-                        </div>
                     </div>
-
-                    <div className="border-t bg-gradient-to-br from-muted/40 to-muted/10 px-4 py-5">
-                        <div className="flex flex-col gap-4">
-                            {/* Filters row */}
-                            <div className="flex flex-wrap items-center gap-2">
-                                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                                    Filters
-                                </div>
-                                <Select
-                                    value={tariffId}
-                                    onValueChange={setTariffId}
-                                >
-                                    <SelectTrigger className="h-9 w-[140px] rounded-lg border-border/60 bg-background/80 shadow-sm">
-                                        <SelectValue placeholder="Tariff" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Tariffs
-                                        </SelectItem>
-                                        {tariffs?.map((tariff) => (
-                                            <SelectItem
-                                                key={tariff.id}
-                                                value={tariff.id.toString()}
-                                            >
-                                                {tariff.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Select
-                                    value={zoneId}
-                                    onValueChange={setZoneId}
-                                >
-                                    <SelectTrigger className="h-9 w-[140px] rounded-lg border-border/60 bg-background/80 shadow-sm">
-                                        <SelectValue placeholder="Zone" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Zones
-                                        </SelectItem>
-                                        {zones?.map((zone) => (
-                                            <SelectItem
-                                                key={zone.id}
-                                                value={zone.id.toString()}
-                                            >
-                                                {zone.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Select
-                                    value={areaId}
-                                    onValueChange={setAreaId}
-                                >
-                                    <SelectTrigger className="h-9 w-[140px] rounded-lg border-border/60 bg-background/80 shadow-sm">
-                                        <SelectValue placeholder="Area" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All Areas
-                                        </SelectItem>
-                                        {areas?.map((area) => (
-                                            <SelectItem
-                                                key={area.id}
-                                                value={area.id.toString()}
-                                            >
-                                                {area.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {(search ||
-                                    zoneId !== 'all' ||
-                                    areaId !== 'all' ||
-                                    tariffId !== 'all') && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={clearFilters}
-                                        className="h-9 gap-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                        Clear all
-                                    </Button>
-                                )}
-                            </div>
-
-                            {/* Active filter chips (compact summary) */}
-                            {(search ||
-                                zoneId !== 'all' ||
-                                areaId !== 'all' ||
-                                tariffId !== 'all') && (
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                    {search && (
-                                        <Badge
-                                            variant="secondary"
-                                            className="gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
-                                        >
-                                            Search:{' '}
-                                            {search.length > 20
-                                                ? `${search.slice(0, 20)}…`
-                                                : search}
-                                        </Badge>
-                                    )}
-                                    {tariffId !== 'all' && (
-                                        <Badge
-                                            variant="secondary"
-                                            className="gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
-                                        >
-                                            {tariffs?.find(
-                                                (t) =>
-                                                    t.id.toString() ===
-                                                    tariffId,
-                                            )?.name ?? 'Tariff'}
-                                        </Badge>
-                                    )}
-                                    {zoneId !== 'all' && (
-                                        <Badge
-                                            variant="secondary"
-                                            className="gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
-                                        >
-                                            {zones?.find(
-                                                (z) =>
-                                                    z.id.toString() === zoneId,
-                                            )?.name ?? 'Zone'}
-                                        </Badge>
-                                    )}
-                                    {areaId !== 'all' && (
-                                        <Badge
-                                            variant="secondary"
-                                            className="gap-1 rounded-md px-2 py-0.5 text-xs font-medium"
-                                        >
-                                            {areas?.find(
-                                                (a) =>
-                                                    a.id.toString() === areaId,
-                                            )?.name ?? 'Area'}
-                                        </Badge>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </Card>
 
                 <Card className="overflow-hidden border shadow-sm">
                     <div className="flex items-center justify-between border-b px-4 py-3">

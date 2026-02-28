@@ -461,6 +461,16 @@ class DashboardController extends Controller
             ],
         ];
 
+        $customerStats = [
+            'totalCustomers' => Customer::count(),
+            'activeCustomers' => Customer::where('supply_status', 'active')->count(),
+            'suspendedCustomers' => Customer::where('supply_status', 'suspended')->count(),
+            'totalMeters' => Meter::count(),
+            'metersActive' => Meter::where('status', 'active')->count(),
+            'metersInactive' => Meter::where('status', 'inactive')->count(),
+            'metersMaintenance' => Meter::whereIn('status', ['maintenance', 'damage'])->count(),
+        ];
+
         return Inertia::render('dashboard-admin/general-report', [
             'stats' => [
                 'totalBills' => $totalBills,
@@ -470,9 +480,12 @@ class DashboardController extends Controller
                 'outstandingAmount' => round($outstandingAmount, 2),
                 'totalConsumption' => $totalConsumption,
                 'paymentRate' => round($paymentRate, 1),
+                'overdueBillsCount' => $overdueBillsCount,
+                'overdueBillsAmount' => round($overdueBillsAmount, 2),
             ],
             'usageByZone' => $usageByZone,
             'highlights' => $highlights,
+            'customerStats' => $customerStats,
             'filters' => $request->only(['month']),
         ]);
     }

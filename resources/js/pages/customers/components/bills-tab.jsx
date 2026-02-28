@@ -33,7 +33,7 @@ import { Link, router, useForm } from '@inertiajs/react';
 import { CreditCard, Eye, Pencil, Receipt, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-export default function BillsTab({ allBills }) {
+export default function BillsTab({ allBills, canEdit = true }) {
     const [deleteId, setDeleteId] = useState(null);
     const [payOpen, setPayOpen] = useState(false);
     const [paymentBill, setPaymentBill] = useState(null);
@@ -216,46 +216,49 @@ export default function BillsTab({ allBills }) {
                                                     <CreditCard className="h-4 w-4" />
                                                 </Button>
                                             )}
-                                            {bill.status === 'pending' ? (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    asChild
-                                                    title="Edit"
-                                                >
-                                                    <Link
-                                                        href={route(
-                                                            'bills.show',
-                                                            bill.id,
-                                                        )}
+                                            {canEdit &&
+                                                (bill.status === 'pending' ? (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8"
+                                                        asChild
+                                                        title="Edit"
+                                                    >
+                                                        <Link
+                                                            href={route(
+                                                                'bills.show',
+                                                                bill.id,
+                                                            )}
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Link>
+                                                    </Button>
+                                                ) : (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 opacity-50"
+                                                        disabled
+                                                        title="Edit"
                                                     >
                                                         <Pencil className="h-4 w-4" />
-                                                    </Link>
-                                                </Button>
-                                            ) : (
+                                                    </Button>
+                                                ))}
+                                            {canEdit && (
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-8 w-8 opacity-50"
-                                                    disabled
-                                                    title="Edit"
+                                                    className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                    onClick={() =>
+                                                        setDeleteId(bill.id)
+                                                    }
+                                                    disabled={!canDelete(bill)}
+                                                    title="Delete"
                                                 >
-                                                    <Pencil className="h-4 w-4" />
+                                                    <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             )}
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                                onClick={() =>
-                                                    setDeleteId(bill.id)
-                                                }
-                                                disabled={!canDelete(bill)}
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
                                         </div>
                                     </TableCell>
                                 </TableRow>

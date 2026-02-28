@@ -40,7 +40,10 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-export default function InvoicesTab({ allInvoices }) {
+export default function InvoicesTab({
+    allInvoices,
+    canEdit = true,
+}) {
     const [deleteId, setDeleteId] = useState(null);
     const [payOpen, setPayOpen] = useState(false);
     const [paymentInvoice, setPaymentInvoice] = useState(null);
@@ -193,34 +196,36 @@ export default function InvoicesTab({ allInvoices }) {
                                                         <CreditCard className="h-4 w-4" />
                                                     </Button>
                                                 )}
-                                            {invoice.status === 'pending' ? (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    asChild
-                                                    title="Edit"
-                                                >
-                                                    <Link
-                                                        href={route(
-                                                            'invoices.show',
-                                                            invoice.id,
-                                                        )}
+                                            {canEdit &&
+                                                (invoice.status ===
+                                                'pending' ? (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8"
+                                                        asChild
+                                                        title="Edit"
+                                                    >
+                                                        <Link
+                                                            href={route(
+                                                                'invoices.show',
+                                                                invoice.id,
+                                                            )}
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Link>
+                                                    </Button>
+                                                ) : (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 opacity-50"
+                                                        disabled
+                                                        title="Edit"
                                                     >
                                                         <Pencil className="h-4 w-4" />
-                                                    </Link>
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8 opacity-50"
-                                                    disabled
-                                                    title="Edit"
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                            )}
+                                                    </Button>
+                                                ))}
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -239,17 +244,19 @@ export default function InvoicesTab({ allInvoices }) {
                                                     <Printer className="h-4 w-4" />
                                                 </a>
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                                onClick={() =>
-                                                    setDeleteId(invoice.id)
-                                                }
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            {canEdit && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                    onClick={() =>
+                                                        setDeleteId(invoice.id)
+                                                    }
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </TableCell>
                                 </TableRow>

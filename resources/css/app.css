@@ -150,7 +150,8 @@
     }
 
     body {
-        @apply bg-background text-foreground;
+        background-color: #fdfdfd;
+        @apply text-foreground;
     }
 
     .bg-sidebar,

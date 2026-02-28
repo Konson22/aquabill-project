@@ -6,10 +6,10 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Link, router, usePage } from '@inertiajs/react';
-import { AlertCircle, FileWarning, LogOut, Settings, User } from 'lucide-react';
+import { AlertCircle, BookOpen, FileWarning, LogOut, Menu, Settings, User } from 'lucide-react';
 import { route } from 'ziggy-js';
 
-export default function AdminNavbar() {
+export default function AdminNavbar({ onMobileMenuClick }) {
     const {
         auth,
         overdue_reading_count = 0,
@@ -19,10 +19,18 @@ export default function AdminNavbar() {
 
     return (
         <header
-            className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-end border-b border-border/80 bg-white px-4 shadow-sm"
+            className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-white px-4 shadow-sm"
             role="banner"
         >
-            <div className="flex items-center gap-2 sm:gap-3">
+            <button
+                type="button"
+                onClick={() => onMobileMenuClick?.()}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                aria-label="Open menu"
+            >
+                <Menu className="h-5 w-5" />
+            </button>
+            <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
                 {Number(overdue_reading_count) > 0 && (
                     <Link
                         href={route('meter-readings')}
@@ -82,6 +90,12 @@ export default function AdminNavbar() {
                             <Link href={route('profile.edit')}>
                                 <User className="h-4 w-4" />
                                 Profile
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href={route('docs.user-manual')}>
+                                <BookOpen className="h-4 w-4" />
+                                User manual
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
