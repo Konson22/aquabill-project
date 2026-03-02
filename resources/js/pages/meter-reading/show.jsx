@@ -114,7 +114,6 @@ export default function Show({ meterReading }) {
                             </p>
                         </div>
                     </div>
-
                     {meterReading.image && (
                         <div className="space-y-2 border-t pt-4">
                             <span className="text-sm font-medium text-muted-foreground">
@@ -122,7 +121,7 @@ export default function Show({ meterReading }) {
                             </span>
                             <div className="overflow-hidden rounded-lg border bg-muted">
                                 <img
-                                    src={meterReading.image_url}
+                                    src={meterReading.image}
                                     alt="Meter Reading"
                                     className="h-auto max-h-[400px] w-full object-contain"
                                 />

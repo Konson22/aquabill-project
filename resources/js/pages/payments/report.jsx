@@ -78,8 +78,7 @@ export default function PaymentReport({
                     <ReportKpiCard
                         icon={Receipt}
                         iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                        title="Water bills"
-                        subtitle="Consumption revenue"
+                        title="Water Consumption revenue"
                         billed={billKpis?.totalBilled}
                         collected={billKpis?.totalCollected}
                         due={billKpis?.totalUnpaid}
@@ -90,8 +89,7 @@ export default function PaymentReport({
                     <ReportKpiCard
                         icon={CreditCard}
                         iconClassName="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                        title="Invoices"
-                        subtitle="Services & other fees"
+                        title="Services & other fees"
                         billed={invoiceKpis?.totalBilled}
                         collected={invoiceKpis?.totalCollected}
                         due={invoiceKpis?.totalUnpaid}

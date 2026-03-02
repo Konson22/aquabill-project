@@ -43,7 +43,7 @@ class MeterController extends Controller
             'damage' => (int) $counts->damage,
         ];
 
-        $perPage = 25;
+        $perPage = 100;
         $page = (int) $request->input('page', 1);
         $total = $request->filled('search') ? (clone $query)->count() : $stats['total'];
         $meters = $query->forPage($page, $perPage)->get();

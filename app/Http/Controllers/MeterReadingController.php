@@ -10,6 +10,7 @@ use App\Models\Bill;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class MeterReadingController extends Controller
@@ -566,7 +567,7 @@ class MeterReadingController extends Controller
             ->findOrFail($id);
 
         if ($meterReading->image) {
-            $meterReading->image_url = url('storage/' . $meterReading->image);
+            $meterReading->image = asset('/'.$meterReading->image); // e.g. /readings/...
         }
 
         return Inertia::render('meter-reading/show', [

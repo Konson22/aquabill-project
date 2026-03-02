@@ -92,6 +92,8 @@ class ReadingController extends Controller
                 $consumption = max(0, $validated['current_reading'] - $validated['previous_reading']);
 
                 // Handle image upload (API: base64 or file)
+                // For compatibility with environments where storage symlinks are problematic,
+                // store directly under public/readings and save a web path usable with asset().
                 $imagePath = null;
                 if (!empty($itemData['image']) && is_string($itemData['image']) && str_starts_with($itemData['image'], 'data:image')) {
                     try {
@@ -101,8 +103,12 @@ class ReadingController extends Controller
                         $image = str_replace($replace, '', $imageData);
                         $image = str_replace(' ', '+', $image);
                         $imageName = 'reading_' . time() . '_' . $index . '.' . $extension;
-                        Storage::disk('public')->put('readings/' . $imageName, base64_decode($image));
-                        $imagePath = 'readings/' . $imageName;
+                        $publicPath = public_path('readings/' . $imageName);
+                        if (!is_dir(dirname($publicPath))) {
+                            mkdir(dirname($publicPath), 0755, true);
+                        }
+                        file_put_contents($publicPath, base64_decode($image));
+                        $imagePath = 'readings/' . $imageName; // relative to public for asset()
                     } catch (\Exception $e) {
                         // Log or handle base64 decode failure
                     }
