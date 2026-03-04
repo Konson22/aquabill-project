@@ -8,9 +8,9 @@ import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import { store } from '@/routes/login';
 import { Form, Head } from '@inertiajs/react';
-import { CheckCircle2, ChevronDown, Lock, User } from 'lucide-react';
+import { CheckCircle2, Lock, User } from 'lucide-react';
 
-export default function Login({ status, users = [] }) {
+export default function Login({ status }) {
     return (
         <AuthLayout
             title="Welcome back"
@@ -35,36 +35,24 @@ export default function Login({ status, users = [] }) {
                         <div className="grid gap-5">
                             <div className="grid gap-2">
                                 <Label
-                                    htmlFor="user"
+                                    htmlFor="username"
                                     className="text-sm font-semibold text-slate-700"
                                 >
-                                    User
+                                    Username
                                 </Label>
                                 <div className="relative">
                                     <User className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 pointer-events-none text-slate-400" />
-                                    <ChevronDown className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 pointer-events-none text-slate-400" />
-                                    <select
-                                        id="user"
+                                    <Input
+                                        id="username"
+                                        type="text"
                                         name="name"
                                         required
                                         autoFocus
                                         tabIndex={1}
                                         autoComplete="username"
-                                        className={`h-12 w-full rounded-md border bg-white pl-9 pr-10 text-slate-900 shadow-sm focus:ring-2 focus:ring-slate-300 focus:border-slate-300 outline-none appearance-none cursor-pointer ${errors.name ? 'border-destructive focus:ring-destructive' : 'border-slate-200'}`}
-                                    >
-                                        <option value="" className="bg-white text-slate-900">
-                                            Select user
-                                        </option>
-                                        {users.map((user) => (
-                                            <option
-                                                key={user.id}
-                                                value={user.name}
-                                                className="bg-white text-slate-900"
-                                            >
-                                                {user.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        placeholder="Enter your username"
+                                        className={`border-slate-200 bg-white pl-9 text-slate-900 placeholder:text-slate-400 shadow-sm focus-visible:ring-slate-300 ${errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                                    />
                                 </div>
                                 <InputError message={errors.name} />
                             </div>

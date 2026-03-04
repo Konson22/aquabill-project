@@ -137,29 +137,19 @@ class MeterReadingController extends Controller
             $tariffRate = $tariff ? $tariff->price : 0;
             $fixedCharge = $tariff ? $tariff->fixed_charge : 0;
             $consumptionAmount = $consumption * $tariffRate;
-            
-            // Previous balance from last active bill
+
+            // Previous balance from last bill and update its status if still pending
             $lastBill = Bill::where('customer_id', $customer->id)
-                ->where('status', '!=', 'cancelled')
-                ->where('status', '!=', 'forwarded')
-                ->latest('id')
+                ->orderByDesc('id')
                 ->first();
-            
+
             $previousBalance = 0;
             if ($lastBill) {
-                if ($lastBill->status !== 'fully paid') {
-                    $previousBalance = $lastBill->balance;
+                if ($lastBill->status === 'pending') {
                     $lastBill->update(['status' => 'forwarded']);
                 }
+                $previousBalance = (float) $lastBill->balance;
             }
-
-            // Ensure any other lingering unpaid bills are also forwarded
-            Bill::where('customer_id', $customer->id)
-                ->whereIn('status', ['pending', 'overdue', 'partial paid'])
-                ->update(['status' => 'forwarded']);
-
-            $amount = $consumptionAmount + $fixedCharge; // current consumption amount
-            $totalAmount = $amount + $previousBalance;
 
             // Generate unique bill number
             $billCount = Bill::count();
@@ -167,8 +157,8 @@ class MeterReadingController extends Controller
 
             // Calculate billing period and due date
             $readingDate = Carbon::parse($validated['reading_date']);
-            
-            // Create the bill
+
+            // Create the bill (amount = water_consumption_volume * tariff + fix_charges is computed on the model)
             Bill::create([
                 'bill_number' => $billNumber,
                 'meter_reading_id' => $reading->id,
@@ -177,11 +167,9 @@ class MeterReadingController extends Controller
                 'billing_period_end' => $readingDate->copy()->endOfMonth(),
                 'tariff' => $tariffRate,
                 'fix_charges' => $fixedCharge,
+                'water_consumption_volume' => $consumption,
                 'previous_balance' => $previousBalance,
-                'amount' => $amount,
-                'total_amount' => $totalAmount,
                 'due_date' => $readingDate->copy()->addDays(14),
-                'status' => 'pending',
             ]);
 
             DB::commit();
@@ -231,18 +219,16 @@ class MeterReadingController extends Controller
                 $reading->update(['consumption' => $newConsumption]);
             }
 
-            // 3. Update linked bill when reading changes (recalculate amount and period)
-            if ($reading->bill && $reading->bill->status !== 'fully paid') {
+            // 3. Update linked bill when reading changes (recalculate volume and period)
+            if ($reading->bill && $reading->bill->balance > 0) {
                 $tariffRate = $reading->meter->customer?->tariff?->price ?? 0;
                 $fixedCharge = $reading->meter->customer?->tariff?->fixed_charge ?? 0;
-                $consumptionAmount = $newConsumption * $tariffRate;
-                $amount = $consumptionAmount + $fixedCharge;
                 $readingDate = Carbon::parse($validated['reading_date']);
 
                 $reading->bill->update([
                     'tariff' => $tariffRate,
                     'fix_charges' => $fixedCharge,
-                    'amount' => $amount,
+                    'water_consumption_volume' => $newConsumption,
                     'billing_period_start' => $readingDate->copy()->startOfMonth(),
                     'billing_period_end' => $readingDate->copy()->endOfMonth(),
                     'due_date' => $readingDate->copy()->addDays(14),
@@ -567,7 +553,7 @@ class MeterReadingController extends Controller
             ->findOrFail($id);
 
         if ($meterReading->image) {
-            $meterReading->image = asset('/'.$meterReading->image); // e.g. /readings/...
+            $meterReading->image = asset('/storage/app/public/'.$meterReading->image); 
         }
 
         return Inertia::render('meter-reading/show', [

@@ -38,6 +38,30 @@ Route::middleware(['auth'])->group(function () {
         return Inertia::render('documentation/index');
     })->name('docs.user-manual');
 
+    Route::get('docs/development-status', function () {
+        return Inertia::render('documentation/manual');
+    })->name('docs.development-status');
+
+    Route::get('docs/user-manuals', function () {
+        return Inertia::render('documentation/UserManual');
+    })->name('docs.user-manuals');
+
+    Route::get('docs/quick-references', function () {
+        return Inertia::render('documentation/QuickReferences');
+    })->name('docs.quick-references');
+
+    Route::get('docs/technical-docs', function () {
+        return Inertia::render('documentation/TechnicalDocumentation');
+    })->name('docs.technical');
+
+    Route::get('docs/process-governance', function () {
+        return Inertia::render('documentation/ProcessGovernance');
+    })->name('docs.process-governance');
+
+    Route::get('docs/training-materials', function () {
+        return Inertia::render('documentation/TrainingMaterials');
+    })->name('docs.training-materials');
+
     // Search (customer search used by invoice modal; homes.search kept for backward compatibility)
     Route::get('/api/h/search', [CustomerController::class, 'search'])->name('homes.search');
     Route::get('/api/customers/search', [CustomerController::class, 'search'])->name('customers.search');

@@ -1,208 +1,106 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import {
-    Activity,
-    CircleDollarSign,
-    Clock,
-    FileText,
-    PieChart,
-    Receipt,
-} from 'lucide-react';
-
-function formatCurrency(value) {
-    if (value == null || Number.isNaN(value)) return '—';
-    return new Intl.NumberFormat(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(value);
-}
+import { Clock, FileText, FileStack, Receipt } from 'lucide-react';
+import RevenueChart from './RevenueChart';
 
 export default function FinanceSection({
     stats,
     performance,
     invoices,
-    totalBillsAmount = 0,
-    totalPaymentsAmount = 0,
+    waterRevenueChartData = [],
+    paymentChartData = [],
 }) {
     if (!stats || !invoices) return null;
 
+    const rate = Math.min(100, Math.max(0, Number(performance) || 0));
+
+
     const items = [
         {
-            label: 'Pending',
-            value: stats.pending,
+            label: 'Total Bills',
+            value: stats.total ?? 0,
+            icon: FileText,
+            accent: 'text-slate-600',
+            accentBg: 'bg-slate-500/10',
+            cardBg: 'bg-slate-100 dark:bg-slate-800/60',
+        },
+        {
+            label: 'Pending Bills',
+            value: stats.pending ?? 0,
             icon: Clock,
-            color: 'text-amber-600',
-            bg: 'bg-amber-100 dark:bg-amber-900/20',
+            accent: 'text-amber-600',
+            accentBg: 'bg-amber-500/10',
+            cardBg: 'bg-amber-50 dark:bg-amber-950/30',
         },
         {
-            label: 'Fully Paid',
-            value: stats.fully_paid,
-            icon: CircleDollarSign,
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-100 dark:bg-emerald-900/20',
+            label: 'Total Invoices',
+            value: invoices.total ?? 0,
+            icon: FileStack,
+            accent: 'text-blue-600',
+            accentBg: 'bg-blue-500/10',
+            cardBg: 'bg-blue-50 dark:bg-blue-950/30',
         },
         {
-            label: 'Partial / Fwd',
-            value: stats.partial_paid + stats.forwarded,
-            icon: PieChart,
-            color: 'text-blue-600',
-            bg: 'bg-blue-100 dark:bg-blue-900/20',
-        },
-        {
-            label: 'Bal Forwarded',
-            value: stats.balance_forwarded,
+            label: 'Pending Invoices',
+            value: invoices.unpaid ?? 0,
             icon: Receipt,
-            color: 'text-purple-600',
-            bg: 'bg-purple-100 dark:bg-purple-900/20',
+            accent: 'text-amber-600',
+            accentBg: 'bg-amber-500/10',
+            cardBg: 'bg-violet-50 dark:bg-violet-950/30',
         },
     ];
 
-    const invoiceItems = [
-        {
-            label: 'Total',
-            value: invoices.total,
-            color: 'text-slate-600',
-            bg: 'bg-slate-100',
-        },
-        {
-            label: 'Paid',
-            value: invoices.paid,
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-100',
-        },
-        {
-            label: 'Unpaid',
-            value: invoices.unpaid,
-            color: 'text-amber-600',
-            bg: 'bg-amber-100',
-        },
-    ];
 
     return (
-        <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-4 lg:col-span-5">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-slate-500" />
-                            Billing Overview
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-4">
-                            {items.map((item) => (
-                                <div
-                                    key={item.label}
-                                    className="group relative flex flex-col items-center justify-center space-y-3 rounded-xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-950"
-                                >
-                                    <div
-                                        className={cn(
-                                            'bg-opacity-10 rounded-2xl p-3 transition-transform duration-300 group-hover:scale-110',
-                                            item.bg,
-                                        )}
-                                    >
-                                        <item.icon
-                                            className={cn(
-                                                'h-6 w-6',
-                                                item.color,
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                                            {item.value}
-                                        </div>
-                                        <div className="text-xs font-medium tracking-wider text-slate-500 uppercase">
-                                            {item.label}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-8">
-                            <h3 className="mb-4 flex items-center gap-2 leading-none font-semibold tracking-tight">
-                                <Activity className="h-5 w-5 text-slate-500" />
-                                Invoices Overview
-                            </h3>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                {invoiceItems.map((item) => (
-                                    <div
-                                        key={item.label}
-                                        className="group flex flex-col items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-950"
-                                    >
-                                        <div className="flex w-full items-center justify-between">
-                                            <span className="text-sm font-medium text-slate-500">
-                                                {item.label} Invoices
-                                            </span>
-                                            <div
-                                                className={cn(
-                                                    'h-3 w-3 rounded-full shadow-sm',
-                                                    item.color.replace(
-                                                        'text-',
-                                                        'bg-',
-                                                    ),
-                                                )}
-                                            />
-                                        </div>
-                                        <div className="flex items-baseline gap-2">
-                                            <span
-                                                className={cn(
-                                                    'text-3xl font-bold tracking-tight',
-                                                    item.color,
-                                                )}
-                                            >
-                                                {item.value}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="col-span-3 lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Billing Performance</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col items-center justify-center py-6">
-                        <div className="relative flex h-40 w-40 items-center justify-center rounded-full border-8 border-slate-100 dark:border-slate-800">
+        <Card className="overflow-hidden border-0 bg-white shadow-sm dark:from-slate-900/50 dark:to-slate-900">
+            <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                        <FileText className="h-4 w-4 text-primary" />
+                    </span>
+                    Billing & Revenue
+                </CardTitle>
+                <CardDescription>
+                    Bills and invoices overview with revenue collected vs billed.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+                <div className="flex space-x-4">
+                    {items.map((item) => (
+                        <div
+                            key={item.label}
+                            className={cn(
+                                'flex items-center gap-3 flex-1 rounded-lg border border-transparent px-4 py-3 transition-colors',
+                                item.cardBg,
+                                'hover:border-slate-200 dark:hover:border-slate-600',
+                            )}
+                        >
                             <div
-                                className="absolute inset-0 rounded-full border-8 border-emerald-500 transition-all duration-1000 ease-out"
-                                style={{
-                                    clipPath: `inset(0 0 ${100 - Math.min(100, Math.max(0, Number(performance) || 0))}% 0)`,
-                                }}
-                            />
-                            <div className="flex flex-col items-center text-center">
-                                <span className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                                    {Math.min(
-                                        100,
-                                        Math.max(0, Number(performance) || 0),
-                                    ).toFixed(1)}
-                                    %
-                                </span>
-                                <span className="text-xs text-slate-500">
-                                    Amount collected vs billed
-                                </span>
+                                className={cn(
+                                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                                    item.accentBg,
+                                )}
+                            >
+                                <item.icon
+                                    className={cn('h-5 w-5', item.accent)}
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="truncate text-xl font-bold tabular-nums text-foreground">
+                                    {item.value}
+                                </p>
+                                <p className="truncate text-xs font-medium text-muted-foreground">
+                                    {item.label}
+                                </p>
                             </div>
                         </div>
-                        <div className="mt-6 w-full space-y-2 text-sm text-slate-500">
-                            <div className="flex items-center justify-between">
-                                <span>Total bills amount</span>
-                                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                                    {formatCurrency(totalBillsAmount)}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span>Payments collected</span>
-                                <span className="font-semibold text-slate-900 dark:text-slate-100">
-                                    {formatCurrency(totalPaymentsAmount)}
-                                </span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        </div>
+                    ))}
+                </div>
+                <RevenueChart
+                    data={waterRevenueChartData}
+                    paymentsData={paymentChartData}
+                />
+            </CardContent>
+        </Card>
     );
 }

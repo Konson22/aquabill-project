@@ -31,10 +31,20 @@ function buildChartData(monthlyTrend) {
             found
                 ? {
                       month: monthStr,
-                      paid: Number(found.paid),
-                      unpaid: Number(found.unpaid),
+                      billed: Number(found.billed ?? (found.paid ?? 0) + (found.unpaid ?? 0)),
+                      paid: Number(found.paid ?? 0),
+                      unpaid: Number(found.unpaid ?? 0),
+                      water_consumption: Number(found.water_consumption ?? 0),
+                      fixed_charges: Number(found.fixed_charges ?? 0),
                   }
-                : { month: monthStr, paid: 0, unpaid: 0 },
+                : {
+                      month: monthStr,
+                      billed: 0,
+                      paid: 0,
+                      unpaid: 0,
+                      water_consumption: 0,
+                      fixed_charges: 0,
+                  },
         );
     }
     return months;
@@ -50,9 +60,24 @@ export default function SettlementTrendChart({
     onZoneChange,
 }) {
     const chartData = buildChartData(monthlyTrend);
+    const totalBilled = chartData.reduce((s, r) => s + (r.billed ?? (r.paid ?? 0) + (r.unpaid ?? 0)), 0);
     const totalCollected = chartData.reduce((s, r) => s + (r.paid ?? 0), 0);
-    const totalOutstanding = chartData.reduce((s, r) => s + (r.unpaid ?? 0), 0);
-    const totalBilled = totalCollected + totalOutstanding;
+    const totalOutstanding = totalBilled - totalCollected;
+    const totalWaterConsumption = chartData.reduce(
+        (s, r) => s + (r.water_consumption ?? 0),
+        0,
+    );
+    const totalFixedCharges = chartData.reduce(
+        (s, r) => s + (r.fixed_charges ?? 0),
+        0,
+    );
+    // Collection rate from total billed and total collected
+    const collectionRatePctRaw =
+        totalBilled > 0 ? (totalCollected / totalBilled) * 100 : 0;
+    const collectionRatePct =
+        totalOutstanding > 0 && collectionRatePctRaw > 99.9
+            ? Math.min(collectionRatePctRaw, 99.9)
+            : collectionRatePctRaw;
 
     return (
         <Card className="overflow-hidden rounded-xl border border-border/80 shadow-sm lg:col-span-4">
@@ -108,9 +133,12 @@ export default function SettlementTrendChart({
                     <TableHeader className="bg-muted/50">
                         <TableRow className="hover:bg-transparent">
                             <TableHead className="font-semibold">Month</TableHead>
+                            <TableHead className="text-right font-semibold">Water Consumption</TableHead>
+                            <TableHead className="text-right font-semibold">Fix Charges</TableHead>
                             <TableHead className="text-right font-semibold">Total Billed</TableHead>
-                            <TableHead className="text-right font-semibold">Outstanding</TableHead>
                             <TableHead className="text-right font-semibold">Collected</TableHead>
+                            <TableHead className="text-right font-semibold">Outstanding</TableHead>
+                            <TableHead className="text-right font-semibold">Collection Rate%</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -119,17 +147,33 @@ export default function SettlementTrendChart({
                             const monthLabel = y && m
                                 ? new Date(Number(y), Number(m) - 1).toLocaleString('en-US', { month: 'short', year: 'numeric' })
                                 : row.month;
+                            const rowBilled = row.billed ?? (row.paid ?? 0) + (row.unpaid ?? 0);
+                            const rowCollectionRateRaw =
+                                rowBilled > 0 ? ((row.paid ?? 0) / rowBilled) * 100 : 0;
+                            const rowCollectionRate =
+                                (row.unpaid ?? 0) > 0 && rowCollectionRateRaw > 99.9
+                                    ? Math.min(rowCollectionRateRaw, 99.9)
+                                    : rowCollectionRateRaw;
                             return (
                                 <TableRow key={i} className="transition-colors hover:bg-muted/50">
                                     <TableCell className="font-medium">{monthLabel}</TableCell>
                                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                                        {formatCurrency(row.paid + row.unpaid)}
+                                        {formatCurrency(row.water_consumption ?? 0)}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                                        {formatCurrency(row.fixed_charges ?? 0)}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                                        {formatCurrency(rowBilled)}
+                                    </TableCell>
+                                    <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                                        {formatCurrency(row.paid)}
                                     </TableCell>
                                     <TableCell className="text-right tabular-nums text-amber-600 dark:text-amber-400">
                                         {formatCurrency(row.unpaid)}
                                     </TableCell>
-                                    <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                                        {formatCurrency(row.paid)}
+                                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                                        {rowCollectionRate.toFixed(1)}%
                                     </TableCell>
                                 </TableRow>
                             );
@@ -137,13 +181,22 @@ export default function SettlementTrendChart({
                         <TableRow className="border-t-2 border-border font-semibold bg-muted/30 hover:bg-muted/40">
                             <TableCell className="font-semibold">Total</TableCell>
                             <TableCell className="text-right tabular-nums text-muted-foreground">
+                                {formatCurrency(totalWaterConsumption)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-muted-foreground">
+                                {formatCurrency(totalFixedCharges)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-muted-foreground">
                                 {formatCurrency(totalBilled)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
+                                {formatCurrency(totalCollected)}
                             </TableCell>
                             <TableCell className="text-right tabular-nums text-amber-600 dark:text-amber-400">
                                 {formatCurrency(totalOutstanding)}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                                {formatCurrency(totalCollected)}
+                            <TableCell className="text-right tabular-nums text-muted-foreground">
+                                {collectionRatePct.toFixed(1)}%
                             </TableCell>
                         </TableRow>
                     </TableBody>

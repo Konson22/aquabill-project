@@ -26,6 +26,7 @@ class BillSeeder extends Seeder
 
         $billCounter = 1;
         $ratePerUnit = 2.50; // Example rate per unit of consumption
+        $fixedCharge = 15.00;
 
         foreach ($meterReadings as $reading) {
             $meter = $reading->meter;
@@ -36,20 +37,13 @@ class BillSeeder extends Seeder
                 continue;
             }
 
-            $consumption = $reading->consumption ?? 0;
-            $totalAmount = $consumption * $ratePerUnit;
-            
-            // Generate bill number
+            $consumption = (float) ($reading->consumption ?? 0);
+            $previousBalance = 0;
+
             $billNumber = 'BILL-' . str_pad($billCounter++, 8, '0', STR_PAD_LEFT);
-            
-            // Calculate billing period (assume monthly billing)
             $billingPeriodStart = $reading->reading_date->copy()->startOfMonth();
             $billingPeriodEnd = $reading->reading_date->copy()->endOfMonth();
             $dueDate = $reading->reading_date->copy()->addDays(30);
-
-            // Randomly assign status
-            $statuses = ['pending', 'paid', 'overdue'];
-            $status = $statuses[array_rand($statuses)];
 
             Bill::create([
                 'bill_number' => $billNumber,
@@ -57,11 +51,12 @@ class BillSeeder extends Seeder
                 'customer_id' => $customer->id,
                 'billing_period_start' => $billingPeriodStart,
                 'billing_period_end' => $billingPeriodEnd,
-                'total_amount' => $totalAmount,
+                'tariff' => $ratePerUnit,
+                'fix_charges' => $fixedCharge,
+                'water_consumption_volume' => $consumption,
+                'previous_balance' => $previousBalance,
                 'due_date' => $dueDate,
-                'status' => $status,
             ]);
         }
     }
 }
-

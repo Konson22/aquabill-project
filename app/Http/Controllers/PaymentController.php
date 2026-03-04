@@ -47,15 +47,15 @@ class PaymentController extends Controller
                 $status = $request->status;
                 if ($status === 'fully_paid') {
                     $q->where(function ($query) {
-                        $query->whereHasMorph('payable', [Bill::class], fn($q) => $q->where('status', 'fully paid'))
-                            ->orWhereHasMorph('payable', [Invoice::class], fn($q) => $q->where('status', 'paid'));
+                        $query->whereHasMorph('payable', [Bill::class], fn ($q) => $q->fullyPaid())
+                            ->orWhereHasMorph('payable', [Invoice::class], fn ($q) => $q->where('status', 'paid'));
                     });
                 } elseif ($status === 'partial_paid') {
-                    $q->whereHasMorph('payable', [Bill::class], fn($q) => $q->where('status', 'partial paid'));
+                    $q->whereHasMorph('payable', [Bill::class], fn ($q) => $q->unpaid());
                 } elseif ($status === 'pending') {
                     $q->where(function ($query) {
-                        $query->whereHasMorph('payable', [Bill::class], fn($q) => $q->where('status', 'pending'))
-                            ->orWhereHasMorph('payable', [Invoice::class], fn($q) => $q->where('status', 'pending'));
+                        $query->whereHasMorph('payable', [Bill::class], fn ($q) => $q->unpaid())
+                            ->orWhereHasMorph('payable', [Invoice::class], fn ($q) => $q->where('status', 'pending'));
                     });
                 }
             })
@@ -65,9 +65,9 @@ class PaymentController extends Controller
 
         $stats = [
             'total_payments' => Payment::count(),
-            'paid' => Bill::where('status', 'fully paid')->count() + Invoice::where('status', 'paid')->count(),
-            'unpaid' => Bill::whereIn('status', ['pending', 'partial paid'])->count() + Invoice::whereIn('status', ['pending'])->count(),
-            'overdue' => Bill::whereIn('status', ['pending', 'partial paid'])->where('due_date', '<', now())->count(),
+            'paid' => Bill::fullyPaid()->count() + Invoice::where('status', 'paid')->count(),
+            'unpaid' => Bill::unpaid()->count() + Invoice::whereIn('status', ['pending'])->count(),
+            'overdue' => Bill::unpaid()->where('due_date', '<', now())->count(),
         ];
 
         return Inertia::render('payments/index', [
@@ -194,11 +194,14 @@ class PaymentController extends Controller
         };
 
         // Bills KPIs: always full data (no filter) — filter applies only to Settlement trend card
+        $billClass = Bill::class;
         $billsKpisRaw = Bill::query()
             ->selectRaw('COUNT(*) as total_count')
-            ->selectRaw("SUM(CASE WHEN status IN ('fully paid', 'forwarded', 'partial paid', 'balance forwarded') THEN 1 ELSE 0 END) as paid_count")
-            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as unpaid_count")
-            ->selectRaw('COALESCE(SUM(amount), 0) as total_billed')
+            ->selectRaw("SUM(CASE WHEN (bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance) <= COALESCE((SELECT SUM(amount) FROM payments WHERE payable_type = ? AND payable_id = bills.id), 0) THEN 1 ELSE 0 END) as paid_count", [$billClass])
+            ->selectRaw("SUM(CASE WHEN (bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance) > COALESCE((SELECT SUM(amount) FROM payments WHERE payable_type = ? AND payable_id = bills.id), 0) THEN 1 ELSE 0 END) as unpaid_count", [$billClass])
+            ->selectRaw('COALESCE(SUM(bills.water_consumption_volume * bills.tariff), 0) as water_consumption_total')
+            ->selectRaw('COALESCE(SUM(bills.fix_charges), 0) as fix_charges_total')
+            ->selectRaw('COALESCE(SUM(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance), 0) as total_billed')
             ->first();
 
         $totalBilledBills = (float) $billsKpisRaw->total_billed;
@@ -223,6 +226,8 @@ class PaymentController extends Controller
             'totalBilled' => $totalBilledBills,
             'totalCollected' => $billPaymentsTotal,
             'totalUnpaid' => $billsTotalUnpaid,
+            'waterConsumptionTotal' => (float) ($billsKpisRaw->water_consumption_total ?? 0),
+            'fixChargesTotal' => (float) ($billsKpisRaw->fix_charges_total ?? 0),
         ];
 
         $invoiceKpis = [
@@ -244,7 +249,7 @@ class PaymentController extends Controller
             ->join('customers', 'bills.customer_id', '=', 'customers.id')
             ->when($month, fn ($q) => $q->whereRaw("DATE_FORMAT(bills.created_at, '%Y-%m') = ?", [$month]))
             ->selectRaw('COALESCE(customers.tariff_id, -1) as tariff_id')
-            ->selectRaw('COALESCE(SUM(bills.amount), 0) as total_billed')
+            ->selectRaw('COALESCE(SUM(bills.water_consumption_volume * bills.tariff + bills.fix_charges), 0) as total_billed')
             ->groupBy('customers.tariff_id')
             ->get()
             ->keyBy(fn ($r) => $r->tariff_id === -1 ? 'null' : (string) $r->tariff_id);
@@ -293,7 +298,7 @@ class PaymentController extends Controller
             ->leftJoin('bills', 'customers.id', '=', 'bills.customer_id')
             ->when($month, fn ($q) => $q->whereRaw("DATE_FORMAT(bills.created_at, '%Y-%m') = ?", [$month]))
             ->select('zones.id', 'zones.name')
-            ->selectRaw('COALESCE(SUM(bills.amount + bills.previous_balance), 0) as total_billed')
+            ->selectRaw('COALESCE(SUM(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance), 0) as total_billed')
             ->groupBy('zones.id', 'zones.name')
             ->get()
             ->keyBy('id');
@@ -333,7 +338,9 @@ class PaymentController extends Controller
         $monthlyBilledBills = Bill::query()
             ->when($tariffId || $zoneId, fn ($q) => $q->whereHas('customer', $customerScope))
             ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month")
-            ->selectRaw('SUM(amount + previous_balance) as billed')
+            ->selectRaw('SUM(water_consumption_volume * tariff + fix_charges + previous_balance) as billed')
+            ->selectRaw('SUM(water_consumption_volume * tariff) as water_consumption')
+            ->selectRaw('SUM(fix_charges) as fixed_charges')
             ->where('created_at', '>=', now()->subMonths(11)->startOfMonth())
             ->groupBy('month')
             ->get()
@@ -352,10 +359,16 @@ class PaymentController extends Controller
             $m = now()->subMonths(11 - $i)->format('Y-m');
             $billed = (float) (($monthlyBilledBills[$m] ?? null)?->billed ?? 0) + (float) (($monthlyBilledInvoices[$m] ?? null)?->billed ?? 0);
             $paid = (float) (($monthlyPayments[$m] ?? null)?->paid ?? 0);
+            $waterConsumption = (float) (($monthlyBilledBills[$m] ?? null)?->water_consumption ?? 0);
+            $fixedCharges = (float) (($monthlyBilledBills[$m] ?? null)?->fixed_charges ?? 0);
+            $unpaid = (float) max(0, $billed - $paid);
             $months->push([
                 'month' => $m,
+                'billed' => $billed,
                 'paid' => $paid,
-                'unpaid' => (float) max(0, $billed - $paid),
+                'unpaid' => $unpaid,
+                'water_consumption' => $waterConsumption,
+                'fixed_charges' => $fixedCharges,
             ]);
         }
         $monthlyTrend = $months;
@@ -438,9 +451,13 @@ class PaymentController extends Controller
                     'notes' => $validated['notes'],
                 ]);
 
+                
                 $bill->update([
-                    'status' => round($newBalanceAfter, 2) <= 0 ? 'fully paid' : 'partial paid',
+                    'status' => round($newBalanceAfter, 2) <= 0
+                        ? 'fully paid'
+                        : 'partial paid',
                 ]);
+                
             } else {
                 $invoice = Invoice::findOrFail($validated['invoice_id']);
                 $currentBalance = (float) $invoice->balance;
@@ -488,13 +505,8 @@ class PaymentController extends Controller
         try {
             $payment->delete();
 
-            // Recalculate status for the payable
-            if ($payable instanceof Bill) {
-                $balance = (float) $payable->balance;
-                $payable->update([
-                    'status' => round($balance, 2) <= 0 ? 'fully paid' : (round($balance, 2) < (float) $payable->total_amount ? 'partial paid' : 'pending'),
-                ]);
-            } elseif ($payable instanceof Invoice) {
+            // Recalculate status for the payable (Bill status is computed from balance; only Invoice has status column)
+            if ($payable instanceof Invoice) {
                 $balance = (float) $payable->balance;
                 $payable->update([
                     'status' => round($balance, 2) <= 0 ? 'paid' : 'pending',

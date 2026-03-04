@@ -20,7 +20,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'password',
-        'department',
+        'department_id',
+        'role',
         'zone_id',
     ];
 
@@ -30,6 +31,22 @@ class User extends Authenticatable
     public function getEmailForPasswordReset(): string
     {
         return $this->name;
+    }
+
+    /**
+     * Get the department the user belongs to.
+     */
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * Department name for backward compatibility (e.g. 'admin', 'finance', 'meters').
+     */
+    public function getDepartmentAttribute(): ?string
+    {
+        return $this->getRelationValue('department')?->name;
     }
 
     /**

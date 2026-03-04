@@ -261,7 +261,7 @@ export default function Tariffs({ tariffs }) {
                                                 <Button
                                                     variant="outline"
                                                     size="icon"
-                                                    className="h-8 w-8 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900"
+                                                    className="h-8 w-8 bg-blue-50 text-blue-600 hover:bg-blue-100"
                                                     asChild
                                                 >
                                                     <Link
@@ -278,7 +278,7 @@ export default function Tariffs({ tariffs }) {
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            className="h-8 w-8 bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-900"
+                                                            className="h-8 w-8 bg-amber-50 text-amber-600 hover:bg-amber-100"
                                                             onClick={() =>
                                                                 handleEdit(
                                                                     tariff,
@@ -290,7 +290,7 @@ export default function Tariffs({ tariffs }) {
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            className="h-8 w-8 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
+                                                            className="h-8 w-8 bg-red-50 text-red-600 hover:bg-red-100"
                                                         >
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>

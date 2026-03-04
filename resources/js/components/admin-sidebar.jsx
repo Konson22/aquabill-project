@@ -25,11 +25,6 @@ const adminNavItems = [
         icon: LayoutGrid,
     },
     {
-        title: 'General Report',
-        href: route('general-report'),
-        icon: BarChart3,
-    },
-    {
         title: 'Customers',
         href: route('customers.index'),
         icon: Users,

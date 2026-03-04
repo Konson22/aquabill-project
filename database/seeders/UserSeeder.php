@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -13,25 +14,33 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         $users = [
-            // Admin department - 2 users
             [
-                'name' => 'Admin User',
+                'name' => 'Pisa',
                 'department' => 'admin',
+                'role' => 'manager',
                 'password' => '123',
             ],
             [
-                'name' => 'Finance User',
+                'name' => 'Jeniffer',
                 'department' => 'finance',
+                'role' => 'staff',
                 'password' => '123',
             ],
             [
-                'name' => 'Meters User',
+                'name' => 'Diana',
                 'department' => 'meters',
+                'role' => 'staff',
                 'password' => '123',
             ],
         ];
 
         foreach ($users as $userData) {
+            $departmentName = $userData['department'];
+            unset($userData['department']);
+
+            $department = Department::where('name', $departmentName)->first();
+            $userData['department_id'] = $department?->id;
+
             User::firstOrCreate(
                 ['name' => $userData['name']],
                 $userData

@@ -58,6 +58,12 @@ class CustomerSeeder extends Seeder
             ]);
         }
 
+        $jebelZone = Zone::whereRaw('UPPER(name) LIKE ?', ['JEBEL%'])->first();
+        if (!$jebelZone) {
+            $this->command->error('Zone "JEBEL" not found. Create the JEBEL zone (e.g. via ZoneSeeder) before running this seeder.');
+            return;
+        }
+
         $otherZone = Zone::where('name', 'OTHER')->first() ?? Zone::first();
         $otherArea = Area::where('name', 'JUBA TOWN')->first() ?? Area::first();
 
@@ -113,6 +119,12 @@ class CustomerSeeder extends Seeder
             if (!$area) {
                 $zone = $otherZone;
                 $area = $otherArea;
+            }
+
+            // Only seed customers in the JEBEL zone (e.g. "JEBEL ZONE")
+            if (! str_starts_with(Str::upper($zone->name ?? ''), 'JEBEL')) {
+                $bar->advance();
+                continue;
             }
 
             $cusType = Str::upper(trim((string) ($data['CUS TYPE'] ?? '')));

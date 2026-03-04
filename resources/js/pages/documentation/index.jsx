@@ -4,12 +4,16 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import {
     BarChart3,
     CreditCard,
     FileText,
+    FileDown,
     Gauge,
     LayoutGrid,
     LineChart,
@@ -20,11 +24,77 @@ import {
     Tag,
     Users,
 } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { Separator } from '@/components/ui/separator';
 
 const sectionIconClass = 'h-5 w-5 shrink-0';
 
 export default function DocumentationIndex() {
+    const contentRef = useRef(null);
+    const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+    async function handleDownloadPdf() {
+        if (!contentRef.current) return;
+        setIsExportingPdf(true);
+        try {
+            const element = contentRef.current;
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+            });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const margin = 10;
+            const contentWidth = pdfWidth - 2 * margin;
+            const contentHeight = pdfHeight - 2 * margin;
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = contentWidth / imgWidth;
+            const scaledHeight = imgHeight * ratio;
+            const totalPages = Math.ceil(scaledHeight / contentHeight);
+
+            for (let i = 0; i < totalPages; i++) {
+                if (i > 0) pdf.addPage();
+                const sourceY = (i * contentHeight) / ratio;
+                const sliceHeight = Math.min(
+                    canvas.height - sourceY,
+                    contentHeight / ratio
+                );
+                const pageCanvas = document.createElement('canvas');
+                pageCanvas.width = canvas.width;
+                pageCanvas.height = sliceHeight;
+                const ctx = pageCanvas.getContext('2d');
+                ctx.drawImage(
+                    canvas,
+                    0,
+                    sourceY,
+                    canvas.width,
+                    sliceHeight,
+                    0,
+                    0,
+                    canvas.width,
+                    sliceHeight
+                );
+                const pageImg = pageCanvas.toDataURL('image/png');
+                const pageImgHeight = sliceHeight * ratio;
+                pdf.addImage(
+                    pageImg,
+                    'PNG',
+                    margin,
+                    margin,
+                    contentWidth,
+                    pageImgHeight
+                );
+            }
+            pdf.save('SSUWC-Billing-System-User-Manual.pdf');
+        } finally {
+            setIsExportingPdf(false);
+        }
+    }
     const modules = [
         {
             title: 'Dashboard',
@@ -98,15 +168,39 @@ export default function DocumentationIndex() {
         <AppLayout>
             <Head title="System User Manual" />
 
-            <div className="mx-auto max-w-4xl space-y-10">
-                <div>
-                    <h1 className="scroll-m-20 text-3xl font-bold tracking-tight">
-                        SSUWC Billing — System User Manual
-                    </h1>
-                    <p className="mt-2 text-lg text-muted-foreground">
-                        How to use the Aquabill water billing system: navigation,
-                        roles, and step-by-step guidance for daily tasks.
-                    </p>
+            <div ref={contentRef} className="mx-auto max-w-4xl space-y-10">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h1 className="scroll-m-20 text-3xl font-bold tracking-tight">
+                            SSUWC Billing — System User Manual
+                        </h1>
+                        <p className="mt-2 text-lg text-muted-foreground">
+                            How to use the Aquabill water billing system: navigation,
+                            roles, and step-by-step guidance for daily tasks.
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            For a high-level overview prepared for the JICA Expert Team
+                            (scope, challenges, actions, and documents to share),
+                            see the{" "}
+                            <a
+                                href={route('docs.development-status')}
+                                className="text-primary underline underline-offset-4 hover:text-primary/80"
+                            >
+                                Development Status document
+                            </a>
+                            .
+                        </p>
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadPdf}
+                        disabled={isExportingPdf}
+                        className="shrink-0"
+                    >
+                        <FileDown className="h-4 w-4" />
+                        {isExportingPdf ? 'Generating…' : 'Download PDF'}
+                    </Button>
                 </div>
 
                 <Separator />

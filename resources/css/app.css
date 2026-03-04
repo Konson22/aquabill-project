@@ -5,8 +5,6 @@
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
-@custom-variant dark (&:is(.dark *));
-
 @theme {
     --font-sans:
         'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
@@ -101,47 +99,6 @@
     --sidebar-accent-foreground: oklch(0.18 0 0);
     --sidebar-border: oklch(0.35 0 0);
     --sidebar-ring: oklch(0.55 0.18 250);
-}
-
-.dark {
-    /* Gray */
-    --background: oklch(0.14 0.01 0);
-    --foreground: oklch(0.95 0 0);
-    --card: oklch(0.18 0.01 0);
-    --card-foreground: oklch(0.95 0 0);
-    --popover: oklch(0.18 0.01 0);
-    --popover-foreground: oklch(0.95 0 0);
-    --muted: oklch(0.24 0.01 0);
-    --muted-foreground: oklch(0.65 0 0);
-    --border: oklch(0.3 0.01 0);
-    --input: oklch(0.22 0.01 0);
-    /* Blue */
-    --primary: oklch(0.65 0.18 250);
-    --primary-foreground: oklch(0.15 0 0);
-    --ring: oklch(0.65 0.18 250);
-    /* Yellow */
-    --secondary: oklch(0.75 0.14 95);
-    --secondary-foreground: oklch(0.15 0 0);
-    --accent: oklch(0.8 0.16 95);
-    --accent-foreground: oklch(0.15 0 0);
-    /* Destructive */
-    --destructive: oklch(0.5 0.1 250);
-    --destructive-foreground: oklch(0.95 0 0);
-    /* Charts */
-    --chart-1: oklch(0.65 0.18 250);
-    --chart-2: oklch(0.8 0.15 95);
-    --chart-3: oklch(0.55 0 0);
-    --chart-4: oklch(0.7 0.14 250);
-    --chart-5: oklch(0.85 0.12 95);
-    /* Sidebar */
-    --sidebar: oklch(0.2 0.01 0);
-    --sidebar-foreground: oklch(0.95 0 0);
-    --sidebar-primary: oklch(0.65 0.18 250);
-    --sidebar-primary-foreground: oklch(0.98 0 0);
-    --sidebar-accent: oklch(0.8 0.15 95);
-    --sidebar-accent-foreground: oklch(0.15 0 0);
-    --sidebar-border: oklch(0.32 0 0);
-    --sidebar-ring: oklch(0.65 0.18 250);
 }
 
 @layer base {

@@ -48,7 +48,7 @@ class FinanceDashboardController extends Controller
         // 1. Revenue by Zone (Total Billed) — total_amount is accessor; use amount + previous_balance
         $revenueByZone = \App\Models\Zone::join('customers', 'zones.id', '=', 'customers.zone_id')
             ->join('bills', 'customers.id', '=', 'bills.customer_id')
-            ->selectRaw('zones.name, sum(bills.amount + bills.previous_balance) as total')
+            ->selectRaw('zones.name, sum(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance) as total')
             ->groupBy('zones.name')
             ->get()
             ->map(function ($item) {
@@ -61,7 +61,7 @@ class FinanceDashboardController extends Controller
         // 2. Revenue by Tariff (Total Billed) — total_amount is accessor; use amount + previous_balance
         $revenueByTariff = \App\Models\Tariff::join('customers', 'tariffs.id', '=', 'customers.tariff_id')
             ->join('bills', 'customers.id', '=', 'bills.customer_id')
-            ->selectRaw('tariffs.name, sum(bills.amount + bills.previous_balance) as total')
+            ->selectRaw('tariffs.name, sum(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance) as total')
             ->groupBy('tariffs.name')
             ->get()
             ->map(function ($item) {
@@ -74,16 +74,16 @@ class FinanceDashboardController extends Controller
         // 3. Debt Aging Report (Based on Due Date of Pending Bills)
         $now = now();
         $agingStats = [
-            '0-30 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])
+            '0-30 Days' => \App\Models\Bill::unpaid()
                 ->where('due_date', '>=', $now->copy()->subDays(30))
                 ->get()->sum(fn ($b) => $b->balance),
-            '31-60 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])
+            '31-60 Days' => \App\Models\Bill::unpaid()
                 ->whereBetween('due_date', [$now->copy()->subDays(60), $now->copy()->subDays(31)])
                 ->get()->sum(fn ($b) => $b->balance),
-            '61-90 Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])
+            '61-90 Days' => \App\Models\Bill::unpaid()
                 ->whereBetween('due_date', [$now->copy()->subDays(90), $now->copy()->subDays(61)])
                 ->get()->sum(fn ($b) => $b->balance),
-            '90+ Days' => \App\Models\Bill::whereIn('status', ['pending', 'partial paid'])
+            '90+ Days' => \App\Models\Bill::unpaid()
                 ->where('due_date', '<', $now->copy()->subDays(90))
                 ->get()->sum(fn ($b) => $b->balance),
         ];

@@ -35,7 +35,11 @@ class BillController extends Controller
         }
 
         if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
+            if ($request->status === 'fully paid') {
+                $query->fullyPaid();
+            } elseif (in_array($request->status, ['pending', 'partial paid'])) {
+                $query->unpaid();
+            }
         }
 
         if ($request->filled('month')) {
@@ -57,7 +61,7 @@ class BillController extends Controller
     public function printingList()
     {
         $bills = \App\Models\Bill::with(['customer.zone', 'customer.meter', 'meterReading'])
-            ->where('status', 'pending')
+            ->unpaid()
             ->latest()
             ->get();
 
@@ -90,13 +94,13 @@ class BillController extends Controller
                 ->when($tariffId, fn($q) => $q->where('customers.tariff_id', $tariffId))
                 ->when($zoneId, fn($q) => $q->where('customers.zone_id', $zoneId));
             $billIds = (clone $kpiQuery)->pluck('bills.id');
-            $totalBilled = (clone $kpiQuery)->selectRaw('SUM(bills.amount + bills.previous_balance) as total')->value('total') ?? 0;
+            $totalBilled = (clone $kpiQuery)->selectRaw('SUM(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance) as total')->value('total') ?? 0;
             $totalCollected = \App\Models\Payment::where('payable_type', \App\Models\Bill::class)
                 ->whereIn('payable_id', $billIds)
                 ->sum('amount');
             $allBillsCount = (clone $kpiQuery)->count();
-            $paidBillsCount = (clone $kpiQuery)->where('bills.status', 'fully paid')->count();
-            $unpaidBillsCount = (clone $kpiQuery)->whereIn('bills.status', ['pending', 'partial paid'])->count();
+            $paidBillsCount = (clone $kpiQuery)->fullyPaid()->count();
+            $unpaidBillsCount = (clone $kpiQuery)->unpaid()->count();
             
             fputcsv($file, ['KPI SUMMARY']);
             fputcsv($file, ['Total Billed Amount', number_format($totalBilled, 2)]);
@@ -111,7 +115,7 @@ class BillController extends Controller
             fputcsv($file, ['MONTHLY PERFORMANCE']);
             fputcsv($file, ['Month', 'Billed', 'Collected']);
             $monthlyData = \App\Models\Bill::query()->join('customers', 'bills.customer_id', '=', 'customers.id')
-                ->selectRaw("DATE_FORMAT(bills.created_at, '%Y-%m') as month, SUM(bills.amount + bills.previous_balance) as billed")
+                ->selectRaw("DATE_FORMAT(bills.created_at, '%Y-%m') as month, SUM(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance) as billed")
                 ->when($tariffId, fn($q) => $q->where('customers.tariff_id', $tariffId))
                 ->when($zoneId, fn($q) => $q->where('customers.zone_id', $zoneId))
                 ->groupBy('month')->orderBy('month')->get()
@@ -135,7 +139,7 @@ class BillController extends Controller
                 ->leftJoin('customers', 'zones.id', '=', 'customers.zone_id')
                 ->leftJoin('bills', 'customers.id', '=', 'bills.customer_id')
                 ->select('zones.id', 'zones.name as name')
-                ->selectRaw('COALESCE(SUM(bills.amount + bills.previous_balance), 0) as billed')
+                ->selectRaw('COALESCE(SUM(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance), 0) as billed')
                 ->when($tariffId, fn($q) => $q->where('customers.tariff_id', $tariffId))
                 ->when($zoneId, fn($q) => $q->where('zones.id', $zoneId))
                 ->groupBy('zones.id', 'zones.name')

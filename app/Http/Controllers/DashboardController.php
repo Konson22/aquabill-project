@@ -10,6 +10,7 @@ use App\Models\Invoice;
 use App\Models\Meter;
 use App\Models\MeterReading;
 use App\Models\Payment;
+use App\Models\Area;
 use App\Models\Tariff;
 use App\Models\User;
 use App\Models\Zone;
@@ -27,26 +28,25 @@ class DashboardController extends Controller
             $totalCollected = \App\Models\Payment::sum('amount');
             $collectedToday = \App\Models\Payment::whereDate('payment_date', now())->sum('amount');
 
-            $pendingBillAmount = Bill::whereIn('status', ['pending', 'partial paid'])->get()->sum(fn ($b) => $b->balance);
+            $pendingBillAmount = Bill::unpaid()->get()->sum(fn ($b) => $b->balance);
             $pendingInvoiceAmount = Invoice::where('status', 'pending')->get()->sum(fn ($i) => $i->balance);
             $totalPending = $pendingBillAmount + $pendingInvoiceAmount;
 
-            // 2. Bills Breakdown
+            // 2. Bills Breakdown (status is computed from balance)
             $billStats = [
                 'total' => Bill::count(),
-                'pending' => Bill::where('status', 'pending')->count(),
-                'fully_paid' => Bill::where('status', 'fully paid')->count(),
-                'partial_paid' => Bill::where('status', 'partial paid')->count(),
-                'forwarded' => Bill::where('status', 'forwarded')->count(),
-                'balance_forwarded' => Bill::where('status', 'balance forwarded')->count(),
-                'overdue' => Bill::whereIn('status', ['pending', 'partial paid'])
-                    ->where('due_date', '<', now())
-                    ->count(),
+                'pending' => Bill::unpaid()->count(),
+                'fully_paid' => Bill::fullyPaid()->count(),
+                'partial_paid' => Bill::unpaid()->count(), // same as unpaid; no separate partial count without loading
+                'forwarded' => 0,
+                'balance_forwarded' => 0,
+                'overdue' => Bill::unpaid()->where('due_date', '<', now())->count(),
                 'amount' => $pendingBillAmount
             ];
-            
+            $billStats['partial_paid'] = $billStats['pending']; // keep for backward compatibility
+
             // Billing performance = total payment amount / total bills amount
-            $totalBillsAmount = (float) Bill::selectRaw('SUM(amount + COALESCE(previous_balance, 0)) as total')->value('total');
+            $totalBillsAmount = (float) Bill::selectRaw('SUM(water_consumption_volume * tariff + fix_charges + COALESCE(previous_balance, 0)) as total')->value('total');
             $totalPaymentsAmount = (float) Payment::where('payable_type', Bill::class)->sum('amount');
             $billingPerformance = $totalBillsAmount > 0
                 ? ($totalPaymentsAmount / $totalBillsAmount) * 100
@@ -77,7 +77,7 @@ class DashboardController extends Controller
             }
 
             // 5. Overdue Bills (Older than 30 days)
-            $overdueBills = Bill::whereIn('status', ['pending', 'partial paid'])
+            $overdueBills = Bill::unpaid()
                 ->where('due_date', '<', now()->subDays(30))
                 ->with('customer')
                 ->latest('due_date')
@@ -225,30 +225,21 @@ class DashboardController extends Controller
             'unpaid' => (int) ($invoiceCounts->unpaid ?? 0),
         ];
 
-        // 5. Bills Stats (single query for counts)
-        $billsCounts = Bill::selectRaw("
-            COUNT(*) as total,
-            SUM(status = 'pending') as pending,
-            SUM(status = 'fully paid') as fully_paid,
-            SUM(status = 'partial paid') as partial_paid,
-            SUM(status = 'forwarded') as forwarded,
-            SUM(status = 'balance forwarded') as balance_forwarded,
-            SUM(CASE WHEN status IN ('pending', 'partial paid') AND due_date < ? THEN 1 ELSE 0 END) as overdue_count
-        ", [now()])->first();
+        // 5. Bills Stats (status is computed from balance; use scopes)
         $billsStats = [
-            'total' => (int) ($billsCounts->total ?? 0),
-            'pending' => (int) ($billsCounts->pending ?? 0),
-            'fully_paid' => (int) ($billsCounts->fully_paid ?? 0),
-            'partial_paid' => (int) ($billsCounts->partial_paid ?? 0),
-            'forwarded' => (int) ($billsCounts->forwarded ?? 0),
-            'balance_forwarded' => (int) ($billsCounts->balance_forwarded ?? 0),
+            'total' => Bill::count(),
+            'pending' => Bill::unpaid()->count(),
+            'fully_paid' => Bill::fullyPaid()->count(),
+            'partial_paid' => Bill::unpaid()->count(),
+            'forwarded' => 0,
+            'balance_forwarded' => 0,
         ];
-        $overdueBillsCount = (int) ($billsCounts->overdue_count ?? 0);
+        $overdueBillsCount = Bill::unpaid()->where('due_date', '<', now())->count();
 
-        $pendingBillsAmount = Bill::whereIn('status', ['pending', 'partial paid'])->get()->sum(fn ($b) => $b->balance);
+        $pendingBillsAmount = Bill::unpaid()->get()->sum(fn ($b) => $b->balance);
 
-        // Total bills amount (amount + previous_balance) vs total payments (amount_paid) for billing performance
-        $totalBillsAmount = (float) Bill::selectRaw('SUM(amount + COALESCE(previous_balance, 0)) as total')->value('total');
+        // Total bills amount (water_consumption_volume * tariff + fix_charges + previous_balance) vs total payments
+        $totalBillsAmount = (float) Bill::selectRaw('SUM(water_consumption_volume * tariff + fix_charges + COALESCE(previous_balance, 0)) as total')->value('total');
         $totalPaymentsAmount = (float) Payment::where('payable_type', Bill::class)->sum('amount');
         $billingPerformance = $totalBillsAmount > 0
             ? ($totalPaymentsAmount / $totalBillsAmount) * 100
@@ -276,6 +267,11 @@ class DashboardController extends Controller
             ->selectRaw('MONTH(created_at) as month, COUNT(*) as total')
             ->groupBy('month')
             ->pluck('total', 'month');
+        $waterRevenueByMonth = Bill::whereYear('created_at', $year)
+            ->selectRaw('MONTH(created_at) as month')
+            ->selectRaw('SUM(water_consumption_volume * tariff) as total')
+            ->groupBy('month')
+            ->pluck('total', 'month');
         $paymentsByMonth = Payment::whereYear('payment_date', $year)
             ->selectRaw('MONTH(payment_date) as month, SUM(amount) as total')
             ->groupBy('month')
@@ -284,11 +280,13 @@ class DashboardController extends Controller
         $usageChartData = [];
         $billsChartData = [];
         $paymentChartData = [];
+        $waterRevenueChartData = [];
         foreach ($months as $index => $monthName) {
             $m = $index + 1;
             $usageChartData[] = ['name' => $monthName, 'total' => round((float) ($usageByMonth[$m] ?? 0), 2)];
             $billsChartData[] = ['name' => $monthName, 'total' => (int) ($billsByMonth[$m] ?? 0)];
             $paymentChartData[] = ['name' => $monthName, 'total' => round((float) ($paymentsByMonth[$m] ?? 0), 2)];
+            $waterRevenueChartData[] = ['name' => $monthName, 'total' => round((float) ($waterRevenueByMonth[$m] ?? 0), 2)];
         }
 
         // 9. Overdue Readings (No reading in > 30 days) - simplified logic
@@ -310,7 +308,7 @@ class DashboardController extends Controller
             });
 
         // 10. Overdue Bills List
-        $overdueBillsList = Bill::whereIn('status', ['pending', 'partial paid'])
+        $overdueBillsList = Bill::unpaid()
             ->where('due_date', '<', now())
             ->with('customer')
             ->oldest('due_date')
@@ -346,10 +344,13 @@ class DashboardController extends Controller
                 'activeTariffsCount' => $activeTariffsCount,
                 'readingsThisMonth' => $totalReadingsThisMonth,
                 'totalConsumptionThisYear' => round($totalConsumptionThisYear, 2),
+                'zonesCount' => Zone::count(),
+                'areasCount' => Area::count(),
             ],
             'chartData' => $usageChartData,
             'billsChartData' => $billsChartData,
             'paymentChartData' => $paymentChartData,
+            'waterRevenueChartData' => $waterRevenueChartData,
             'usageByCategory' => $usageByCategory,
             'usageByZone' => $usageByZone,
             'overdueReadings' => $overdueReadings, // New
@@ -373,8 +374,8 @@ class DashboardController extends Controller
         }
 
         $totalBills = (clone $billQuery)->count();
-        $paidBills = (clone $billQuery)->where('status', 'fully paid')->count();
-        $unpaidBills = (clone $billQuery)->whereIn('status', ['pending', 'partial paid'])->count();
+        $paidBills = (clone $billQuery)->fullyPaid()->count();
+        $unpaidBills = (clone $billQuery)->unpaid()->count();
 
         $paymentQuery = \App\Models\Payment::query();
         if ($monthYear && $monthNumber) {
@@ -383,7 +384,7 @@ class DashboardController extends Controller
         $totalPaidAmount = $paymentQuery->sum('amount');
 
         $outstandingAmount = (clone $billQuery)
-            ->whereIn('status', ['pending', 'partial paid'])
+            ->unpaid()
             ->get()->sum(fn ($b) => $b->balance);
 
         $readingQuery = MeterReading::query();
@@ -440,7 +441,7 @@ class DashboardController extends Controller
             ->count();
 
         $billsTotal = (clone $billQuery)->count();
-        $fullyPaidBills = (clone $billQuery)->where('status', 'fully paid')->count();
+        $fullyPaidBills = (clone $billQuery)->fullyPaid()->count();
         $collectionRate = $billsTotal > 0 ? ($fullyPaidBills / $billsTotal) * 100 : 0;
 
         $highlights = [

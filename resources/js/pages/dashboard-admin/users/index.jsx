@@ -25,13 +25,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
     Table,
     TableBody,
     TableCell,
@@ -41,20 +34,15 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    Eye,
-    Pencil,
-    Plus,
-    Shield,
-    ShieldAlert,
-    ShieldCheck,
-    Trash2,
-    User,
-} from 'lucide-react';
+import { Eye, Pencil, Plus, Shield, ShieldAlert, ShieldCheck, Trash2, User } from 'lucide-react';
 import { useState } from 'react';
+import { DepartmentSelect } from './components/department-select';
+import { EditUserDialog } from './components/edit-user-dialog';
 
-export default function Users({ users }) {
+export default function Users({ users, departments = [], zones = [] }) {
     const [isOpen, setIsOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState(null);
     const { delete: destroy } = useForm();
 
     const handleDelete = (id) => {
@@ -71,6 +59,11 @@ export default function Users({ users }) {
         password_confirmation: '',
         department: 'admin',
     });
+
+    const handleEdit = (user) => {
+        setEditingUser(user);
+        setEditOpen(true);
+    };
 
     const submit = (e) => {
         e.preventDefault();
@@ -118,13 +111,14 @@ export default function Users({ users }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Users" />
 
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Users</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Manage system users, access roles, and permissions.
-                    </p>
-                </div>
+            <div className="space-y-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+                        <p className="text-sm text-muted-foreground">
+                            Manage system users, access roles, and permissions.
+                        </p>
+                    </div>
 
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
                     <DialogTrigger asChild>
@@ -155,42 +149,14 @@ export default function Users({ users }) {
                                     <InputError message={errors.name} />
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="department">
-                                        Department
-                                    </Label>
-                                    <Select
-                                        value={data.department}
-                                        onValueChange={(value) =>
-                                            setData('department', value)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select Department" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="admin">
-                                                <div className="flex items-center">
-                                                    <ShieldAlert className="mr-2 h-4 w-4 text-destructive" />
-                                                    Admin
-                                                </div>
-                                            </SelectItem>
-                                            <SelectItem value="finance">
-                                                <div className="flex items-center">
-                                                    <ShieldCheck className="mr-2 h-4 w-4 text-emerald-500" />
-                                                    Finance
-                                                </div>
-                                            </SelectItem>
-                                            <SelectItem value="meters">
-                                                <div className="flex items-center">
-                                                    <Shield className="mr-2 h-4 w-4 text-blue-500" />
-                                                    Meters
-                                                </div>
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <InputError message={errors.department} />
-                                </div>
+                                <DepartmentSelect
+                                    id="department"
+                                    value={data.department}
+                                    onValueChange={(value) =>
+                                        setData('department', value)
+                                    }
+                                    error={errors.department}
+                                />
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
@@ -244,6 +210,38 @@ export default function Users({ users }) {
                         </form>
                     </DialogContent>
                 </Dialog>
+
+                <EditUserDialog
+                    open={editOpen}
+                    onOpenChange={(open) => {
+                        setEditOpen(open);
+                        if (!open) setEditingUser(null);
+                    }}
+                    user={editingUser}
+                    zones={zones}
+                    onSuccess={() => setEditingUser(null)}
+                />
+                </div>
+
+                {departments.length > 0 && (
+                    <div className="rounded-lg border bg-card p-4">
+                        <h3 className="mb-2 text-sm font-medium text-muted-foreground">
+                            Departments
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                            {departments.map((dept) => (
+                                <Badge
+                                    key={dept.id}
+                                    variant="secondary"
+                                    className="flex w-fit items-center capitalize"
+                                >
+                                    {getDepartmentIcon(dept.name)}
+                                    <span>{dept.name}</span>
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <Card>

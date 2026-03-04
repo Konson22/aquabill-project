@@ -22,36 +22,36 @@ export default function HomesSection({ stats, trend }) {
                 </div>
 
                 <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 dark:border-emerald-900/50 dark:bg-emerald-900/20">
-                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
+                        <div className="flex items-center gap-2 text-emerald-600">
                             <CheckCircle className="h-4 w-4" />
                             <span className="text-sm font-medium">Active</span>
                         </div>
-                        <div className="mt-2 text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                        <div className="mt-2 text-2xl font-bold text-emerald-700">
                             {stats.active}
                         </div>
                     </div>
 
-                    <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3 dark:border-amber-900/50 dark:bg-amber-900/20">
-                        <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                    <div className="rounded-lg border border-amber-100 bg-amber-50/50 p-3">
+                        <div className="flex items-center gap-2 text-amber-600">
                             <AlertCircle className="h-4 w-4" />
                             <span className="text-sm font-medium">
                                 Suspended
                             </span>
                         </div>
-                        <div className="mt-2 text-2xl font-bold text-amber-700 dark:text-amber-300">
+                        <div className="mt-2 text-2xl font-bold text-amber-700">
                             {stats.suspended}
                         </div>
                     </div>
 
-                    <div className="rounded-lg border border-red-100 bg-red-50/50 p-3 dark:border-red-900/50 dark:bg-red-900/20">
-                        <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <div className="rounded-lg border border-red-100 bg-red-50/50 p-3">
+                        <div className="flex items-center gap-2 text-red-600">
                             <XCircle className="h-4 w-4" />
                             <span className="text-sm font-medium">
                                 Disconnected
                             </span>
                         </div>
-                        <div className="mt-2 text-2xl font-bold text-red-700 dark:text-red-300">
+                        <div className="mt-2 text-2xl font-bold text-red-700">
                             {stats.disconnected}
                         </div>
                     </div>

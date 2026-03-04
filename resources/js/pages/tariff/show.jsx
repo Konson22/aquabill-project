@@ -66,7 +66,7 @@ export default function TariffShow({ tariff }) {
             <Card className="m-4 border-slate-200/80 p-0 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/60 p-6">
                     <div>
-                        <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
                             {tariff.name}
                         </h1>
                         <p className="text-sm text-slate-500">
@@ -89,33 +89,33 @@ export default function TariffShow({ tariff }) {
                 </div>
 
                 <div className="px-6 pb-6 pt-6">
-                    <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    <h2 className="mb-4 text-lg font-semibold text-slate-900">
                         Current Rates
                     </h2>
-                    <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/40">
+                    <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
                         <div className="grid gap-6 md:grid-cols-2">
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
                                 <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Price per Unit
                                 </span>
-                                <span className="mt-2 block text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                                <span className="mt-2 block text-2xl font-semibold text-slate-900">
                                     {formatCurrency(tariff.price)}
                                 </span>
                             </div>
-                            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                            <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
                                 <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                     Fixed Charge
                                 </span>
-                                <span className="mt-2 block text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                                <span className="mt-2 block text-2xl font-semibold text-slate-900">
                                     {formatCurrency(tariff.fixed_charge)}
                                 </span>
                             </div>
                         </div>
-                        <div className="mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">
+                        <div className="mt-6 border-t border-slate-100 pt-4">
                             <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Description
                             </span>
-                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                            <p className="mt-2 text-sm text-slate-600">
                                 {tariff.description ||
                                     'No description provided.'}
                             </p>
@@ -124,32 +124,32 @@ export default function TariffShow({ tariff }) {
                 </div>
 
                 <div className="px-6 pb-6">
-                    <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    <h2 className="mb-4 text-lg font-semibold text-slate-900">
                         Historical Changes
                     </h2>
-                    <div className="overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm dark:border-slate-700/60">
+                    <div className="overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm">
                         <Table>
                             <TableHeader>
-                                <TableRow className="bg-slate-50/80 dark:bg-slate-800">
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                <TableRow className="bg-slate-50/80">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         From
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         To
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Duration
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Price / Unit
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Fixed Charge
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Comment
                                     </TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                                         Updated By
                                     </TableHead>
                                 </TableRow>
@@ -160,33 +160,33 @@ export default function TariffShow({ tariff }) {
                                     tariff.histories.map((history) => (
                                         <TableRow
                                             key={history.id}
-                                            className="hover:bg-slate-50/70 dark:hover:bg-slate-800/60"
+                                            className="hover:bg-slate-50/70"
                                         >
-                                            <TableCell className="text-sm text-slate-600 dark:text-slate-300">
+                                            <TableCell className="text-sm text-slate-600">
                                                 {formatDate(
                                                     history.effective_from,
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-sm text-slate-600 dark:text-slate-300">
+                                            <TableCell className="text-sm text-slate-600">
                                                 {formatDate(
                                                     history.effective_to,
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-sm text-slate-600 dark:text-slate-300">
+                                            <TableCell className="text-sm text-slate-600">
                                                 {calculateDuration(
                                                     history.effective_from,
                                                     history.effective_to,
                                                 )}
                                             </TableCell>
-                                            <TableCell className="font-semibold text-slate-900 dark:text-slate-100">
+                                            <TableCell className="font-semibold text-slate-900">
                                                 {formatCurrency(history.price)}
                                             </TableCell>
-                                            <TableCell className="font-semibold text-slate-900 dark:text-slate-100">
+                                            <TableCell className="font-semibold text-slate-900">
                                                 {formatCurrency(
                                                     history.fixed_charge,
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-sm text-slate-600 dark:text-slate-300">
+                                            <TableCell className="text-sm text-slate-600">
                                                 {history.description}
                                             </TableCell>
                                             <TableCell className="text-sm text-slate-500">

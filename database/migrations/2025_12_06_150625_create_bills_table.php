@@ -20,16 +20,15 @@ return new class extends Migration
             $table->date('billing_period_end');
             $table->decimal('tariff', 10, 2)->default(0);
             $table->decimal('fix_charges', 10, 2)->default(0);
-            $table->decimal('amount', 10, 2); // current consumption amount (tariff * water consumption + fix charges)
+            $table->decimal('water_consumption_volume', 10, 2)->default(0); // water consumption volume (e.g. m³) for the billing period
             $table->decimal('previous_balance', 10, 2)->default(0);
             $table->date('due_date');
-            $table->enum('status', ['pending', 'fully paid', 'forwarded', 'partial paid', 'balance forwarded'])->default('pending');
+            $table->enum('status', ['pending', 'fully paid', 'forwarded', 'partial paid', 'cancelled'])->default('pending');
             $table->timestamps();
 
             $table->index('meter_reading_id');
             $table->index('customer_id');
             $table->index('bill_number');
-            $table->index('status');
             $table->index('due_date');
         });
     }

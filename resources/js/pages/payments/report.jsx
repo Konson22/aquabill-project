@@ -58,8 +58,12 @@ export default function PaymentReport({
     const totalOutstanding =
         (Number(billKpis?.totalUnpaid) || 0) +
         (Number(invoiceKpis?.totalUnpaid) || 0);
-    const collectionRate =
+    const collectionRateRaw =
         totalBilled > 0 ? (totalCollected / totalBilled) * 100 : 0;
+    const collectionRate =
+        totalOutstanding > 0 && collectionRateRaw > 99.9
+            ? Math.min(collectionRateRaw, 99.9)
+            : collectionRateRaw;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -78,36 +82,25 @@ export default function PaymentReport({
                     <ReportKpiCard
                         icon={Receipt}
                         iconClassName="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                        title="Water Consumption revenue"
-                        billed={billKpis?.totalBilled}
-                        collected={billKpis?.totalCollected}
-                        due={billKpis?.totalUnpaid}
-                        billedSuffix={`${billKpis?.totalCount?.toLocaleString() ?? 0} bills`}
-                        collectedSuffix={`${billKpis?.paidCount?.toLocaleString() ?? 0} paid`}
-                        dueSuffix={`${billKpis?.unpaidCount?.toLocaleString() ?? 0} unpaid`}
-                    />
-                    <ReportKpiCard
-                        icon={CreditCard}
-                        iconClassName="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                        title="Services & other fees"
-                        billed={invoiceKpis?.totalBilled}
-                        collected={invoiceKpis?.totalCollected}
-                        due={invoiceKpis?.totalUnpaid}
-                        billedSuffix={`${invoiceKpis?.totalCount?.toLocaleString() ?? 0} invs`}
-                        collectedSuffix={`${invoiceKpis?.paidCount?.toLocaleString() ?? 0} paid`}
-                        dueSuffix={`${invoiceKpis?.unpaidCount?.toLocaleString() ?? 0} unpaid`}
+                        title="Water & service revenue"
+                        waterConsumptionTotal={Number(billKpis?.waterConsumptionTotal ?? 0)}
+                        fixChargesTotal={Number(billKpis?.fixChargesTotal ?? 0)}
+                        totalBilled={totalBilled}
+                        collected={totalCollected}
+                        outstanding={totalOutstanding}
+                        collectionRatePct={collectionRate}
                     />
                 </div>
 
-                    <SettlementTrendChart
-                        monthlyTrend={monthlyTrend}
-                        tariffs={tariffs}
-                        zones={zones}
-                        tariffId={tariffId}
-                        zoneId={zoneId}
-                        onTariffChange={setTariffId}
-                        onZoneChange={setZoneId}
-                    />
+                <SettlementTrendChart
+                    monthlyTrend={monthlyTrend}
+                    tariffs={tariffs}
+                    zones={zones}
+                    tariffId={tariffId}
+                    zoneId={zoneId}
+                    onTariffChange={setTariffId}
+                    onZoneChange={setZoneId}
+                />
 
                 <TariffBreakdownTable
                     tariffRevenue={tariffRevenue}

@@ -275,16 +275,13 @@ export default function Bills({ bills, filters, tariffs = [] }) {
                         <Table>
                             <TableHeader className="bg-muted/50">
                                 <TableRow>
-                                    <TableHead className="w-[120px]">
-                                        Reading ID
-                                    </TableHead>
                                     <TableHead>Customer</TableHead>
 
                                     <TableHead>Meter No</TableHead>
 
                                     <TableHead>Billing Date</TableHead>
                                     <TableHead className="text-right">
-                                        Prev. Balance
+                                        Prev/Bal
                                     </TableHead>
                                     <TableHead className="text-right">
                                         Amount
@@ -305,20 +302,6 @@ export default function Bills({ bills, filters, tariffs = [] }) {
                                             key={bill.id}
                                             className="hover:bg-muted/5"
                                         >
-                                            <TableCell className="font-mono font-medium">
-                                                <Link
-                                                    href={route(
-                                                        'bills.show',
-                                                        bill.id,
-                                                    )}
-                                                    className="flex items-center gap-1 text-primary hover:underline"
-                                                >
-                                                    <FileText className="h-3 w-3" />
-                                                    {bill.meter_reading_id ??
-                                                        bill.meterReading?.id ??
-                                                        '-'}
-                                                </Link>
-                                            </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col">
                                                     <span className="font-medium">

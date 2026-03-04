@@ -15,6 +15,8 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         try {
+            $user = $request->user();
+
             $query = Customer::query()
                 ->has('meter')
                 ->with([
@@ -25,10 +27,10 @@ class CustomerController extends Controller
                     'latestReading',
                 ]);
 
-            $user = $request->user();
-            if ($user && $user->zone_id !== null) {
-                $query->where('zone_id', $user->zone_id);
-            }
+            // If user has a zone assigned, only fetch customers in that zone; otherwise fetch all.
+            $query->when($user?->zone_id, function ($q) use ($user) {
+                $q->where('zone_id', $user->zone_id);
+            });
 
             $customers = $query->latest()
                 ->get()

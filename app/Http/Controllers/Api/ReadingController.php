@@ -92,30 +92,51 @@ class ReadingController extends Controller
                 $consumption = max(0, $validated['current_reading'] - $validated['previous_reading']);
 
                 // Handle image upload (API: base64 or file)
-                // For compatibility with environments where storage symlinks are problematic,
-                // store directly under public/readings and save a web path usable with asset().
                 $imagePath = null;
-                if (!empty($itemData['image']) && is_string($itemData['image']) && str_starts_with($itemData['image'], 'data:image')) {
+
+                // Case 1: Base64 Image
+                if (!empty($itemData['image']) &&
+                    is_string($itemData['image']) &&
+                    str_starts_with($itemData['image'], 'data:image')
+                ) {
                     try {
                         $imageData = $itemData['image'];
-                        $extension = explode('/', explode(':', substr($imageData, 0, strpos($imageData, ';')))[1])[1];
-                        $replace = substr($imageData, 0, strpos($imageData, ',') + 1);
-                        $image = str_replace($replace, '', $imageData);
+
+                        // Get extension
+                        preg_match("/data:image\/(.*?);base64,/", $imageData, $matches);
+                        $extension = $matches[1] ?? 'png';
+
+                        // Remove header
+                        $image = preg_replace("/^data:image\/(.*?);base64,/", '', $imageData);
                         $image = str_replace(' ', '+', $image);
+
                         $imageName = 'reading_' . time() . '_' . $index . '.' . $extension;
-                        $publicPath = public_path('readings/' . $imageName);
-                        if (!is_dir(dirname($publicPath))) {
-                            mkdir(dirname($publicPath), 0755, true);
-                        }
-                        file_put_contents($publicPath, base64_decode($image));
-                        $imagePath = 'readings/' . $imageName; // relative to public for asset()
+
+                        // Store in storage/app/public/readings
+                        Storage::disk('public')->put(
+                            'readings/' . $imageName,
+                            base64_decode($image)
+                        );
+
+                        $imagePath = 'readings/' . $imageName;
+
                     } catch (\Exception $e) {
-                        // Log or handle base64 decode failure
+                        Log::error('Base64 image upload failed: ' . $e->getMessage());
                     }
+
+                // Case 2: Nested file upload (readings[index][image])
                 } elseif ($request->hasFile("readings.{$index}.image")) {
-                    $imagePath = $request->file("readings.{$index}.image")->store('readings', 'public');
+
+                    $imagePath = $request
+                        ->file("readings.{$index}.image")
+                        ->store('readings', 'public');
+
+                // Case 3: Single file upload
                 } elseif ($request->hasFile("image") && count($items) === 1) {
-                    $imagePath = $request->file("image")->store('readings', 'public');
+
+                    $imagePath = $request
+                        ->file("image")
+                        ->store('readings', 'public');
                 }
 
                 DB::beginTransaction();
@@ -138,29 +159,18 @@ class ReadingController extends Controller
                 $tariffRate = $tariff ? $tariff->price : 0;
                 $fixedCharge = $tariff ? $tariff->fixed_charge : 0;
                 $consumptionAmount = $consumption * $tariffRate;
-
-                // Previous balance from last active bill
+                // Previous balance from last bill and update its status if still pending
                 $lastBill = Bill::where('customer_id', $customer->id)
-                    ->where('status', '!=', 'cancelled')
-                    ->where('status', '!=', 'forwarded')
-                    ->latest('id')
+                    ->orderByDesc('id')
                     ->first();
 
                 $previousBalance = 0;
                 if ($lastBill) {
-                    if ($lastBill->status !== 'fully paid') {
-                        $previousBalance = $lastBill->balance;
+                    if ($lastBill->status === 'pending') {
                         $lastBill->update(['status' => 'forwarded']);
                     }
+                    $previousBalance = (float) $lastBill->balance;
                 }
-
-                // Ensure any other lingering unpaid bills are also forwarded
-                Bill::where('customer_id', $customer->id)
-                    ->whereIn('status', ['pending', 'overdue', 'partial paid'])
-                    ->update(['status' => 'forwarded']);
-
-                $amount = $consumptionAmount + $fixedCharge; // current consumption amount
-                $totalAmount = $amount + $previousBalance;
 
                 // Generate unique bill number
                 $billCount = Bill::count();
@@ -169,7 +179,7 @@ class ReadingController extends Controller
                 // Calculate billing period and due date
                 $readingDate = Carbon::parse($validated['reading_date']);
 
-                // Create the bill
+                // Create the bill (amount computed on model from water_consumption_volume * tariff + fix_charges)
                 $bill = Bill::create([
                     'bill_number' => $billNumber,
                     'meter_reading_id' => $reading->id,
@@ -178,11 +188,9 @@ class ReadingController extends Controller
                     'billing_period_end' => $readingDate->copy()->endOfMonth(),
                     'tariff' => $tariffRate,
                     'fix_charges' => $fixedCharge,
+                    'water_consumption_volume' => $consumption,
                     'previous_balance' => $previousBalance,
-                    'amount' => $amount,
-                    'total_amount' => $totalAmount,
                     'due_date' => $readingDate->copy()->addDays(14),
-                    'status' => 'pending',
                 ]);
 
                 DB::commit();
@@ -190,7 +198,7 @@ class ReadingController extends Controller
                     'customer_id' => $customer->id,
                     'reading_id' => $reading->id,
                     'bill_number' => $bill->bill_number,
-                    'total' => $totalAmount,
+                    'total' => $bill->total_amount,
                     'index' => $index,
                 ];
             } catch (\Exception $e) {

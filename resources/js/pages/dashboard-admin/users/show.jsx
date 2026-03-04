@@ -18,16 +18,52 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import { Link, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { ArrowLeft, Calendar, Shield, Trash2 } from 'lucide-react';
 
 export default function UserShow({ user }) {
+    const [editOpen, setEditOpen] = useState(false);
+
+    const {
+        data,
+        setData,
+        put,
+        processing,
+        errors,
+        reset,
+    } = useForm({
+        name: user.name ?? '',
+        department: user.department ?? '',
+    });
+
     const { delete: destroy } = useForm();
 
     const handleDelete = () => {
         destroy(route('users.destroy', user.id));
+    };
+
+    const handleEditSubmit = (e) => {
+        e.preventDefault();
+
+        put(route('users.update', user.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setEditOpen(false);
+            },
+        });
     };
 
     const breadcrumbs = [
@@ -83,11 +119,24 @@ export default function UserShow({ user }) {
                                 User Profile
                             </h1>
                             <p className="text-sm text-muted-foreground">
-                                Manage user details and permissions
+                                View and manage user details
                             </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setEditOpen(true);
+                                setData({
+                                    name: user.name ?? '',
+                                    department: user.department ?? '',
+                                });
+                            }}
+                        >
+                            Edit User
+                        </Button>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button variant="destructive" size="sm">
@@ -102,7 +151,7 @@ export default function UserShow({ user }) {
                                     </AlertDialogTitle>
                                     <AlertDialogDescription>
                                         This action cannot be undone. This will
-                                        permanently delete the user account
+                                        permanently delete the user account and
                                         related data.
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
@@ -131,10 +180,10 @@ export default function UserShow({ user }) {
                             </div>
                             <div className="flex flex-col">
                                 <CardTitle>{user.name}</CardTitle>
-                                <CardDescription className="flex items-center gap-2">
+                                <CardDescription className="mt-1 flex items-center gap-2">
                                     <Badge
                                         variant="outline"
-                                        className="mt-1 w-fit capitalize"
+                                        className="w-fit capitalize"
                                     >
                                         {user.department}
                                     </Badge>
@@ -170,7 +219,7 @@ export default function UserShow({ user }) {
                         <CardContent className="space-y-6">
                             <div className="grid gap-4 md:grid-cols-2">
                                 <div className="space-y-1">
-                                    <p className="text-sm leading-none font-medium text-muted-foreground">
+                                    <p className="text-sm font-medium leading-none text-muted-foreground">
                                         Full Name
                                     </p>
                                     <p className="text-sm font-semibold">
@@ -178,7 +227,7 @@ export default function UserShow({ user }) {
                                     </p>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-sm leading-none font-medium text-muted-foreground">
+                                    <p className="text-sm font-medium leading-none text-muted-foreground">
                                         Department
                                     </p>
                                     <p className="text-sm font-semibold capitalize">
@@ -186,7 +235,7 @@ export default function UserShow({ user }) {
                                     </p>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-sm leading-none font-medium text-muted-foreground">
+                                    <p className="text-sm font-medium leading-none text-muted-foreground">
                                         Status
                                     </p>
                                     <Badge>Active</Badge>
@@ -196,12 +245,12 @@ export default function UserShow({ user }) {
                             <Separator />
 
                             <div className="space-y-4">
-                                <h4 className="text-sm leading-none font-medium">
+                                <h4 className="text-sm font-medium leading-none">
                                     System Metadata
                                 </h4>
                                 <div className="grid gap-4 md:grid-cols-2">
                                     <div className="space-y-1">
-                                        <p className="text-sm leading-none font-medium text-muted-foreground">
+                                        <p className="text-sm font-medium leading-none text-muted-foreground">
                                             Created At
                                         </p>
                                         <p className="text-sm text-foreground">
@@ -211,7 +260,7 @@ export default function UserShow({ user }) {
                                         </p>
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-sm leading-none font-medium text-muted-foreground">
+                                        <p className="text-sm font-medium leading-none text-muted-foreground">
                                             Last Updated
                                         </p>
                                         <p className="text-sm text-foreground">
@@ -225,6 +274,67 @@ export default function UserShow({ user }) {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Edit user modal */}
+                <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                    <DialogContent className="sm:max-w-[480px]">
+                        <DialogHeader>
+                            <DialogTitle>Edit user</DialogTitle>
+                            <DialogDescription>
+                                Update basic details for this user. Changes
+                                apply immediately.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleEditSubmit} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Full name</Label>
+                                <Input
+                                    id="name"
+                                    value={data.name}
+                                    onChange={(e) =>
+                                        setData('name', e.target.value)
+                                    }
+                                />
+                                {errors.name && (
+                                    <p className="text-xs text-red-500">
+                                        {errors.name}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="department">Department</Label>
+                                <Input
+                                    id="department"
+                                    value={data.department}
+                                    onChange={(e) =>
+                                        setData('department', e.target.value)
+                                    }
+                                    placeholder="admin, finance, meters, ..."
+                                />
+                                {errors.department && (
+                                    <p className="text-xs text-red-500">
+                                        {errors.department}
+                                    </p>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        reset();
+                                        setEditOpen(false);
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={processing}>
+                                    Save changes
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </div>
         </AppLayout>
     );

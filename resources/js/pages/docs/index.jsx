@@ -47,6 +47,20 @@ export default function DocsIndex() {
             badge: 'New',
         },
         {
+            title: 'Development Status (JICA Meeting)',
+            description:
+                'Scope, challenges, actions and schedule, and documents to share for the JICA Expert Team meeting.',
+            icon: <FileText className="h-6 w-6 text-blue-500" />,
+            href: route('docs.development-status'),
+        },
+        {
+            title: 'User Manual',
+            description:
+                'SSUWC Billing system user manual: navigation, roles, and step-by-step guidance for daily tasks.',
+            icon: <BookOpen className="h-6 w-6 text-emerald-500" />,
+            href: route('docs.user-manual'),
+        },
+        {
             title: 'Billing & Invoicing',
             description:
                 'Creating bills, managing invoices, generating receipts, and payment processing.',

@@ -14,11 +14,12 @@ export default function PrintBillCard({ bill }) {
     const customer = bill?.customer;
     const tariff = customer?.tariff || bill?.home?.tariff || {};
     const meterReading = bill?.meter_reading;
-    const grandTotal = Number(bill?.amount || 0);
     // Calculate consumption
     const consumption =
-        meterReading?.current_reading - meterReading?.previous_reading || 0;
+    meterReading?.current_reading - meterReading?.previous_reading || 0;
     const VOLUM_CHARGES = consumption * tariff.price;
+    const totalAmount = Number(VOLUM_CHARGES || 0) + Number(bill?.fix_charges || 0);
+    const amountDue = totalAmount + Number(bill?.previous_balance || 0);
 
     return (
         <>
@@ -27,11 +28,10 @@ export default function PrintBillCard({ bill }) {
                     @media print {
                         .bill-print-root {
                             background-color: #eee !important;
-                            font-size: 10px !important;
-                         
+                            font-size: 11px !important;
                         }
                         .bill-print-root .bill-print-heading {
-                            font-size: 14px !important;
+                            font-size: 15px !important;
                         }
                         .bill-print-root .text-xs,
                         .bill-print-root .text-sm,
@@ -135,15 +135,21 @@ export default function PrintBillCard({ bill }) {
                             value={formatCurrency(bill?.tariff || 0)}
                         />
                         <PrintLabelValue
-                            label="Volume"
+                            label="Volume Charges"
                             value={formatCurrency(VOLUM_CHARGES || 0)}
                         />
                         <PrintLabelValue
                             label="Total"
-                            value={formatCurrency(grandTotal)}
+                            value={formatCurrency(totalAmount)}
                             className="border-t border-slate-200 pt-1.5"
                             valueClassName="normal-case text-slate-900"
                         />
+                        {/* <PrintLabelValue
+                            label="Total Due"
+                            value={formatCurrency(amountDue)}
+                            className="border-t border-slate-200 pt-1.5"
+                            valueClassName="normal-case text-slate-900"
+                        /> */}
                     </div>
                 </div>
 
