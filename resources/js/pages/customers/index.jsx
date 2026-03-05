@@ -71,7 +71,12 @@ export default function Customers({
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [invoiceModalCustomer, setInvoiceModalCustomer] = useState(null);
     const { auth } = usePage().props;
-    const department = auth?.user?.department;
+    const department =
+        typeof auth?.user?.department === 'string'
+            ? auth.user.department
+            : auth?.user?.department?.name ?? null;
+    const canCreateCustomer = department !== 'finance' && department != null;
+    const isAdmin = department === 'admin';
 
     const readingForm = useForm({
         meter_id: '',
@@ -290,7 +295,7 @@ export default function Customers({
                                     <DropdownMenuLabel>
                                         Actions
                                     </DropdownMenuLabel>
-                                    {hasMeters && department !== 'finance' && (
+                                    {hasMeters && canCreateCustomer && (
                                         <DropdownMenuItem
                                             onClick={() =>
                                                 openReadingModal(customer)
@@ -322,7 +327,7 @@ export default function Customers({
                                             View
                                         </Link>
                                     </DropdownMenuItem>
-                                    {department === 'admin' && (
+                                    {isAdmin && (
                                         <>
                                             <DropdownMenuItem asChild>
                                                 <Link
@@ -354,7 +359,7 @@ export default function Customers({
                 },
             },
         ],
-        [department],
+        [department, canCreateCustomer, isAdmin],
     );
 
     const table = useReactTable({
@@ -422,14 +427,14 @@ export default function Customers({
                                 <Download className="h-4 w-4" />
                                 Export Data
                             </Button>
-                            {department === 'admin' && (
+                            {canCreateCustomer && (
                                 <Button
                                     asChild
                                     className="h-9 gap-2"
                                 >
                                     <Link href={route('customers.create')}>
                                         <Plus className="h-4 w-4" />
-                                        Add New Customer
+                                        Create new customer
                                     </Link>
                                 </Button>
                             )}

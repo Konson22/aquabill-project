@@ -284,7 +284,7 @@ class CustomerController extends Controller
             'customer' => $customer,
             'zones' => \App\Models\Zone::select('id', 'name')->get(),
             'tariffs' => \App\Models\Tariff::select('id', 'name')->get(),
-            'areas' => \App\Models\Area::select('id', 'name')->get(),
+            'areas' => \App\Models\Area::select('id', 'name', 'zone_id')->get(),
         ]);
     }
 

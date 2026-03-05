@@ -24,8 +24,14 @@ export default function CustomerEdit({
         email: customer.email || '',
         address: customer.address || '',
         plot_number: customer.plot_number || '',
-        zone_id: customer.zone_id?.toString() || '',
-        area_id: customer.area_id?.toString() || '',
+        zone_id:
+            customer.zone_id?.toString() ||
+            customer.zone?.id?.toString() ||
+            '',
+        area_id:
+            customer.area_id?.toString() ||
+            customer.area?.id?.toString() ||
+            '',
         tariff_id: customer.tariff_id?.toString() || '',
     });
 

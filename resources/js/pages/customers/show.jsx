@@ -10,10 +10,7 @@ import {
     FileText,
     Gauge,
     LayoutDashboard,
-    Mail,
-    MapPin,
     Pencil,
-    Phone,
     Receipt,
 } from 'lucide-react';
 import { useMemo } from 'react';
@@ -151,50 +148,43 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
 
             <div className="">
                 {/* Main Profile Card */}
-                <div className="mb-4 rounded-xl border bg-card shadow-sm">
-                    <div className="grid gap-0 md:grid-cols-[1fr_auto]">
-                        {/* Left: Avatar + Identity */}
-                        <div className="flex items-center gap-4 p-5 md:border-r">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary text-lg font-bold text-primary-foreground">
-                                {customer.name
-                                    .split(' ')
-                                    .map((n) => n[0])
-                                    .join('')
-                                    .toUpperCase()
-                                    .slice(0, 2)}
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-semibold text-foreground">
-                                    {customer.name}
-                                </h1>
-                                <div className="mt-1 flex items-center gap-2">
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                        Active
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        Since{' '}
-                                        {new Date(
-                                            customer.created_at,
-                                        ).toLocaleDateString(undefined, {
-                                            month: 'short',
-                                            year: 'numeric',
-                                        })}
-                                    </span>
-                                </div>
-                            </div>
+                <div className="overflow-hidden rounded-lg border bg-card">
+                    <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+                        {/* Left: Customer identity */}
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                            <h1 className="text-base font-semibold text-foreground">
+                                {customer.name}
+                            </h1>
+                            <p className="truncate">
+                                {[customer.phone, customer.email]
+                                    .filter(Boolean)
+                                    .join(' · ') || '—'}
+                            </p>
+                            <p className="truncate">
+                                {[customer.plot_number, customer.zone?.name, customer.area?.name]
+                                    .filter(Boolean)
+                                    .join(' · ') || '—'}
+                            </p>
+                            <p className="truncate">
+                                {customer.address || '—'}
+                            </p>
+                            <p>
+                                <span className="font-medium text-foreground">
+                                    Joined:
+                                </span>{' '}
+                                {new Date(customer.created_at).toLocaleDateString(undefined, {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                })}
+                            </p>
                         </div>
 
                         {/* Right: Actions */}
-                        <div className="flex flex-wrap items-center gap-2 border-t p-5 md:border-t-0">
+                        <div className="flex flex-wrap items-center gap-2">
                             {canEdit && (
                                 <Button variant="outline" size="sm" asChild>
-                                    <Link
-                                        href={route(
-                                            'customers.edit',
-                                            customer.id,
-                                        )}
-                                    >
+                                    <Link href={route('customers.edit', customer.id)}>
                                         <Pencil className="mr-2 h-3.5 w-3.5" />
                                         Edit
                                     </Link>
@@ -216,69 +206,14 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
                             />
                             {canEdit &&
                                 (!customer.meter ||
-                                    (customer.meters &&
-                                        customer.meters.length === 0)) && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        asChild
-                                    >
-                                        <Link
-                                            href={route(
-                                                'meters.assign',
-                                                customer.id,
-                                            )}
-                                        >
-                                            <Gauge className="mr-2 h-3 w-3" />
-                                            Assign Meter
-                                        </Link>
-                                    </Button>
-                                )}
-                        </div>
-                    </div>
-
-                    {/* Contact Row */}
-                    <div className="flex flex-wrap items-center gap-6 border-t px-5 py-3">
-                        <a
-                            href={
-                                customer.email
-                                    ? `mailto:${customer.email}`
-                                    : undefined
-                            }
-                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                        >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-                                <Mail className="h-4 w-4" />
-                            </div>
-                            <span className="truncate">
-                                {customer.email || 'N/A'}
-                            </span>
-                        </a>
-                        <a
-                            href={
-                                customer.phone
-                                    ? `tel:${customer.phone}`
-                                    : undefined
-                            }
-                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                        >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-                                <Phone className="h-4 w-4" />
-                            </div>
-                            <span className="truncate">
-                                {customer.phone || 'N/A'}
-                            </span>
-                        </a>
-                        <div
-                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground"
-                            title={customer.address}
-                        >
-                            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-                                <MapPin className="h-4 w-4" />
-                            </div>
-                            <span className="max-w-[220px] truncate">
-                                {customer.address || 'N/A'}
-                            </span>
+                                    (customer.meters && customer.meters.length === 0)) && (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={route('meters.assign', customer.id)}>
+                                        <Gauge className="mr-2 h-3 w-3" />
+                                        Assign Meter
+                                    </Link>
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>

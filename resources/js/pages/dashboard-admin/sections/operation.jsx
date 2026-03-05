@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Activity, AlertTriangle, Droplets, MapPin, LayoutGrid, Tag, Users, ZapOff } from 'lucide-react';
+import { AlertTriangle, Users, ZapOff } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 
 const operationCards = [
@@ -9,14 +9,6 @@ const operationCards = [
         icon: Users,
         bgClass: 'bg-emerald-100',
         iconClass: 'text-emerald-600',
-        href: 'customers.index',
-    },
-    {
-        key: 'totalCustomers',
-        title: 'Total Customers',
-        icon: Activity,
-        bgClass: 'bg-blue-100',
-        iconClass: 'text-blue-600',
         href: 'customers.index',
     },
     {
@@ -33,82 +25,38 @@ const operationCards = [
         bgClass: 'bg-red-100',
         iconClass: 'text-red-600',
     },
-    {
-        key: 'consumption',
-        title: 'Consumption (YTD)',
-        icon: Droplets,
-        bgClass: 'bg-cyan-100',
-        iconClass: 'text-cyan-600',
-    },
-    {
-        key: 'tariffCount',
-        title: 'Tariffs',
-        icon: Tag,
-        bgClass: 'bg-violet-100',
-        iconClass: 'text-violet-600',
-        href: 'tariffs.index',
-    },
-    {
-        key: 'zonesCount',
-        title: 'Zones',
-        icon: MapPin,
-        bgClass: 'bg-sky-100',
-        iconClass: 'text-sky-600',
-        href: 'zones.index',
-    },
-    {
-        key: 'areasCount',
-        title: 'Areas',
-        icon: LayoutGrid,
-        bgClass: 'bg-teal-100',
-        iconClass: 'text-teal-600',
-    },
 ];
-
-function formatConsumption(value) {
-    if (value == null || Number.isNaN(value)) return '0';
-    if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-    return String(Math.round(value));
-}
 
 export default function Operation({
     activeCustomers = 0,
-    totalCustomers = 0,
     suspendedCustomers = 0,
     damageMeters = 0,
-    consumption = 0,
-    tariffCount = 0,
-    zonesCount = 0,
-    areasCount = 0,
 }) {
     const values = {
         activeCustomers,
-        totalCustomers,
         suspendedCustomers,
         damageMeters,
-        consumption: formatConsumption(consumption),
-        tariffCount,
-        zonesCount,
-        areasCount,
     };
 
     function renderStatCard(card) {
         const Icon = card.icon;
         const value = values[card.key];
         const content = (
-            <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg">
-                <div
-                    className={`rounded-2xl p-3 transition-transform duration-300 group-hover:scale-110 ${card.bgClass}`}
-                >
-                    <Icon className={`h-6 w-6 ${card.iconClass}`} />
-                </div>
-                <div className="text-center">
-                    <p className="text-2xl font-bold text-foreground">{value}</p>
-                    <p className="text-xs font-medium text-muted-foreground">
-                        {card.title}
-                    </p>
-                </div>
-            </div>
+            <Card className="group flex flex-col items-center justify-center space-y-3 rounded-xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg">
+                <CardContent className="flex flex-col items-center space-y-3 p-0">
+                    <div
+                        className={`rounded-2xl p-3 transition-transform duration-300 group-hover:scale-110 ${card.bgClass}`}
+                    >
+                        <Icon className={`h-6 w-6 ${card.iconClass}`} />
+                    </div>
+                    <div className="text-center">
+                        <p className="text-2xl font-bold text-foreground">{value}</p>
+                        <p className="text-xs font-medium text-muted-foreground">
+                            {card.title}
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
         );
         return card.href ? (
             <Link
@@ -129,7 +77,7 @@ export default function Operation({
                 <CardTitle>Operation</CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-8">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                     {operationCards.map((card) => renderStatCard(card))}
                 </div>
             </CardContent>

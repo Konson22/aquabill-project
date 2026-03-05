@@ -71,9 +71,11 @@ export default function RevenueChart({ data = [], paymentsData = [] }) {
                             }}
                             formatter={(value, name) => {
                                 const label =
-                                    name === 'payments'
-                                        ? 'Payments Collected'
-                                        : 'Water Revenue';
+                                    name === 'revenue'
+                                        ? 'Water Revenue'
+                                        : name === 'payments'
+                                          ? 'Payments Collected'
+                                          : name;
                                 return [
                                     `SSP ${formatCompactNumber(value)}`,
                                     label,
@@ -84,7 +86,7 @@ export default function RevenueChart({ data = [], paymentsData = [] }) {
                             type="monotone"
                             dataKey="revenue"
                             name="Water Revenue"
-                            stroke="#0ea5e9"
+                            stroke="#ef4444"
                             strokeWidth={2}
                             dot={false}
                         />

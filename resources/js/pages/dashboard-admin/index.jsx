@@ -1,9 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
 import { Link, usePage } from '@inertiajs/react';
 import { Activity, Banknote, BarChart3, ChevronRight } from 'lucide-react';
+import ConnectionSection from './sections/connection';
 import FinanceSection from './sections/finance';
 import Operation from './sections/operation';
-import ReadingSection from './sections/reading-section';
+
+
 const QuickAction = ({
     href,
     icon: Icon,
@@ -86,6 +88,12 @@ export default function Dashboard({
                         bgClass="bg-amber-600"
                     />
                 </div>
+                <ConnectionSection
+                    totalCustomers={stats?.homes?.total ?? 0}
+                    tariffCount={stats?.activeTariffsCount ?? 0}
+                    zonesCount={stats?.zonesCount ?? 0}
+                    areasCount={stats?.areasCount ?? 0}
+                />
                 <FinanceSection
                     stats={stats.bills}
                     performance={stats.billingPerformance}
@@ -95,13 +103,8 @@ export default function Dashboard({
                 />
                 <Operation
                     activeCustomers={stats?.homes?.active ?? 0}
-                    totalCustomers={stats?.homes?.total ?? 0}
                     suspendedCustomers={stats?.homes?.suspended ?? 0}
                     damageMeters={stats?.meters?.damage ?? 0}
-                    consumption={stats?.totalConsumptionThisYear ?? 0}
-                    tariffCount={stats?.activeTariffsCount ?? 0}
-                    zonesCount={stats?.zonesCount ?? 0}
-                    areasCount={stats?.areasCount ?? 0}
                 />
             </div>
         </AppLayout>
