@@ -4,9 +4,10 @@ namespace Database\Seeders;
 
 use App\Models\Meter;
 use App\Models\MeterReading;
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 
 class MeterReadingSeeder extends Seeder
 {
@@ -16,58 +17,68 @@ class MeterReadingSeeder extends Seeder
     public function run(): void
     {
         $meters = Meter::all();
-        $users = User::where('department', 'meters')->get();
 
         if ($meters->isEmpty()) {
             $this->command->warn('No meters found. Please run MeterSeeder first.');
             return;
         }
 
-        if ($users->isEmpty()) {
-            $this->command->warn('No meter department users found. Please run UserSeeder first.');
+        $jsonPath = base_path('customers.json');
+        if (!File::exists($jsonPath)) {
+            $this->command->warn("File not found: $jsonPath. Skipping initial meter readings seeding.");
             return;
         }
 
-        foreach ($meters as $meter) {
-            // Get tariff information from the meter's home
-            $tariff = $meter->home?->tariff;
-            $tariffPrice = $tariff?->price ?? 3.00; // Default to 3.00 if no tariff
-            $fixCharges = $tariff?->fixed_charge ?? 15.00; // Default to 15.00 if no tariff
+        $customersData = json_decode(File::get($jsonPath), true);
+        if (!is_array($customersData)) {
+            $this->command->warn("Invalid JSON format in $jsonPath. Skipping initial meter readings seeding.");
+            return;
+        }
 
-            // Create 3-5 readings per meter with different dates
-            $numReadings = rand(3, 5);
-            $previousReading = 0;
-            $previousBalance = 0;
+        // Map cleaned meter numbers -> numeric initialReading (without "M3")
+        $initialReadings = [];
+        foreach ($customersData as $data) {
+            $meterNoRaw = $data['meterNo'] ?? null;
+            $initialReadingRaw = $data['initialReading'] ?? null;
 
-            for ($i = 0; $i < $numReadings; $i++) {
-                $readingDate = now()->subMonths($numReadings - $i)->startOfMonth()->addDays(rand(1, 10));
-                $currentReading = $previousReading + rand(50, 500);
-                $consumption = $i > 0 ? $currentReading - $previousReading : 0;
-                
-                $status = $i === $numReadings - 1 ? 'pending' : 'billed';
-
-                MeterReading::create([
-                    'meter_id' => $meter->id,
-                    'home_id' => $meter->home_id,
-                    'reading_date' => $readingDate,
-                    'current_reading' => $currentReading,
-                    'previous_reading' => $i > 0 ? $previousReading : null,
-                    'consumption' => $consumption > 0 ? $consumption : null,
-                    'read_by' => $users->random()->id,
-                    'status' => $status,
-                    'tariff' => $tariffPrice,
-                    'fix_charges' => $fixCharges,
-                    'previous_balance' => $i > 0 ? $previousBalance : 0,
-                ]);
-
-                // Update previous balance for next reading (simulate bill payment)
-                // For billed readings, previous balance could be 0 (paid) or carry forward
-                if ($status === 'billed') {
-                    $previousBalance = rand(0, 1) === 0 ? 0 : rand(100, 1000); // 50% chance of having balance
-                }
-
-                $previousReading = $currentReading;
+            if (!$meterNoRaw || !$initialReadingRaw) {
+                continue;
             }
+
+            $cleanMeterNo = str_replace([' ', 'TRM'], '', (string) $meterNoRaw);
+
+            if (preg_match('/([\d.,]+)/', (string) $initialReadingRaw, $matches)) {
+                $numeric = (float) str_replace(',', '', $matches[1]);
+            } else {
+                $numeric = 0;
+            }
+
+            if ($numeric > 0) {
+                $initialReadings[$cleanMeterNo] = $numeric;
+            }
+        }
+
+        $this->command->info('Seeding initial meter readings from customers.json...');
+
+        foreach ($meters as $meter) {
+            $meterKey = $meter->meter_number;
+
+            if (!array_key_exists($meterKey, $initialReadings)) {
+                continue;
+            }
+
+            $initial = $initialReadings[$meterKey];
+
+            MeterReading::create([
+                'customer_id' => $meter->customer_id,
+                'meter_id' => $meter->id,
+                'reading_date' => now()->subMonths(2),
+                'current_reading' => $initial,
+                'previous_reading' => $initial,
+                'is_initial' => true,
+                'read_by' => 1,
+                'status' => 'paid',
+            ]);
         }
     }
 }

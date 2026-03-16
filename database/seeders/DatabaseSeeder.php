@@ -21,13 +21,8 @@ class DatabaseSeeder extends Seeder
             AreaSeeder::class,
             TariffSeeder::class,
             CustomerSeeder::class,
-            // TariffHistorySeeder::class,
-            // HomeSeeder::class,
-            // MeterSeeder::class,
-            // MeterReadingSeeder::class,
-            // BillSeeder::class,
-            // InvoiceSeeder::class,
-            // PaymentSeeder::class,
+            MeterReadingSeeder::class,
+            PaymentSeeder::class,
         ]);
     }
 }

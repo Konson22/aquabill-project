@@ -4,8 +4,10 @@ namespace Database\Seeders;
 
 use App\Models\Area;
 use App\Models\Customer;
+use App\Models\Invoice;
 use App\Models\Meter;
 use App\Models\MeterReading;
+use App\Models\Payment;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Illuminate\Database\Seeder;
@@ -19,7 +21,7 @@ class CustomerSeeder extends Seeder
      */
     public function run(): void
     {
-        $jsonPath = base_path('data/customers_output.json');
+        $jsonPath = base_path('customers.json');
 
         if (!File::exists($jsonPath)) {
             $this->command->error("File not found: $jsonPath");
@@ -28,27 +30,28 @@ class CustomerSeeder extends Seeder
 
         $customersData = json_decode(File::get($jsonPath), true);
 
-        if (!$customersData) {
+        if (!is_array($customersData)) {
             $this->command->error("Invalid JSON format in $jsonPath");
             return;
         }
 
         $tariffs = Tariff::all();
+        $domesticTariff = $tariffs->where('name', 'DOMESTIC')->first();
+
+        // We only have one tariff (DOMESTIC), but keep
+        // common variations mapped back to DOMESTIC.
         $tariffMap = [
-            'C1' => $tariffs->where('name', 'C1')->first(),
-            'C2' => $tariffs->where('name', 'C2')->first(),
-            'C3' => $tariffs->where('name', 'C3')->first(),
-            'C4' => $tariffs->where('name', 'C4')->first(),
-            'DOMESTIC' => $tariffs->where('name', 'DOMESTIC')->first(),
-            'DOMESTRIC' => $tariffs->where('name', 'DOMESTIC')->first(),
-            'DOMESTI' => $tariffs->where('name', 'DOMESTIC')->first(),
-            'DOESTIC' => $tariffs->where('name', 'DOMESTIC')->first(),
-            'HTL' => $tariffs->where('name', 'HOTEL')->first(),
-            'HOTEL' => $tariffs->where('name', 'HOTEL')->first(),
-            'OFFICE' => $tariffs->where('name', 'OFFICE')->first(),
+            'DOMESTIC' => $domesticTariff,
+            'DOMESTRIC' => $domesticTariff,
+            'DOMESTI' => $domesticTariff,
+            'DOESTIC' => $domesticTariff,
+            'DOMESTICKI' => $domesticTariff,
+            'GH' => $domesticTariff,
+            'RE' => $domesticTariff,
+            'PUB' => $domesticTariff,
         ];
 
-        $defaultTariff = $tariffs->where('name', 'DOMESTIC')->first() ?? $tariffs->first();
+        $defaultTariff = $domesticTariff ?? $tariffs->first();
         if (!$defaultTariff) {
             $defaultTariff = Tariff::create([
                 'name' => 'DOMESTIC',
@@ -58,36 +61,36 @@ class CustomerSeeder extends Seeder
             ]);
         }
 
-        $jebelZone = Zone::whereRaw('UPPER(name) LIKE ?', ['JEBEL%'])->first();
+        $jebelZone = Zone::where('name', 'JEBEL SUK')->first();
         if (!$jebelZone) {
-            $this->command->error('Zone "JEBEL" not found. Create the JEBEL zone (e.g. via ZoneSeeder) before running this seeder.');
+            $this->command->error('Zone "JEBEL SUK" not found. Run ZoneSeeder to create it before running this seeder.');
             return;
         }
 
-        $otherZone = Zone::where('name', 'OTHER')->first() ?? Zone::first();
-        $otherArea = Area::where('name', 'JUBA TOWN')->first() ?? Area::first();
+        $otherZone = $jebelZone;
+        $otherArea = Area::where('name', 'HAI GWONGOROKI')->first();
 
-        if (!$otherZone || !$otherArea) {
-            $this->command->error('At least one Zone and one Area must exist. Run Zone and Area seeders first.');
+        if (!$otherArea) {
+            $this->command->error('Area "HAI GWONGOROKI" not found. Run AreaSeeder to create it before running this seeder.');
             return;
         }
 
         $allAreas = Area::with('zone')->get();
         $reader = \App\Models\User::first();
 
-        $this->command->info('Starting customer seeding...');
+        $this->command->info('Starting customer seeding from customers.json...');
         $bar = $this->command->getOutput()->createProgressBar(count($customersData));
         $bar->start();
 
         foreach ($customersData as $data) {
-            $name = $data['CUS NAME'] ?? 'Unknown Customer';
-            $phone = $data['TEL'] ?? null;
+            $name = $data['customerName'] ?? 'Unknown Customer';
+            $phone = $data['tel'] ?? null;
 
             if ($phone) {
                 $phone = substr(preg_replace('/[^0-9]/', '', (string) $phone), 0, 15);
             }
 
-            $addressBlock = trim($data['ADDRESS/BLOCK'] ?? '');
+            $addressBlock = trim($data['area'] ?? '');
             $area = null;
             $zone = null;
 
@@ -121,14 +124,13 @@ class CustomerSeeder extends Seeder
                 $area = $otherArea;
             }
 
-            // Only seed customers in the JEBEL zone (e.g. "JEBEL ZONE")
-            if (! str_starts_with(Str::upper($zone->name ?? ''), 'JEBEL')) {
+            if (!str_starts_with(Str::upper($zone->name ?? ''), 'JEBEL')) {
                 $bar->advance();
                 continue;
             }
 
-            $cusType = Str::upper(trim((string) ($data['CUS TYPE'] ?? '')));
-            $tariff = $tariffMap[$cusType] ?? $defaultTariff;
+            $tariffName = Str::upper(trim((string) ($data['tariff'] ?? '')));
+            $tariff = $tariffMap[$tariffName] ?? $defaultTariff;
 
             $customer = Customer::create([
                 'name' => $name,
@@ -137,12 +139,13 @@ class CustomerSeeder extends Seeder
                 'area_id' => $area->id,
                 'tariff_id' => $tariff?->id,
                 'address' => $addressBlock ?: 'No address provided',
-                'plot_number' => (string) ($data['HOUSE /PLOT NO'] ?? ''),
-                'property_type' => $cusType ?: null,
+                'plot_number' => (string) ($data['housePlotNo'] ?? ''),
+                // Always ensure a non-null property_type (DB column is non-nullable)
+                'property_type' => $tariffName !== '' ? $tariffName : 'RESIDENTIAL',
                 'supply_status' => 'active',
             ]);
 
-            $meterNumber = $data['METER NO'] ?? null;
+            $meterNumber = $data['meterNo'] ?? null;
 
             if ($meterNumber !== null && $meterNumber !== 0 && $meterNumber !== '0' && $meterNumber !== '') {
                 $cleanMeterNumber = str_replace([' ', 'TRM'], '', (string) $meterNumber);
@@ -155,16 +158,40 @@ class CustomerSeeder extends Seeder
                     'status' => 'active',
                 ]);
 
-                $currentReading = $data['current_reading'] ?? 0;
-                if ($currentReading > 0) {
-                    MeterReading::create([
-                        'meter_id' => $meter->id,
+                // Initial meter readings are now seeded exclusively
+                // in MeterReadingSeeder using customers.json.
+            }
+
+            $depositRaw = $data['deposit'] ?? null;
+            if ($depositRaw) {
+                if (preg_match('/([\d.,]+)/', (string) $depositRaw, $matches)) {
+                    $depositAmount = (float) str_replace(',', '', $matches[1]);
+                } else {
+                    $depositAmount = 0;
+                }
+
+                if ($depositAmount > 0) {
+                    $invoice = Invoice::create([
+                        'invoice_number' => 'DEP-' . str_pad((string) $customer->id, 8, '0', STR_PAD_LEFT),
                         'customer_id' => $customer->id,
-                        'reading_date' => now()->subDay(),
-                        'current_reading' => $currentReading,
-                        'previous_reading' => 0,
-                        'read_by' => $reader ? $reader->id : 1,
-                        'status' => 'billed',
+                        'description' => 'Initial deposit for meter ' . ($meterNumber ?? ''),
+                        'amount' => $depositAmount,
+                        'due_date' => now(),
+                        'status' => 'paid',
+                    ]);
+
+                    Payment::create([
+                        'payable_type'    => Invoice::class,
+                        'payable_id'      => $invoice->id,
+                        'amount'          => $depositAmount,
+                        'payable_total'   => $depositAmount,
+                        'amount_paid'     => $depositAmount,
+                        'balance_after'   => 0,
+                        'payment_date'    => now(),
+                        'payment_method'  => 'cash',
+                        'reference_number'=> 'DEP-' . str_pad((string) $customer->id, 8, '0', STR_PAD_LEFT),
+                        'received_by'     => 1,
+                        'notes'           => 'Initial deposit payment from import',
                     ]);
                 }
             }
@@ -173,6 +200,6 @@ class CustomerSeeder extends Seeder
         }
 
         $bar->finish();
-        $this->command->info("\nSeeding of " . count($customersData) . " customers completed successfully.");
+        $this->command->info("\nSeeding of " . count($customersData) . " customers from customers.json completed successfully.");
     }
 }

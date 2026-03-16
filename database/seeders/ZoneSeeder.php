@@ -14,13 +14,7 @@ class ZoneSeeder extends Seeder
     public function run(): void
     {
         $zones = [
-            'HOSPITAL ZONE',
-            'JEBEL ZONE',
-            'NYAKURON',
-            'JUBA UNIVERSITY ZONE',
-            'KATOR',
-            'PARLIAMENT ZONE',
-            'OTHER',
+            'JEBEL SUK',
         ];
 
         foreach ($zones as $zoneName) {

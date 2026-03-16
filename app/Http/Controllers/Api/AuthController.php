@@ -12,12 +12,12 @@ class AuthController extends Controller
 {
     public function login(Request $request)
     {
-
         $validated = $request->validate([
             'name' => 'required|string',
             'password' => 'required',
         ]);
-
+        
+        Log::info('API login attempt', ['name' => $validated['name']]);
 
         if (!Auth::attempt($validated)) {
             return response()->json([
@@ -30,6 +30,7 @@ class AuthController extends Controller
         $user = User::where('name', $validated['name'])->first();
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        Log::warning('API login failed: invalid credentials', ['name' => $validated['name']]);
         return response()->json([
             'status' => true,
             'user' => [

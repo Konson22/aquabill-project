@@ -20,9 +20,7 @@ class MeterReadingController extends Controller
         $month = $request->input('month'); // YYYY-MM format
 
         $query = \App\Models\MeterReading::with(['meter', 'customer', 'reader', 'bill' => fn ($q) => $q->withSum('payments', 'amount')])
-            ->where(function ($q) {
-                $q->has('bill')->orWhere('is_initial', true);
-            });
+            ->where('is_initial', false);
 
         if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
             $query->whereYear('reading_date', substr($month, 0, 4))

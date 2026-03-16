@@ -66,6 +66,57 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function indexForMeterDepartment(Request $request)
+    {
+        $customers = Customer::query()
+            ->when($request->search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('address', 'like', "%{$search}%")
+                        ->orWhereHas('meters', function ($m) use ($search) {
+                            $m->where('meter_number', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when($request->zone_id, function ($query, $zoneId) {
+                $query->where('zone_id', $zoneId);
+            })
+            ->when($request->area_id, function ($query, $areaId) {
+                $query->where('area_id', $areaId);
+            })
+            ->when($request->tariff_id, function ($query, $tariffId) {
+                $query->where('tariff_id', $tariffId);
+            })
+            ->with([
+                'zone:id,name',
+                'area:id,name',
+                'meters' => fn ($q) => $q->select('id', 'customer_id', 'meter_number')
+                    ->with('latestReading'),
+            ])
+            ->withCount('meters')
+            ->latest()
+            ->paginate(100)
+            ->withQueryString();
+
+        [$zones, $areas, $tariffs] = Cache::remember('customers_index_filters', self::FILTER_CACHE_TTL, function () {
+            return [
+                Zone::select('id', 'name')->orderBy('name')->get(),
+                Area::select('id', 'name')->orderBy('name')->get(),
+                Tariff::select('id', 'name')->orderBy('name')->get(),
+            ];
+        });
+
+        return Inertia::render('dashboard-meter-department/customers/index', [
+            'customers' => $customers,
+            'filters' => $request->only(['search', 'zone_id', 'area_id', 'tariff_id']),
+            'zones' => $zones,
+            'areas' => $areas,
+            'tariffs' => $tariffs,
+        ]);
+    }
+
     public function export(Request $request)
     {
         $customers = \App\Models\Customer::query()

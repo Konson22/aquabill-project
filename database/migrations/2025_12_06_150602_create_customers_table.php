@@ -19,9 +19,9 @@ return new class extends Migration
             $table->foreignId('zone_id')->constrained('zones')->onDelete('restrict');
             $table->foreignId('area_id')->constrained('areas')->onDelete('restrict');
             $table->foreignId('tariff_id')->nullable()->constrained('tariffs')->onDelete('set null');
-            $table->text('address');
+            $table->text('address')->nullable();
             $table->string('plot_number')->nullable();
-            $table->string('property_type')->nullable();
+            $table->string('property_type')->default('residential');
             $table->date('contract_date')->nullable();
             $table->date('meter_install_date')->nullable();
             $table->enum('supply_status', ['active', 'inactive', 'suspended', 'disconnect'])->default('active');

@@ -117,6 +117,11 @@ const metersNavItems = [
         icon: LayoutGrid,
     },
     {
+        title: 'Customers',
+        href: route('dashboard-meter-department.customers.index'),
+        icon: Users,
+    },
+    {
         title: 'Meters',
         href: route('meters'),
         icon: Gauge,

@@ -120,7 +120,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['department:meters,admin'])->group(function () {
         // Route::get('meter-department/dashboard', [MeterDepartmentDashboardController::class, 'index'])->name('meter-department');
-        
+
+        Route::get('dashboard-meter-department/customers', [CustomerController::class, 'indexForMeterDepartment'])->name('dashboard-meter-department.customers.index');
+
         // Meters
         Route::get('meters', [MeterController::class, 'index'])->name('meters');
         Route::get('meters/export', [MeterController::class, 'export'])->name('meters.export');
