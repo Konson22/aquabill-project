@@ -18,8 +18,7 @@ export default function PrintBillCard({ bill }) {
     const consumption =
     meterReading?.current_reading - meterReading?.previous_reading || 0;
     const VOLUM_CHARGES = consumption * tariff.price;
-    const totalAmount = Number(VOLUM_CHARGES || 0) + Number(bill?.fix_charges || 0);
-    const amountDue = totalAmount + Number(bill?.previous_balance || 0);
+    const totalAmount = Number(VOLUM_CHARGES || 0) + Number(bill?.fix_charges || 0) + Number(bill?.previous_balance || 0);
 
     return (
         <>

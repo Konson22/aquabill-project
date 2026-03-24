@@ -4,10 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Area;
 use App\Models\Customer;
-use App\Models\Invoice;
 use App\Models\Meter;
-use App\Models\MeterReading;
-use App\Models\Payment;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Illuminate\Database\Seeder;
@@ -23,15 +20,17 @@ class CustomerSeeder extends Seeder
     {
         $jsonPath = base_path('customers.json');
 
-        if (!File::exists($jsonPath)) {
+        if (! File::exists($jsonPath)) {
             $this->command->error("File not found: $jsonPath");
+
             return;
         }
 
         $customersData = json_decode(File::get($jsonPath), true);
 
-        if (!is_array($customersData)) {
+        if (! is_array($customersData)) {
             $this->command->error("Invalid JSON format in $jsonPath");
+
             return;
         }
 
@@ -52,7 +51,7 @@ class CustomerSeeder extends Seeder
         ];
 
         $defaultTariff = $domesticTariff ?? $tariffs->first();
-        if (!$defaultTariff) {
+        if (! $defaultTariff) {
             $defaultTariff = Tariff::create([
                 'name' => 'DOMESTIC',
                 'price' => 4000,
@@ -62,16 +61,18 @@ class CustomerSeeder extends Seeder
         }
 
         $jebelZone = Zone::where('name', 'JEBEL SUK')->first();
-        if (!$jebelZone) {
+        if (! $jebelZone) {
             $this->command->error('Zone "JEBEL SUK" not found. Run ZoneSeeder to create it before running this seeder.');
+
             return;
         }
 
         $otherZone = $jebelZone;
         $otherArea = Area::where('name', 'HAI GWONGOROKI')->first();
 
-        if (!$otherArea) {
+        if (! $otherArea) {
             $this->command->error('Area "HAI GWONGOROKI" not found. Run AreaSeeder to create it before running this seeder.');
+
             return;
         }
 
@@ -94,21 +95,21 @@ class CustomerSeeder extends Seeder
             $area = null;
             $zone = null;
 
-            if (!empty($addressBlock)) {
+            if (! empty($addressBlock)) {
                 $area = $allAreas->where('name', $addressBlock)->first();
 
-                if (!$area) {
+                if (! $area) {
                     $cleanAddress = str_replace('"', '', $addressBlock);
                     $area = $allAreas->where('name', $cleanAddress)->first();
                 }
 
-                if (!$area) {
+                if (! $area) {
                     $area = $allAreas->first(function ($a) use ($addressBlock) {
                         return str_contains(Str::upper($addressBlock), Str::upper($a->name));
                     });
                 }
 
-                if (!$area) {
+                if (! $area) {
                     $area = $allAreas->first(function ($a) use ($addressBlock) {
                         return str_contains(Str::upper($a->name), Str::upper($addressBlock));
                     });
@@ -119,13 +120,14 @@ class CustomerSeeder extends Seeder
                 }
             }
 
-            if (!$area) {
+            if (! $area) {
                 $zone = $otherZone;
                 $area = $otherArea;
             }
 
-            if (!str_starts_with(Str::upper($zone->name ?? ''), 'JEBEL')) {
+            if (! str_starts_with(Str::upper($zone->name ?? ''), 'JEBEL')) {
                 $bar->advance();
+
                 continue;
             }
 
@@ -150,7 +152,7 @@ class CustomerSeeder extends Seeder
             if ($meterNumber !== null && $meterNumber !== 0 && $meterNumber !== '0' && $meterNumber !== '') {
                 $cleanMeterNumber = str_replace([' ', 'TRM'], '', (string) $meterNumber);
                 $exists = Meter::where('meter_number', $cleanMeterNumber)->exists();
-                $finalMeterNumber = $exists ? $cleanMeterNumber . '-' . $customer->id : $cleanMeterNumber;
+                $finalMeterNumber = $exists ? $cleanMeterNumber.'-'.$customer->id : $cleanMeterNumber;
 
                 $meter = Meter::create([
                     'customer_id' => $customer->id,
@@ -162,44 +164,10 @@ class CustomerSeeder extends Seeder
                 // in MeterReadingSeeder using customers.json.
             }
 
-            $depositRaw = $data['deposit'] ?? null;
-            if ($depositRaw) {
-                if (preg_match('/([\d.,]+)/', (string) $depositRaw, $matches)) {
-                    $depositAmount = (float) str_replace(',', '', $matches[1]);
-                } else {
-                    $depositAmount = 0;
-                }
-
-                if ($depositAmount > 0) {
-                    $invoice = Invoice::create([
-                        'invoice_number' => 'DEP-' . str_pad((string) $customer->id, 8, '0', STR_PAD_LEFT),
-                        'customer_id' => $customer->id,
-                        'description' => 'Initial deposit for meter ' . ($meterNumber ?? ''),
-                        'amount' => $depositAmount,
-                        'due_date' => now(),
-                        'status' => 'paid',
-                    ]);
-
-                    Payment::create([
-                        'payable_type'    => Invoice::class,
-                        'payable_id'      => $invoice->id,
-                        'amount'          => $depositAmount,
-                        'payable_total'   => $depositAmount,
-                        'amount_paid'     => $depositAmount,
-                        'balance_after'   => 0,
-                        'payment_date'    => now(),
-                        'payment_method'  => 'cash',
-                        'reference_number'=> 'DEP-' . str_pad((string) $customer->id, 8, '0', STR_PAD_LEFT),
-                        'received_by'     => 1,
-                        'notes'           => 'Initial deposit payment from import',
-                    ]);
-                }
-            }
-
             $bar->advance();
         }
 
         $bar->finish();
-        $this->command->info("\nSeeding of " . count($customersData) . " customers from customers.json completed successfully.");
+        $this->command->info("\nSeeding of ".count($customersData).' customers from customers.json completed successfully.');
     }
 }

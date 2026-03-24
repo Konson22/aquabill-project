@@ -2,20 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use Inertia\Inertia;
-
+use App\Models\Area;
 use App\Models\Bill;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Meter;
 use App\Models\MeterReading;
 use App\Models\Payment;
-use App\Models\Area;
 use App\Models\Tariff;
 use App\Models\User;
 use App\Models\Zone;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
@@ -41,7 +39,7 @@ class DashboardController extends Controller
                 'forwarded' => 0,
                 'balance_forwarded' => 0,
                 'overdue' => Bill::unpaid()->where('due_date', '<', now())->count(),
-                'amount' => $pendingBillAmount
+                'amount' => $pendingBillAmount,
             ];
             $billStats['partial_paid'] = $billStats['pending']; // keep for backward compatibility
 
@@ -58,13 +56,13 @@ class DashboardController extends Controller
                 'paid' => Invoice::where('status', 'paid')->count(),
                 'unpaid' => Invoice::where('status', 'pending')->count(),
                 'overdue' => Invoice::where('status', 'pending')->where('due_date', '<', now())->count(),
-                'amount' => $pendingInvoiceAmount
+                'amount' => $pendingInvoiceAmount,
             ];
 
             // 4. Revenue Trend (January to December)
             $revenueTrend = [];
             $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            
+
             foreach ($months as $index => $monthName) {
                 $sum = Payment::where('payable_type', Bill::class)
                     ->whereMonth('payment_date', $index + 1)
@@ -72,7 +70,7 @@ class DashboardController extends Controller
                     ->sum('amount');
                 $revenueTrend[] = [
                     'name' => $monthName,
-                    'total' => round($sum, 2)
+                    'total' => round($sum, 2),
                 ];
             }
 
@@ -93,7 +91,7 @@ class DashboardController extends Controller
                     ];
                 });
 
-            return Inertia::render('dashboard-finance/index', [
+            return Inertia::render('finance/dashboard/index', [
                 'stats' => [
                     'totalCollected' => $totalCollected,
                     'collectedToday' => $collectedToday,
@@ -103,16 +101,16 @@ class DashboardController extends Controller
                     'billingPerformance' => round($billingPerformance, 1),
                 ],
                 'revenueTrend' => $revenueTrend,
-                'overdueBills' => $overdueBills
+                'overdueBills' => $overdueBills,
             ]);
         } elseif ($user->department === 'meters') {
-            return Inertia::render('dashboard-meter-department/index');
+            return Inertia::render('meters-readers/dashboard/index');
         }
 
         // Admin Dashboard Data
-        
+
         // Admin Dashboard Data
-        
+
         // 1. Total Revenue
         $totalRevenue = \App\Models\Payment::sum('amount');
         $revenueLastMonth = \App\Models\Payment::whereMonth('payment_date', now()->subMonth()->month)
@@ -121,7 +119,7 @@ class DashboardController extends Controller
         $revenueThisMonth = \App\Models\Payment::whereMonth('payment_date', now()->month)
             ->whereYear('payment_date', now()->year)
             ->sum('amount');
-            
+
         $revenueTrend = 0;
         if ($revenueLastMonth > 0) {
             $revenueTrend = (($revenueThisMonth - $revenueLastMonth) / $revenueLastMonth) * 100;
@@ -145,13 +143,13 @@ class DashboardController extends Controller
             'damage' => (int) ($metersCounts->damage ?? 0),
         ];
 
-        $metersMonthCounts = Meter::selectRaw("
+        $metersMonthCounts = Meter::selectRaw('
             SUM(created_at < ?) as last_month,
             SUM(MONTH(created_at) = ? AND YEAR(created_at) = ?) as this_month
-        ", [now()->startOfMonth(), now()->month, now()->year])->first();
+        ', [now()->startOfMonth(), now()->month, now()->year])->first();
         $metersLastMonth = (int) ($metersMonthCounts->last_month ?? 0);
         $newMetersThisMonth = (int) ($metersMonthCounts->this_month ?? 0);
-        $metersTrend = $metersLastMonth > 0 ? ($newMetersThisMonth / $metersLastMonth) * 100 : 0; 
+        $metersTrend = $metersLastMonth > 0 ? ($newMetersThisMonth / $metersLastMonth) * 100 : 0;
 
         // 3. Water Usage by Tariff & Zone (2 queries instead of N)
         $year = now()->year;
@@ -187,7 +185,7 @@ class DashboardController extends Controller
                 'fill' => $colors[$index % count($colors)],
             ];
         });
-       
+
         // 4. Customers (connections) Stats (single query)
         $customersCounts = Customer::selectRaw("
             COUNT(*) as total,
@@ -202,10 +200,10 @@ class DashboardController extends Controller
             'disconnected' => (int) ($customersCounts->disconnected ?? 0),
         ];
 
-        $homesMonthCounts = Customer::selectRaw("
+        $homesMonthCounts = Customer::selectRaw('
             SUM(created_at < ?) as last_month,
             SUM(MONTH(created_at) = ? AND YEAR(created_at) = ?) as this_month
-        ", [now()->startOfMonth(), now()->month, now()->year])->first();
+        ', [now()->startOfMonth(), now()->month, now()->year])->first();
         $homesLastMonth = (int) ($homesMonthCounts->last_month ?? 0);
         $newHomesThisMonth = (int) ($homesMonthCounts->this_month ?? 0);
         $homesTrend = $homesLastMonth > 0 ? ($newHomesThisMonth / $homesLastMonth) * 100 : 0;
@@ -244,9 +242,9 @@ class DashboardController extends Controller
         $billingPerformance = $totalBillsAmount > 0
             ? ($totalPaymentsAmount / $totalBillsAmount) * 100
             : 0;
-        
+
         // 6. Tariffs
-        $activeTariffsCount = Tariff::count(); 
+        $activeTariffsCount = Tariff::count();
 
         // 7. Readings & Consumption
         $totalReadingsThisMonth = MeterReading::whereMonth('reading_date', now()->month)
@@ -292,19 +290,19 @@ class DashboardController extends Controller
         // 9. Overdue Readings (No reading in > 30 days) - simplified logic
         // Assuming we want meters that have NOT had a reading in the last 30 days but are active
         $overdueReadings = Meter::where('status', 'active')
-            ->whereDoesntHave('readings', function($query) {
+            ->whereDoesntHave('readings', function ($query) {
                 $query->where('reading_date', '>=', now()->subDays(30));
             })
             ->with('customer')
             ->take(5)
             ->get()
-            ->map(function($meter) {
-                 return [
+            ->map(function ($meter) {
+                return [
                     'serial_number' => $meter->meter_number,
                     'customer' => $meter->customer?->name ?? 'N/A',
                     'last_reading_date' => $meter->last_reading_date ?? 'Never',
-                    'location' => $meter->customer?->address ?? 'N/A'
-                 ];
+                    'location' => $meter->customer?->address ?? 'N/A',
+                ];
             });
 
         // 10. Overdue Bills List
@@ -314,18 +312,18 @@ class DashboardController extends Controller
             ->oldest('due_date')
             ->take(5)
             ->get()
-            ->map(function($bill) {
+            ->map(function ($bill) {
                 return [
                     'id' => $bill->id,
                     'bill_number' => $bill->bill_number,
                     'customer' => $bill->customer ? $bill->customer->name : 'N/A',
                     'amount' => $bill->balance,
                     'due_date' => $bill->due_date,
-                    'status' => $bill->status
+                    'status' => $bill->status,
                 ];
             });
 
-        return Inertia::render('dashboard-admin/index', [
+        return Inertia::render('admin/dashboard/index', [
             'stats' => [
                 'totalRevenue' => $totalRevenue,
                 'revenueTrend' => round($revenueTrend, 1),
@@ -448,7 +446,7 @@ class DashboardController extends Controller
             [
                 'label' => 'Overdue bills',
                 'value' => number_format($overdueBillsCount),
-                'description' => 'Pending balance: ' . number_format($overdueBillsAmount, 2),
+                'description' => 'Pending balance: '.number_format($overdueBillsAmount, 2),
             ],
             [
                 'label' => 'Readings overdue',
@@ -457,7 +455,7 @@ class DashboardController extends Controller
             ],
             [
                 'label' => 'Collection rate',
-                'value' => number_format($collectionRate, 1) . '%',
+                'value' => number_format($collectionRate, 1).'%',
                 'description' => 'Fully paid bills vs total',
             ],
         ];
@@ -472,7 +470,7 @@ class DashboardController extends Controller
             'metersMaintenance' => Meter::whereIn('status', ['maintenance', 'damage'])->count(),
         ];
 
-        return Inertia::render('dashboard-admin/general-report', [
+        return Inertia::render('admin/dashboard/general-report', [
             'stats' => [
                 'totalBills' => $totalBills,
                 'paidBills' => $paidBills,

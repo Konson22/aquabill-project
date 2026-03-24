@@ -1,19 +1,18 @@
 <?php
 
+use App\Http\Controllers\Admin\AreaController;
+use App\Http\Controllers\Admin\MeterReadingController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\ZoneController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\BillController;
-use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\InvoiceController;
-use App\Http\Controllers\HomeController;
-use App\Http\Controllers\MeterController;
-use App\Http\Controllers\MeterReadingController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\AdminDashboardController;
-use App\Http\Controllers\FinanceDashboardController;
+use App\Http\Controllers\Finance\BillController;
+use App\Http\Controllers\Finance\CustomerController;
+use App\Http\Controllers\Finance\FinanceDashboardController;
+use App\Http\Controllers\Finance\InvoiceController;
+use App\Http\Controllers\Finance\MeterController;
+use App\Http\Controllers\Finance\PaymentController;
+use App\Http\Controllers\Finance\TariffController;
 use App\Http\Controllers\MeterDepartmentDashboardController;
-use App\Http\Controllers\TariffController;
-use App\Http\Controllers\ZoneController;
-use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -21,46 +20,51 @@ Route::get('/', function () {
     if (auth()->check()) {
         return redirect()->route('dashboard');
     }
+
     return redirect()->route('login');
 })->name('home');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('docs', function () {
-        return Inertia::render('docs/index');
-    })->name('docs.index');
 
-    Route::get('docs/system', function () {
-        return Inertia::render('docs/system-documentation');
-    })->name('docs.system');
+    // Documentation: not under resources/js/pages/finance — admin & meter staff only
+    Route::middleware(['department:admin,meters'])->group(function () {
+        Route::get('docs', function () {
+            return Inertia::render('docs/index');
+        })->name('docs.index');
 
-    Route::get('docs/user-manual', function () {
-        return Inertia::render('documentation/index');
-    })->name('docs.user-manual');
+        Route::get('docs/system', function () {
+            return Inertia::render('docs/system-documentation');
+        })->name('docs.system');
 
-    Route::get('docs/development-status', function () {
-        return Inertia::render('documentation/manual');
-    })->name('docs.development-status');
+        Route::get('docs/user-manual', function () {
+            return Inertia::render('documentation/index');
+        })->name('docs.user-manual');
 
-    Route::get('docs/user-manuals', function () {
-        return Inertia::render('documentation/UserManual');
-    })->name('docs.user-manuals');
+        Route::get('docs/development-status', function () {
+            return Inertia::render('documentation/manual');
+        })->name('docs.development-status');
 
-    Route::get('docs/quick-references', function () {
-        return Inertia::render('documentation/QuickReferences');
-    })->name('docs.quick-references');
+        Route::get('docs/user-manuals', function () {
+            return Inertia::render('documentation/UserManual');
+        })->name('docs.user-manuals');
 
-    Route::get('docs/technical-docs', function () {
-        return Inertia::render('documentation/TechnicalDocumentation');
-    })->name('docs.technical');
+        Route::get('docs/quick-references', function () {
+            return Inertia::render('documentation/QuickReferences');
+        })->name('docs.quick-references');
 
-    Route::get('docs/process-governance', function () {
-        return Inertia::render('documentation/ProcessGovernance');
-    })->name('docs.process-governance');
+        Route::get('docs/technical-docs', function () {
+            return Inertia::render('documentation/TechnicalDocumentation');
+        })->name('docs.technical');
 
-    Route::get('docs/training-materials', function () {
-        return Inertia::render('documentation/TrainingMaterials');
-    })->name('docs.training-materials');
+        Route::get('docs/process-governance', function () {
+            return Inertia::render('documentation/ProcessGovernance');
+        })->name('docs.process-governance');
+
+        Route::get('docs/training-materials', function () {
+            return Inertia::render('documentation/TrainingMaterials');
+        })->name('docs.training-materials');
+    });
 
     // Search (customer search used by invoice modal; homes.search kept for backward compatibility)
     Route::get('/api/h/search', [CustomerController::class, 'search'])->name('homes.search');
@@ -84,7 +88,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware(['department:finance'])->group(function () {
         Route::get('finance/overview', [FinanceDashboardController::class, 'overview'])->name('finance.overview');
-        
+
         // Bills
         Route::get('bills', [BillController::class, 'index'])->name('bills');
         Route::get('bills/printing-list', [BillController::class, 'printingList'])->name('bills.printing-list');
@@ -109,6 +113,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('payments/report', [PaymentController::class, 'report'])->name('payments.report');
         Route::post('payments', [PaymentController::class, 'store'])->name('payments.store');
         Route::get('payments/{id}', [PaymentController::class, 'show'])->name('payments.show');
+        Route::delete('payments/{id}', [PaymentController::class, 'destroy'])->name('payments.destroy');
 
         // Tariffs
         Route::get('tariffs', [TariffController::class, 'index'])->name('tariffs.index');
@@ -148,11 +153,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('zones/{id}', [ZoneController::class, 'show'])->name('zones.show');
         Route::put('zones/{id}', [ZoneController::class, 'update'])->name('zones.update');
         Route::delete('zones/{id}', [ZoneController::class, 'destroy'])->name('zones.destroy');
-        
+
         // Areas
-        Route::post('areas', [\App\Http\Controllers\AreaController::class, 'store'])->name('areas.store');
-        Route::put('areas/{id}', [\App\Http\Controllers\AreaController::class, 'update'])->name('areas.update');
-        Route::delete('areas/{id}', [\App\Http\Controllers\AreaController::class, 'destroy'])->name('areas.destroy');
+        Route::post('areas', [AreaController::class, 'store'])->name('areas.store');
+        Route::put('areas/{id}', [AreaController::class, 'update'])->name('areas.update');
+        Route::delete('areas/{id}', [AreaController::class, 'destroy'])->name('areas.destroy');
     });
 
     // Customers
@@ -166,7 +171,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('customers/{id}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('customers/{id}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('customers/{id}', [CustomerController::class, 'destroy'])->name('customers.destroy');
-        
+
         // Homes (merged into customers: same controller, old URLs still work)
         Route::get('homes', [CustomerController::class, 'index'])->name('homes.index');
         Route::get('homes/export', [CustomerController::class, 'export'])->name('homes.export');
@@ -180,5 +185,3 @@ Route::middleware(['auth'])->group(function () {
 });
 
 require __DIR__.'/settings.php';
-
-

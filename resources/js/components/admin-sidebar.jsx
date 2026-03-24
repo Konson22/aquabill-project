@@ -132,6 +132,24 @@ const metersNavItems = [
     },
 ];
 
+/** Department key for nav: string accessor or nested { name }; normalized to lowercase. */
+function departmentName(user) {
+    if (!user?.department) return null;
+    const d = user.department;
+    let raw = null;
+    if (typeof d === 'string') raw = d;
+    else if (typeof d === 'object' && d !== null && 'name' in d && d.name != null) {
+        raw = String(d.name);
+    }
+    return raw ? raw.trim().toLowerCase() : null;
+}
+
+const NAV_BY_DEPARTMENT = {
+    admin: adminNavItems,
+    finance: financeNavItems,
+    meters: metersNavItems,
+};
+
 function NavSection({ items, label, collapsed, onLinkClick }) {
     const page = usePage();
 
@@ -180,14 +198,8 @@ export default function AdminSidebar({
     const { auth } = usePage().props;
     const user = auth?.user;
 
-    const items =
-        user?.department === 'admin'
-            ? adminNavItems
-            : user?.department === 'finance'
-              ? financeNavItems
-              : user?.department === 'meters'
-                ? metersNavItems
-                : adminNavItems;
+    const dept = departmentName(user);
+    const items = NAV_BY_DEPARTMENT[dept] ?? adminNavItems;
 
     const sidebarContent = (
         <>

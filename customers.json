@@ -7629,18 +7629,5 @@
     "tariff": null,
     "tel": null,
     "initialReading": "230 M3"
-  },
-  {
-    "meterNo": "587",
-    "customerName": null,
-    "deposit": null,
-    "contractNo": null,
-    "contractDate": null,
-    "receiptNo": null,
-    "housePlotNo": null,
-    "area": "587",
-    "tariff": null,
-    "tel": null,
-    "initialReading": "46,157 M3"
   }
 ]

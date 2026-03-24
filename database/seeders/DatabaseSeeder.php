@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
             TariffSeeder::class,
             CustomerSeeder::class,
             MeterReadingSeeder::class,
-            PaymentSeeder::class,
+            // InvoiceSeeder / PaymentSeeder — not used (no seeded invoices or payments).
         ]);
     }
 }
