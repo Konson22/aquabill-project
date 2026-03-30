@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Area;
 use App\Models\Bill;
 use App\Models\Customer;
 use App\Models\Invoice;
@@ -243,10 +242,7 @@ class DashboardController extends Controller
             ? ($totalPaymentsAmount / $totalBillsAmount) * 100
             : 0;
 
-        // 6. Tariffs
-        $activeTariffsCount = Tariff::count();
-
-        // 7. Readings & Consumption
+        // 6. Readings & Consumption
         $totalReadingsThisMonth = MeterReading::whereMonth('reading_date', now()->month)
             ->whereYear('reading_date', now()->year)
             ->count();
@@ -339,11 +335,8 @@ class DashboardController extends Controller
                 'totalPaymentsAmount' => round($totalPaymentsAmount, 2),
                 'pendingBillsAmount' => $pendingBillsAmount,
                 'overdueBillsCount' => $overdueBillsCount,
-                'activeTariffsCount' => $activeTariffsCount,
                 'readingsThisMonth' => $totalReadingsThisMonth,
                 'totalConsumptionThisYear' => round($totalConsumptionThisYear, 2),
-                'zonesCount' => Zone::count(),
-                'areasCount' => Area::count(),
             ],
             'chartData' => $usageChartData,
             'billsChartData' => $billsChartData,
@@ -358,12 +351,212 @@ class DashboardController extends Controller
 
     public function generalReport(Request $request)
     {
+        $data = $this->buildGeneralReportData($request);
+
+        return Inertia::render('admin/dashboard/general-report', [
+            'stats' => $data['stats'],
+            'usageByZone' => $data['usageByZone'],
+            'usageByTariff' => $data['usageByTariff'],
+            'customerStats' => $data['customerStats'],
+            'filters' => $request->only(['month']),
+        ]);
+    }
+
+    public function exportGeneralReport(Request $request)
+    {
+        $data = $this->buildGeneralReportData($request);
+        $asExcel = $request->input('format') === 'xlsx';
+        $filename = 'general_report_'.date('Y-m-d').($asExcel ? '.xls' : '.csv');
+        $headers = [
+            'Content-Type' => $asExcel
+                ? 'application/vnd.ms-excel; charset=UTF-8'
+                : 'text/csv; charset=UTF-8',
+        ];
+
+        return response()->streamDownload(function () use ($data, $asExcel) {
+            if ($asExcel) {
+                echo $this->renderGeneralReportExcelDocument($data);
+
+                return;
+            }
+
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            $stats = $data['stats'];
+            $period = $data['periodDescription'];
+
+            fputcsv($file, ['GENERAL REPORT', $period]);
+            fputcsv($file, ['Generated', now()->toDateTimeString()]);
+            fputcsv($file, []);
+
+            fputcsv($file, ['BILLING & PAYMENTS']);
+            fputcsv($file, ['Total bills', $stats['totalBills']]);
+            fputcsv($file, ['Pending bills', $stats['unpaidBills']]);
+            fputcsv($file, ['Paid amount', number_format($stats['totalPaidAmount'], 2, '.', '')]);
+            fputcsv($file, ['Outstanding', number_format($stats['outstandingAmount'], 2, '.', '')]);
+            fputcsv($file, ['Paid bills count', $stats['paidBills']]);
+            fputcsv($file, ['Payment rate %', $stats['paymentRate']]);
+            fputcsv($file, ['Collection rate %', $stats['collectionRate']]);
+            fputcsv($file, ['Overdue bills count', $stats['overdueBillsCount']]);
+            fputcsv($file, ['Overdue bills amount', number_format($stats['overdueBillsAmount'], 2, '.', '')]);
+            fputcsv($file, []);
+
+            fputcsv($file, ['USAGE']);
+            fputcsv($file, ['Total consumption (m3)', $stats['totalConsumption']]);
+            fputcsv($file, []);
+
+            fputcsv($file, ['USAGE BY ZONE']);
+            fputcsv($file, ['Zone', 'Usage (m3)']);
+            foreach ($data['usageByZone'] as $row) {
+                fputcsv($file, [$row['name'], $row['value']]);
+            }
+            fputcsv($file, []);
+
+            fputcsv($file, ['USAGE BY TARIFF']);
+            fputcsv($file, ['Tariff', 'Usage (m3)']);
+            foreach ($data['usageByTariff'] as $row) {
+                fputcsv($file, [$row['name'], $row['value']]);
+            }
+            fputcsv($file, []);
+
+            fputcsv($file, ['CUSTOMERS & METERS']);
+            $cs = $data['customerStats'];
+            fputcsv($file, ['Customers', $cs['totalCustomers']]);
+            fputcsv($file, ['Active customers', $cs['activeCustomers']]);
+            fputcsv($file, ['Suspended customers', $cs['suspendedCustomers']]);
+            fputcsv($file, ['Meters (total)', $cs['totalMeters']]);
+            fputcsv($file, ['Meters active', $cs['metersActive']]);
+            fputcsv($file, ['Meters inactive', $cs['metersInactive']]);
+            fputcsv($file, ['Meters maintenance / damage', $cs['metersMaintenance']]);
+
+            fclose($file);
+        }, $filename, $headers);
+    }
+
+    /**
+     * Single-sheet HTML document Excel can open as .xls (inline styles for compatibility).
+     */
+    private function renderGeneralReportExcelDocument(array $data): string
+    {
+        $stats = $data['stats'];
+        $period = e($data['periodDescription']);
+        $generated = e(now()->toDateTimeString());
+        $border = 'border:1px solid #64748b';
+        $cell = 'padding:7px 10px;'.$border;
+        $sectionHead = 'background:#334155;color:#ffffff;font-weight:700;text-align:left;'.$cell.';font-size:11pt';
+        $colHead = 'background:#e2e8f0;color:#0f172a;font-weight:600;'.$cell;
+        $cellText = 'background:#ffffff;'.$cell;
+        $cellNum = $cellText.';text-align:right';
+        $tableBase = 'border-collapse:collapse;width:100%;max-width:720px;'.$border;
+        $wrapTitle = '<table cellspacing="0" cellpadding="0" style="'.$tableBase.';margin-bottom:28px">';
+        $wrapSection = '<table cellspacing="0" cellpadding="0" style="'.$tableBase.';margin-bottom:48px">';
+
+        $row2 = static function (string $label, string $value, bool $num = false) use ($cellText, $cellNum): string {
+            $l = e($label);
+            $v = e($value);
+            $right = $num ? $cellNum : $cellText;
+
+            return '<tr><td style="'.$cellText.'">'.$l.'</td><td style="'.$right.'">'.$v.'</td></tr>';
+        };
+
+        $section = static function (string $title, string $innerRows) use ($wrapSection, $sectionHead): string {
+            $t = e($title);
+
+            return $wrapSection.'<tr><th colspan="2" style="'.$sectionHead.'">'.$t.'</th></tr>'.$innerRows.'</table>';
+        };
+
+        $billingRows =
+            $row2('Total bills', (string) $stats['totalBills'], true)
+            .$row2('Pending bills', (string) $stats['unpaidBills'], true)
+            .$row2('Paid amount', number_format($stats['totalPaidAmount'], 2, '.', ''), true)
+            .$row2('Outstanding', number_format($stats['outstandingAmount'], 2, '.', ''), true)
+            .$row2('Paid bills count', (string) $stats['paidBills'], true)
+            .$row2('Payment rate %', (string) $stats['paymentRate'], true)
+            .$row2('Collection rate %', (string) $stats['collectionRate'], true)
+            .$row2('Overdue bills count', (string) $stats['overdueBillsCount'], true)
+            .$row2('Overdue bills amount', number_format($stats['overdueBillsAmount'], 2, '.', ''), true);
+
+        $usageRows =
+            $row2('Total consumption (m³)', (string) $stats['totalConsumption'], true);
+
+        $zoneHead = '<tr><th style="'.$colHead.';text-align:left">'.e('Zone').'</th>'
+            .'<th style="'.$colHead.';text-align:right">'.e('Usage (m³)').'</th></tr>';
+        $zoneBody = '';
+        foreach ($data['usageByZone'] as $row) {
+            $zoneBody .= '<tr><td style="'.$cellText.'">'.e($row['name']).'</td>'
+                .'<td style="'.$cellNum.'">'.e((string) $row['value']).'</td></tr>';
+        }
+
+        $tariffHead = '<tr><th style="'.$colHead.';text-align:left">'.e('Tariff').'</th>'
+            .'<th style="'.$colHead.';text-align:right">'.e('Usage (m³)').'</th></tr>';
+        $tariffBody = '';
+        foreach ($data['usageByTariff'] as $row) {
+            $tariffBody .= '<tr><td style="'.$cellText.'">'.e($row['name']).'</td>'
+                .'<td style="'.$cellNum.'">'.e((string) $row['value']).'</td></tr>';
+        }
+
+        $cs = $data['customerStats'];
+        $customerRows =
+            $row2('Customers', (string) $cs['totalCustomers'], true)
+            .$row2('Active customers', (string) $cs['activeCustomers'], true)
+            .$row2('Suspended customers', (string) $cs['suspendedCustomers'], true)
+            .$row2('Meters (total)', (string) $cs['totalMeters'], true)
+            .$row2('Meters active', (string) $cs['metersActive'], true)
+            .$row2('Meters inactive', (string) $cs['metersInactive'], true)
+            .$row2('Meters maintenance / damage', (string) $cs['metersMaintenance'], true);
+
+        $titleBlock = $wrapTitle
+            .'<tr><th colspan="2" style="background:#0f172a;color:#ffffff;font-weight:700;font-size:13pt;text-align:left;'.$cell.'">'
+            .e('General report').'</th></tr>'
+            .'<tr><td colspan="2" style="background:#f1f5f9;color:#334155;'.$cell.'"><strong>'.e('Period').':</strong> '
+            .$period.'</td></tr>'
+            .'<tr><td colspan="2" style="background:#f8fafc;color:#475569;font-size:9pt;'.$cell.'"><strong>'.e('Generated').':</strong> '
+            .$generated.'</td></tr>'
+            .'</table>';
+
+        $zoneSection = $section('USAGE BY ZONE', $zoneHead.$zoneBody);
+        $tariffSection = $section('USAGE BY TARIFF', $tariffHead.$tariffBody);
+
+        $html = '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" '
+            .'xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8">'
+            .'<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>'
+            .'<x:ExcelWorksheet><x:Name>General Report</x:Name><x:WorksheetOptions>'
+            .'<x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet>'
+            .'</x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>'
+            .'<body style="margin:16px 20px 32px 20px">'
+            .$titleBlock
+            .$section('BILLING & PAYMENTS', $billingRows)
+            .$section('USAGE', $usageRows)
+            .$zoneSection
+            .$tariffSection
+            .$section('CUSTOMERS & METERS', $customerRows)
+            .'</body></html>';
+
+        return $html;
+    }
+
+    /**
+     * @return array{
+     *     stats: array,
+     *     usageByZone: \Illuminate\Support\Collection<int, array{name: string, value: float}>,
+     *     usageByTariff: \Illuminate\Support\Collection<int, array{name: string, value: float}>,
+     *     customerStats: array<string, int>,
+     *     periodDescription: string
+     * }
+     */
+    private function buildGeneralReportData(Request $request): array
+    {
         $month = $request->input('month');
         $monthYear = null;
         $monthNumber = null;
         if ($month && preg_match('/^\d{4}-\d{2}$/', $month)) {
             [$monthYear, $monthNumber] = array_map('intval', explode('-', $month));
         }
+
+        $periodDescription = ($monthYear && $monthNumber)
+            ? \Carbon\Carbon::create($monthYear, $monthNumber, 1)->format('F Y')
+            : 'All time';
 
         $billQuery = Bill::query();
         if ($monthYear && $monthNumber) {
@@ -375,7 +568,7 @@ class DashboardController extends Controller
         $paidBills = (clone $billQuery)->fullyPaid()->count();
         $unpaidBills = (clone $billQuery)->unpaid()->count();
 
-        $paymentQuery = \App\Models\Payment::query();
+        $paymentQuery = Payment::query();
         if ($monthYear && $monthNumber) {
             $paymentQuery->whereYear('payment_date', $monthYear)->whereMonth('payment_date', $monthNumber);
         }
@@ -423,6 +616,27 @@ class DashboardController extends Controller
             ];
         });
 
+        $usageByTariff = Tariff::query()->orderBy('name')->get()->map(function ($tariff) use ($monthYear, $monthNumber) {
+            $usageQuery = MeterReading::join('customers', 'meter_readings.customer_id', '=', 'customers.id')
+                ->where('customers.tariff_id', $tariff->id)
+                ->selectRaw('SUM(current_reading - previous_reading) as total');
+
+            if ($monthYear && $monthNumber) {
+                $usageQuery->whereYear('reading_date', $monthYear)
+                    ->whereMonth('reading_date', $monthNumber);
+            } else {
+                $usageQuery->whereYear('reading_date', now()->year);
+            }
+
+            $totalUsage = $usageQuery->value('total') ?? 0;
+
+            return [
+                'id' => $tariff->id,
+                'name' => $tariff->name,
+                'value' => round((float) $totalUsage, 2),
+            ];
+        });
+
         $overdueBillsCount = (clone $billQuery)
             ->whereIn('status', ['pending', 'partial paid'])
             ->where('due_date', '<', now())
@@ -432,33 +646,9 @@ class DashboardController extends Controller
             ->where('due_date', '<', now())
             ->get()->sum(fn ($b) => $b->balance);
 
-        $overdueReadingsCount = Meter::where('status', 'active')
-            ->whereDoesntHave('readings', function ($query) {
-                $query->where('reading_date', '>=', now()->subDays(30));
-            })
-            ->count();
-
         $billsTotal = (clone $billQuery)->count();
         $fullyPaidBills = (clone $billQuery)->fullyPaid()->count();
         $collectionRate = $billsTotal > 0 ? ($fullyPaidBills / $billsTotal) * 100 : 0;
-
-        $highlights = [
-            [
-                'label' => 'Overdue bills',
-                'value' => number_format($overdueBillsCount),
-                'description' => 'Pending balance: '.number_format($overdueBillsAmount, 2),
-            ],
-            [
-                'label' => 'Readings overdue',
-                'value' => number_format($overdueReadingsCount),
-                'description' => 'Active meters without 30-day read',
-            ],
-            [
-                'label' => 'Collection rate',
-                'value' => number_format($collectionRate, 1).'%',
-                'description' => 'Fully paid bills vs total',
-            ],
-        ];
 
         $customerStats = [
             'totalCustomers' => Customer::count(),
@@ -470,7 +660,7 @@ class DashboardController extends Controller
             'metersMaintenance' => Meter::whereIn('status', ['maintenance', 'damage'])->count(),
         ];
 
-        return Inertia::render('admin/dashboard/general-report', [
+        return [
             'stats' => [
                 'totalBills' => $totalBills,
                 'paidBills' => $paidBills,
@@ -479,13 +669,14 @@ class DashboardController extends Controller
                 'outstandingAmount' => round($outstandingAmount, 2),
                 'totalConsumption' => $totalConsumption,
                 'paymentRate' => round($paymentRate, 1),
+                'collectionRate' => round($collectionRate, 1),
                 'overdueBillsCount' => $overdueBillsCount,
                 'overdueBillsAmount' => round($overdueBillsAmount, 2),
             ],
             'usageByZone' => $usageByZone,
-            'highlights' => $highlights,
+            'usageByTariff' => $usageByTariff,
             'customerStats' => $customerStats,
-            'filters' => $request->only(['month']),
-        ]);
+            'periodDescription' => $periodDescription,
+        ];
     }
 }

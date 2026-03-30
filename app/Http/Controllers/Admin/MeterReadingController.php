@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class MeterReadingController extends Controller
 {
@@ -561,13 +562,31 @@ class MeterReadingController extends Controller
         ]);
     }
 
+    /**
+     * Serve meter photo from disk (avoids relying on public/storage symlink).
+     */
+    public function image($id)
+    {
+        $meterReading = MeterReading::findOrFail($id);
+
+        if (! $meterReading->image) {
+            abort(404);
+        }
+
+        if (! Storage::disk('public')->exists($meterReading->image)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($meterReading->image);
+    }
+
     public function show($id)
     {
         $meterReading = MeterReading::with(['meter.home', 'reader', 'bill'])
             ->findOrFail($id);
 
         if ($meterReading->image) {
-            $meterReading->image = asset('/storage/app/public/'.$meterReading->image);
+            $meterReading->image = route('meter-readings.image', ['id' => $meterReading->id]);
         }
 
         return $this->renderMetersOrAdmin('meter-reading/show', [

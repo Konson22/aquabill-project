@@ -147,37 +147,9 @@ export default function CustomerShow({ customer, zones = [], tariffs = [] }) {
                 {/* Main Profile Card */}
                 <div className="overflow-hidden rounded-lg border bg-card">
                     <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-                        {/* Left: Customer identity */}
-                        <div className="space-y-1 text-xs text-muted-foreground">
-                            <h1 className="text-base font-semibold text-foreground">
-                                {customer.name}
-                            </h1>
-                            <p className="truncate">
-                                {[customer.phone, customer.email]
-                                    .filter(Boolean)
-                                    .join(' · ') || '—'}
-                            </p>
-                            <p className="truncate">
-                                {[customer.plot_number, customer.zone?.name, customer.area?.name]
-                                    .filter(Boolean)
-                                    .join(' · ') || '—'}
-                            </p>
-                            <p className="truncate">
-                                {customer.address || '—'}
-                            </p>
-                            <p>
-                                <span className="font-medium text-foreground">
-                                    Joined:
-                                </span>{' '}
-                                {new Date(customer.created_at).toLocaleDateString(undefined, {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                })}
-                            </p>
-                        </div>
-
-                        {/* Right: Actions */}
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                            {customer.name}
+                        </h1>
                         <div className="flex flex-wrap items-center gap-2">
                             <Button variant="outline" size="sm" asChild>
                                 <Link href={route('customers.edit', customer.id)}>

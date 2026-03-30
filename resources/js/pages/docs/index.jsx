@@ -19,6 +19,7 @@ import {
     Download,
     Droplets,
     FileText,
+    Layers,
     Search,
     Settings,
     Shield,
@@ -45,6 +46,13 @@ export default function DocsIndex() {
             icon: <BookOpen className="h-6 w-6 text-blue-500" />,
             href: route('docs.system'),
             badge: 'New',
+        },
+        {
+            title: 'System core functionalities',
+            description:
+                'What the system does end-to-end: customers, billing, service fees, payments, meters, zones, tariffs, reporting, API, and access by department.',
+            icon: <Layers className="h-6 w-6 text-sky-500" />,
+            href: route('docs.system-core-functionalities'),
         },
         {
             title: 'Development Status (JICA Meeting)',

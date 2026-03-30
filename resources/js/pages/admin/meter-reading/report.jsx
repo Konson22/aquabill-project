@@ -53,7 +53,6 @@ const MONTH_OPTIONS = (() => {
 export default function MeterReadingReport({
     monthlyConsumption,
     readingsByTariff,
-    consumptionByTariff,
     consumptionByZone,
     totalReadings,
     totalConsumption,
@@ -75,14 +74,6 @@ export default function MeterReadingReport({
             color: 'hsl(var(--chart-1))',
         },
     };
-
-    const tariffConfig = consumptionByTariff.reduce((acc, item, index) => {
-        acc[item.name] = {
-            label: item.name,
-            color: `hsl(var(--chart-${(index % 5) + 1}))`,
-        };
-        return acc;
-    }, {});
 
     const zoneConfig = consumptionByZone.reduce((acc, item, index) => {
         acc[item.name] = {
@@ -168,11 +159,6 @@ export default function MeterReadingReport({
         name,
         total: monthlyConsumptionMap[index] ?? 0,
     }));
-
-    const tariffTotal = consumptionByTariff.reduce(
-        (sum, item) => sum + Number(item.value || 0),
-        0,
-    );
 
     const zoneTotal = consumptionByZone.reduce(
         (sum, item) => sum + Number(item.value || 0),
@@ -513,117 +499,6 @@ export default function MeterReadingReport({
                                                             '#f97316',
                                                             '#e11d48',
                                                             '#8b5cf6',
-                                                        ][index % 5]
-                                                    }
-                                                />
-                                            ),
-                                        )}
-                                    </Pie>
-                                </PieChart>
-                            </ChartContainer>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Detailed Breakdowns */}
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                    <Card className="overflow-hidden border border-border shadow-sm">
-                        <CardHeader className="border-b border-border bg-muted/30 pb-4">
-                            <div>
-                                <CardTitle className="text-base font-semibold">
-                                    Consumption by Tariff
-                                </CardTitle>
-                                <p className="text-xs text-slate-500">
-                                    Category share of total usage
-                                </p>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="pt-4">
-                            <div className="space-y-4">
-                                {consumptionByTariff.map((item, index) => {
-                                    const percent =
-                                        tariffTotal > 0
-                                            ? Math.round(
-                                                  (Number(item.value) /
-                                                      tariffTotal) *
-                                                      100,
-                                              )
-                                            : 0;
-                                    return (
-                                        <div
-                                            key={item.name}
-                                            className="flex items-center justify-between"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <span
-                                                    className="h-3 w-3 rounded-full"
-                                                    style={{
-                                                        backgroundColor: [
-                                                            '#38bdf8',
-                                                            '#22c55e',
-                                                            '#f59e0b',
-                                                            '#a855f7',
-                                                            '#e11d48',
-                                                        ][index % 5],
-                                                    }}
-                                                />
-                                                <span className="text-sm font-medium text-slate-700">
-                                                    {item.name}
-                                                </span>
-                                            </div>
-                                            <span className="text-sm font-semibold text-slate-600">
-                                                {percent}%
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="overflow-hidden border border-border shadow-sm">
-                        <CardHeader className="border-b border-border bg-muted/30 pb-4">
-                            <div>
-                                <CardTitle className="text-base font-semibold">
-                                    Tariff Split
-                                </CardTitle>
-                                <p className="text-xs text-slate-500">
-                                    Proportion of total consumption
-                                </p>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="pt-4">
-                            <ChartContainer
-                                config={tariffConfig}
-                                className="h-[240px] w-full"
-                            >
-                                <PieChart>
-                                    <ChartTooltip
-                                        content={<ChartTooltipContent />}
-                                    />
-                                    <Pie
-                                        data={consumptionByTariff.map(
-                                            (item) => ({
-                                                name: item.name,
-                                                value: Number(item.value || 0),
-                                            }),
-                                        )}
-                                        dataKey="value"
-                                        nameKey="name"
-                                        innerRadius={70}
-                                        outerRadius={100}
-                                        paddingAngle={2}
-                                    >
-                                        {consumptionByTariff.map(
-                                            (entry, index) => (
-                                                <Cell
-                                                    key={`tariff-cell-${index}`}
-                                                    fill={
-                                                        [
-                                                            '#38bdf8',
-                                                            '#22c55e',
-                                                            '#f59e0b',
-                                                            '#a855f7',
-                                                            '#e11d48',
                                                         ][index % 5]
                                                     }
                                                 />

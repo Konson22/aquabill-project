@@ -76,6 +76,7 @@ class Bill extends Model
         if ($this->amountPaidResolved === null) {
             $this->amountPaidResolved = (float) ($this->payments_sum_amount ?? $this->payments()->sum('amount'));
         }
+
         return $this->amountPaidResolved;
     }
 
@@ -141,6 +142,14 @@ class Bill extends Model
     public function payments()
     {
         return $this->morphMany(Payment::class, 'payable');
+    }
+
+    /**
+     * Most recent payment on this bill (by id).
+     */
+    public function latestPayment()
+    {
+        return $this->morphOne(Payment::class, 'payable')->latestOfMany();
     }
 
     protected static function booted(): void

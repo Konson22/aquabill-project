@@ -38,20 +38,16 @@ Route::middleware(['auth'])->group(function () {
         })->name('docs.system');
 
         Route::get('docs/user-manual', function () {
-            return Inertia::render('documentation/index');
+            return Inertia::render('docs/user-manual-documentation');
         })->name('docs.user-manual');
+
+        Route::get('docs/system-core-functionalities', function () {
+            return Inertia::render('docs/system-core-functionalities-doc');
+        })->name('docs.system-core-functionalities');
 
         Route::get('docs/development-status', function () {
             return Inertia::render('documentation/manual');
         })->name('docs.development-status');
-
-        Route::get('docs/user-manuals', function () {
-            return Inertia::render('documentation/UserManual');
-        })->name('docs.user-manuals');
-
-        Route::get('docs/quick-references', function () {
-            return Inertia::render('documentation/QuickReferences');
-        })->name('docs.quick-references');
 
         Route::get('docs/technical-docs', function () {
             return Inertia::render('documentation/TechnicalDocumentation');
@@ -60,10 +56,6 @@ Route::middleware(['auth'])->group(function () {
         Route::get('docs/process-governance', function () {
             return Inertia::render('documentation/ProcessGovernance');
         })->name('docs.process-governance');
-
-        Route::get('docs/training-materials', function () {
-            return Inertia::render('documentation/TrainingMaterials');
-        })->name('docs.training-materials');
     });
 
     // Search (customer search used by invoice modal; homes.search kept for backward compatibility)
@@ -74,6 +66,7 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['department:admin'])->group(function () {
         // Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('general-report', [DashboardController::class, 'generalReport'])->name('general-report');
+        Route::get('general-report/export', [DashboardController::class, 'exportGeneralReport'])->name('general-report.export');
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::get('users/{user}', [UserController::class, 'show'])->name('users.show');
@@ -91,6 +84,9 @@ Route::middleware(['auth'])->group(function () {
 
         // Bills
         Route::get('bills', [BillController::class, 'index'])->name('bills');
+        Route::get('bills/unpaid', fn () => redirect()->route('bills', ['status' => 'unpaid']));
+        Route::get('bills/paid', fn () => redirect()->route('bills', ['status' => 'fully paid']));
+        Route::get('bills/forwarded', fn () => redirect()->route('bills', ['status' => 'forwarded_group']));
         Route::get('bills/printing-list', [BillController::class, 'printingList'])->name('bills.printing-list');
         Route::get('bills/bulk-print', [BillController::class, 'bulkPrint'])->name('bills.bulk-print');
         Route::get('bills/export', [BillController::class, 'export'])->name('bills.export');
@@ -143,6 +139,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('meter-readings', [MeterReadingController::class, 'store'])->name('meter-readings.store');
         Route::put('meter-readings/{id}', [MeterReadingController::class, 'update'])->name('meter-readings.update');
         Route::delete('meter-readings/{id}', [MeterReadingController::class, 'destroy'])->name('meter-readings.destroy');
+        Route::get('meter-readings/{id}/image', [MeterReadingController::class, 'image'])->name('meter-readings.image');
         Route::get('meter-readings/{id}', [MeterReadingController::class, 'show'])->name('meter-readings.show');
     });
 

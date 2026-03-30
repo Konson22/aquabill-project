@@ -1,7 +1,6 @@
 import { formatCurrency } from '@/lib/utils';
 
 export default function PrintInvoiceCard({ invoice }) {
-    // Alias invoice to bill to reuse the variable name 'bill'
     const bill = invoice;
 
     const formatDateLong = (d) =>
@@ -15,18 +14,9 @@ export default function PrintInvoiceCard({ invoice }) {
 
     const home = bill?.home;
     const customer = bill?.customer;
-    const tariff = home?.tariff || customer?.tariff || {};
-    const meterReading = bill?.meter_reading;
     const grandTotal = Number(bill?.amount || bill?.total_amount || 0);
 
-    // Calculate consumption
-    const consumption = bill?.consumption || 0;
-
-    // For bills: usage * rate. For invoices: just amount (handled in total) but maybe show breakdown if description allows.
-    // In strict bill card layout, there was VOLUM_CHARGES.
-    const VOLUM_CHARGES = consumption * (bill?.tariff || 0);
-
-    const isWaterBill = !!meterReading;
+    const serviceFeeDescription = (bill?.description || '').trim() || 'Service fee';
 
     return (
         <>
@@ -36,12 +26,15 @@ export default function PrintInvoiceCard({ invoice }) {
                         @page { margin: 0.5cm; }
                         body { margin: 0; padding: 0; }
                         .bill-print-root {
-                            height: 32vh !important; /* approx 1/3 of page */
-                            font-size: 9px !important;
+                            height: auto !important;
+                            min-height: auto;
                             page-break-inside: avoid;
-                            overflow: hidden; /* Prevent spillover */
-                            margin-bottom: 0 !important;
-                            border-bottom: 1px dashed #ccc; /* Separator for clarity if needed */
+                            font-size: 11px !important;
+                            line-height: 1.45 !important;
+                        }
+                        .bill-print-root .service-doc-heading {
+                            font-size: 13px !important;
+                            letter-spacing: 0.02em;
                         }
                         .bill-print-root:last-child {
                             border-bottom: none;
@@ -61,241 +54,166 @@ export default function PrintInvoiceCard({ invoice }) {
                     }
                 `}
             </style>
-            <div className="bill-print-root flex h-full w-full flex-col rounded-2xl border border-slate-300 bg-white p-4 text-xs leading-none text-slate-900 print:p-4 print:shadow-none">
-                {/* Header Section */}
-                <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-3">
-                    <div className="flex items-center gap-3">
+            <div className="bill-print-root flex h-full w-full flex-col rounded-sm border-2 border-slate-800 bg-white p-6 text-[11px] leading-snug text-slate-900 shadow-none print:p-8 print:shadow-none">
+                {/* Logo + letterhead */}
+                <header className="mb-6 border-b-2 border-slate-800 pb-6">
+                    <div className="mb-5 flex justify-center">
                         <img
                             src="/logo.png"
-                            alt="Logo"
-                            className="h-10 w-10 object-contain"
+                            alt=""
+                            className="h-16 w-16 object-contain print:h-16 print:w-16"
                         />
-                        <div>
-                            <p className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+                    </div>
+                    <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between sm:gap-10">
+                        <div className="mx-auto max-w-sm text-center sm:mx-0 sm:text-left">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 South Sudan Urban Water Corp.
                             </p>
-                            <p className="text-sm font-semibold text-slate-900">
+                            <p className="mt-1.5 text-base font-bold leading-tight tracking-tight text-slate-900">
                                 CES / Juba Station
                             </p>
+                            <p className="mt-2 text-[10px] leading-relaxed text-slate-600">
+                                Behind Directorate of Passports, Immigration and
+                                Passports, Juba
+                            </p>
+                            <p className="mt-2.5 text-[10px] leading-none text-slate-600">
+                                <span className="text-slate-500">Tel</span>{' '}
+                                <span className="font-semibold tabular-nums text-slate-900">
+                                    +211 929 928 736
+                                </span>
+                            </p>
                         </div>
+                       
                     </div>
-                    <div className="text-right">
-                        <span className="inline-block rounded bg-slate-100 px-2 py-1 text-[10px] font-bold tracking-wider text-slate-600 uppercase print:bg-slate-100">
-                            {isWaterBill ? 'Water Bill' : 'Invoice'}
-                        </span>
-                        <div className="mt-1 text-sm font-bold text-slate-900">
-                            #{bill?.bill_number || bill?.invoice_number}
-                        </div>
-                    </div>
-                </div>
+                </header>
 
-                {/* Main Content Grid */}
-                <div className="grid flex-1 grid-cols-12 gap-4">
-                    {/* Left Column: Customer & Location (Col-Span 5) */}
-                    <div className="col-span-5 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-                        <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                            Customer Details
+                {/* Customer + document reference */}
+                <section className="mb-6 border-b border-slate-200 pb-6">
+                    <p className="service-doc-heading mb-4 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-800">
+                        Customer
+                    </p>
+                    <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
+                        <div className="min-w-0 flex-1 space-y-2 text-[11px] text-slate-800">
+                            <p className="text-base font-bold leading-tight text-slate-900">
+                                {customer?.name || '—'}
+                            </p>
+                            {(customer?.phone || customer?.email) && (
+                                <p className="text-slate-700">
+                                    {customer?.phone && (
+                                        <span>Tel: {customer.phone}</span>
+                                    )}
+                                    {customer?.phone && customer?.email && (
+                                        <span className="text-slate-400">
+                                            {' '}
+                                            ·{' '}
+                                        </span>
+                                    )}
+                                    {customer?.email && (
+                                        <span>{customer.email}</span>
+                                    )}
+                                </p>
+                            )}
+                            <div>
+                                <span className="font-semibold text-slate-600">
+                                    Address &amp; zone:{' '}
+                                </span>
+                                <span className="whitespace-pre-wrap">
+                                    {[
+                                        (
+                                            customer?.address ||
+                                            home?.address ||
+                                            ''
+                                        ).trim(),
+                                        home?.zone?.name || customer?.zone?.name,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ') || '—'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="w-full shrink-0 text-center sm:max-w-md sm:mx-auto lg:mx-0 lg:w-[17rem] lg:border-l lg:border-slate-200 lg:pl-8 lg:text-right">
+                            <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                Official fee notice
+                            </p>
+                            <p className="mt-2 font-mono text-[13px] font-semibold leading-none text-slate-800">
+                                {bill?.invoice_number}
+                            </p>
+                            <div className="mt-4 space-y-2 text-[11px] leading-snug">
+                                <p className="text-slate-800">
+                                    <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 lg:mb-0 lg:inline lg:mr-2">
+                                        Issue
+                                    </span>
+                                    <span className="font-medium text-slate-900">
+                                        {formatDateLong(bill?.created_at)}
+                                    </span>
+                                </p>
+                                <p className="text-slate-800">
+                                    <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 lg:mb-0 lg:inline lg:mr-2">
+                                        Payment due
+                                    </span>
+                                    <span className="font-medium text-slate-900">
+                                        {formatDateLong(bill?.due_date)}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Invoice body — single card */}
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="space-y-5">
+                        <p className="border-b border-slate-100 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-700">
+                            Fee statement
                         </p>
-                        <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 print:bg-slate-50">
-                            <p className="truncate text-sm font-bold text-slate-900">
-                                {bill?.customer?.name || '—'}
-                            </p>
-                            <p className="mt-0.5 text-[10px] font-semibold text-slate-500 uppercase">
-                                {tariff?.name || bill?.type || '—'}
+                        <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                           
+                            <p className="max-w-md text-[11px] leading-relaxed text-slate-600">
+                                The following fees and charges are assessed in
+                                accordance with applicable service rules.
                             </p>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[10px]">
-                            <div>
-                                <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                                    Zone
-                                </p>
-                                <p className="font-semibold text-slate-700">
-                                    {home?.zone?.name ||
-                                        customer?.zone?.name ||
-                                        '—'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                                    Area
-                                </p>
-                                <p className="font-semibold text-slate-700">
-                                    {home?.address ||
-                                        home?.area?.name ||
-                                        customer?.address ||
-                                        customer?.area?.name ||
-                                        '—'}
-                                </p>
-                            </div>
-                        </div>
-                        {isWaterBill && (
-                            <div>
-                                <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                                    Meter No.
-                                </p>
-                                <p className="font-mono text-[10px] font-semibold text-slate-700">
-                                    {meterReading?.meter?.meter_number || '—'}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Billing + Charges (Col-Span 7) */}
-                    <div className="col-span-7 space-y-4 rounded-xl border border-slate-200 bg-white p-3">
                         <div>
-                            <p className="mb-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                                Billing Date
+                            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-800">
+                                Charge detail
                             </p>
-                            <p className="text-[10px] font-semibold text-slate-700">
-                                {formatDateLong(
-                                    bill?.billing_period_end ||
-                                        bill?.due_date ||
-                                        bill?.created_at,
-                                )}
-                            </p>
-                        </div>
-
-                        {isWaterBill ? (
-                            <>
-                                <div>
-                                    <p className="mb-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                                        Readings
+                            <div className="overflow-hidden rounded-lg border border-slate-300">
+                                <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-slate-200 bg-slate-100 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-800 print:bg-slate-100">
+                                    <span>Description</span>
+                                    <span className="text-right">Amount</span>
+                                </div>
+                                <div className="grid grid-cols-[1fr_auto] gap-4 bg-white px-4 py-4 text-[11px]">
+                                    <p className="whitespace-pre-wrap leading-relaxed text-slate-800">
+                                        {serviceFeeDescription}
                                     </p>
-                                    <div className="grid grid-cols-2 gap-3 text-[10px]">
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-500">
-                                                Prev
-                                            </span>
-                                            <span className="font-mono text-slate-700">
-                                                {meterReading?.previous_reading ??
-                                                    0}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-500">
-                                                Curr
-                                            </span>
-                                            <span className="font-mono text-slate-700">
-                                                {meterReading?.current_reading ??
-                                                    0}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    <span className="self-start font-mono text-sm font-semibold text-slate-900">
+                                        {formatCurrency(grandTotal)}
+                                    </span>
                                 </div>
-                                <div className="border-t border-slate-200 pt-2">
-                                    <div className="flex items-baseline justify-between">
-                                        <span className="text-[9px] font-semibold text-slate-500 uppercase">
-                                            Consumption
-                                        </span>
-                                        <span className="text-sm font-bold text-slate-900 print:text-black">
-                                            {consumption} m³
-                                        </span>
-                                    </div>
-                                </div>
-                            </>
-                        ) : (
-                            <div>
-                                <p className="mb-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                                    Description
-                                </p>
-                                <p className="text-[10px] text-slate-600 italic">
-                                    {bill?.description || 'N/A'}
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="border-t border-slate-200 pt-2">
-                            <p className="mb-1 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                                Charges Breakdown
-                            </p>
-                            <div className="space-y-1">
-                                {isWaterBill ? (
-                                    <>
-                                        <div className="flex justify-between text-[10px]">
-                                            <span className="text-slate-600">
-                                                Arrears
-                                            </span>
-                                            <span className="font-mono text-slate-700">
-                                                {formatCurrency(
-                                                    bill?.previous_balance || 0,
-                                                )}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-[10px]">
-                                            <span className="text-slate-600">
-                                                Fixed Chg
-                                            </span>
-                                            <span className="font-mono text-slate-700">
-                                                {formatCurrency(
-                                                    bill?.fix_charges || 0,
-                                                )}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-[10px]">
-                                            <span className="text-slate-600">
-                                                Tariff
-                                            </span>
-                                            <span className="font-mono text-slate-700">
-                                                {formatCurrency(
-                                                    bill?.tariff || 0,
-                                                )}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between border-t border-dashed border-slate-200 pt-1 text-[10px]">
-                                            <span className="font-semibold text-slate-800">
-                                                Vol. Charge
-                                            </span>
-                                            <span className="font-mono font-semibold text-slate-800">
-                                                {formatCurrency(
-                                                    VOLUM_CHARGES || 0,
-                                                )}
-                                            </span>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="flex justify-between text-[10px]">
-                                        <span className="text-slate-600">
-                                            Base Amount
-                                        </span>
-                                        <span className="font-mono text-slate-700">
-                                            {formatCurrency(grandTotal)}
-                                        </span>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Footer Section */}
-                <div className="mt-4 rounded-xl border border-slate-300 bg-white px-4 py-3">
-                    <div className="flex items-end justify-between">
-                        <div className="text-[9px] text-slate-500">
-                            <div className="mb-1 flex gap-4">
-                                <span>
-                                    Billed By:{' '}
-                                    <strong className="text-slate-700">
-                                        {bill?.meterReading?.reader?.name ||
-                                            'System'}
-                                    </strong>
-                                </span>
-                                <span>
-                                    {' '}
-                                    Helpline: <strong>+211 929 928 736</strong>
-                                </span>
-                            </div>
-                            <p className="italic">
-                                Please pay within 7 days to avoid disconnection.
-                            </p>
+                {/* Footer */}
+                <div className="mt-10 border-t-2 border-slate-800 bg-white px-0 py-6">
+                    <div className="text-[9px] text-slate-500">
+                        <div className="mb-1 flex flex-wrap gap-x-4 gap-y-1">
+                            <span>
+                                Prepared by:{' '}
+                                <strong className="text-slate-700">
+                                    SSUWC Finance
+                                </strong>
+                            </span>
+                            <span>
+                                Helpline:{' '}
+                                <strong>+211 929 928 736</strong>
+                            </span>
                         </div>
-                        <div className="text-right">
-                            <p className="mb-0.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-                                Total Payable
-                            </p>
-                            <p className="text-2xl leading-none font-black text-slate-900">
-                                {formatCurrency(grandTotal)}
-                            </p>
-                        </div>
+                        <p className="italic">
+                            {`Payment is due by ${formatDateLong(bill?.due_date)}. Thank you for your cooperation.`}
+                        </p>
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-6 text-[9px] tracking-wide text-slate-400 uppercase">
                         <div>

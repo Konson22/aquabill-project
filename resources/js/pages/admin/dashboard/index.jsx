@@ -1,7 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Link } from '@inertiajs/react';
 import { Activity, Banknote, BarChart3, ChevronRight } from 'lucide-react';
-import ConnectionSection from './sections/connection';
 import FinanceSection from './sections/finance';
 import Operation from './sections/operation';
 
@@ -87,12 +86,6 @@ export default function Dashboard({
                         bgClass="bg-amber-600"
                     />
                 </div>
-                <ConnectionSection
-                    totalCustomers={stats?.homes?.total ?? 0}
-                    tariffCount={stats?.activeTariffsCount ?? 0}
-                    zonesCount={stats?.zonesCount ?? 0}
-                    areasCount={stats?.areasCount ?? 0}
-                />
                 <FinanceSection
                     stats={stats.bills}
                     performance={stats.billingPerformance}

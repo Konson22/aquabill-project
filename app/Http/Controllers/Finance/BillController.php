@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Finance\Concerns\RendersFinanceOrAdminInertia;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -19,35 +20,56 @@ class BillController extends Controller
         }
     }
 
+    private function applyBillsSearch(Builder $query, Request $request): void
+    {
+        if (! $request->has('search')) {
+            return;
+        }
+
+        $search = $request->input('search');
+        $query->where(function ($q) use ($search) {
+            $q->where('bill_number', 'like', "%{$search}%")
+                ->orWhereHas('customer', function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%");
+                })
+                ->orWhereHas('customer', function ($q) use ($search) {
+                    $q->where('address', 'like', "%{$search}%")
+                        ->orWhereHas('zone', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('meter', function ($q) use ($search) {
+                            $q->where('meter_number', 'like', "%{$search}%");
+                        });
+                });
+        });
+    }
+
     public function index(Request $request)
     {
+        $isFinance = auth()->user()?->department === 'finance';
+
         $query = \App\Models\Bill::with(['customer.zone', 'customer.meter', 'meterReading.meter'])
             ->withSum('payments', 'amount');
 
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('bill_number', 'like', "%{$search}%")
-                    ->orWhereHas('customer', function ($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('customer', function ($q) use ($search) {
-                        $q->where('address', 'like', "%{$search}%")
-                            ->orWhereHas('zone', function ($q) use ($search) {
-                                $q->where('name', 'like', "%{$search}%");
-                            })
-                            ->orWhereHas('meter', function ($q) use ($search) {
-                                $q->where('meter_number', 'like', "%{$search}%");
-                            });
-                    });
-            });
-        }
+        $this->applyBillsSearch($query, $request);
 
         if ($request->filled('status') && $request->status !== 'all') {
-            if ($request->status === 'fully paid') {
-                $query->fullyPaid();
-            } elseif (in_array($request->status, ['pending', 'partial paid'])) {
-                $query->unpaid();
+            $status = $request->status;
+            if ($status === 'unpaid') {
+                $query->whereIn('status', ['pending', 'partial paid']);
+            } elseif ($status === 'forwarded_group') {
+                $query->whereIn('status', ['forwarded', 'balance forwarded']);
+            } else {
+                $allowedStatuses = [
+                    'pending',
+                    'partial paid',
+                    'fully paid',
+                    'forwarded',
+                    'balance forwarded',
+                ];
+                if (in_array($status, $allowedStatuses, true)) {
+                    $query->where('status', $status);
+                }
             }
         }
 
@@ -64,7 +86,7 @@ class BillController extends Controller
         return $this->renderFinanceOrAdmin('bills/index', [
             'bills' => $bills,
             'filters' => $request->only(['search', 'status', 'month', 'tariff_id']),
-            'tariffs' => \App\Models\Tariff::orderBy('name')->get(['id', 'name']),
+            'tariffs' => $isFinance ? [] : \App\Models\Tariff::orderBy('name')->get(['id', 'name']),
         ]);
     }
 

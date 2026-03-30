@@ -4,15 +4,21 @@ import { useEffect } from 'react';
 
 export default function PrintSingleInvoice({ invoice }) {
     useEffect(() => {
-        // Auto-print when component loads
         window.print();
     }, []);
 
+    const title =
+        invoice?.invoice_number != null
+            ? `Service fee & charges — ${invoice.invoice_number}`
+            : 'Service fee & charges';
+
     return (
         <>
-            <Head title={`Print Invoice #${invoice?.id || ''}`} />
-            <div className="min-h-screen bg-gray-100 p-4">
-                <PrintInvoiceCard invoice={invoice} />
+            <Head title={title} />
+            <div className="min-h-screen bg-stone-200/90 p-6 print:bg-white print:p-0">
+                <div className="mx-auto max-w-3xl print:max-w-none">
+                    <PrintInvoiceCard invoice={invoice} />
+                </div>
             </div>
         </>
     );

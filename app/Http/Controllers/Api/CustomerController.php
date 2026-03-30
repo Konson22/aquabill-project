@@ -18,13 +18,16 @@ class CustomerController extends Controller
             $user = $request->user();
 
             $query = Customer::query()
-                ->has('meter')
                 ->with([
                     'meter',
                     'zone',
                     'area',
                     'tariff',
                     'latestReading',
+                    'latestBill' => function ($q) {
+                        $q->withSum('payments', 'amount')
+                            ->with('latestPayment');
+                    },
                 ]);
 
             // If user has a zone assigned, only fetch customers in that zone; otherwise fetch all.
@@ -56,6 +59,7 @@ class CustomerController extends Controller
                             'current_reading' => $customer->latestReading?->current_reading ?? 0,
                             'reading_date' => $customer->latestReading?->reading_date ?? 'N/A',
                         ],
+                        'previous_balance' => $this->previousBalanceFromLatestBill($customer),
                     ];
                 });
         } catch (\Throwable $e) {
@@ -69,5 +73,23 @@ class CustomerController extends Controller
         }
 
         return response()->json($customers);
+    }
+
+    /**
+     * Prefer balance_after on the latest payment for the latest bill; otherwise bill balance.
+     */
+    private function previousBalanceFromLatestBill(Customer $customer): float
+    {
+        $bill = $customer->latestBill;
+        if (! $bill) {
+            return 0;
+        }
+
+        $payment = $bill->latestPayment;
+        if ($payment?->balance_after !== null) {
+            return round((float) $payment->balance_after, 2);
+        }
+
+        return round((float) $bill->balance, 2);
     }
 }

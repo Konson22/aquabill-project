@@ -64,6 +64,11 @@ class Customer extends Model
         return $this->hasMany(Bill::class);
     }
 
+    public function latestBill()
+    {
+        return $this->hasOne(Bill::class)->latestOfMany();
+    }
+
     public function invoices()
     {
         return $this->hasMany(Invoice::class);
