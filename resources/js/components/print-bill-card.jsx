@@ -12,6 +12,11 @@ export default function PrintBillCard({ bill }) {
             : '';
 
     const customer = bill?.customer;
+    const customerDisplayName = (() => {
+        const raw = customer?.name?.trim();
+        if (!raw) return '—';
+        return raw.split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
+    })();
     const tariff = customer?.tariff || bill?.home?.tariff || {};
     const meterReading = bill?.meter_reading;
     // Calculate consumption
@@ -24,10 +29,32 @@ export default function PrintBillCard({ bill }) {
         <>
             <style>
                 {`
+                    .bill-print-root {
+                        position: relative;
+                    }
+                    .bill-print-root::before {
+                        content: '';
+                        position: absolute;
+                        inset: 0;
+                        z-index: 0;
+                        background: url(/logo.png) no-repeat center / min(55%, 220px)
+                            auto;
+                        opacity: 0.07;
+                        pointer-events: none;
+                        print-color-adjust: exact;
+                        -webkit-print-color-adjust: exact;
+                    }
+                    .bill-print-root > * {
+                        position: relative;
+                        z-index: 1;
+                    }
                     @media print {
                         .bill-print-root {
                             background-color: #eee !important;
                             font-size: 11px !important;
+                        }
+                        .bill-print-root::before {
+                            opacity: 0.09;
                         }
                         .bill-print-root .bill-print-heading {
                             font-size: 15px !important;
@@ -79,11 +106,11 @@ export default function PrintBillCard({ bill }) {
                 <div className="mt-4 flex space-x-6">
                     <div className="flex-1 space-y-1.5 text-xs">
                         <PrintLabelValue
-                            label="Name"
-                            value={bill?.customer?.name || '—'}
+                            label="Cus Name"
+                            value={customerDisplayName}
                         />
                         <PrintLabelValue
-                            label="Type"
+                            label="Tariff"
                             value={tariff?.name || '—'}
                         />
                         <PrintLabelValue
@@ -108,11 +135,11 @@ export default function PrintBillCard({ bill }) {
                             value={meterReading?.meter?.meter_number || '—'}
                         />
                         <PrintLabelValue
-                            label="Previous"
+                            label="Previous Reading"
                             value={meterReading?.previous_reading ?? 0}
                         />
                         <PrintLabelValue
-                            label="Current"
+                            label="Current Reading"
                             value={meterReading?.current_reading ?? 0}
                         />
                         <PrintLabelValue
@@ -122,11 +149,11 @@ export default function PrintBillCard({ bill }) {
                     </div>
                     <div className="flex-1 space-y-1.5 text-xs">
                         <PrintLabelValue
-                            label="Outstanding"
+                            label="Outstanding Balance"
                             value={formatCurrency(bill?.previous_balance || 0)}
                         />
                         <PrintLabelValue
-                            label="Fixed"
+                            label="Fixed Charges"
                             value={formatCurrency(bill?.fix_charges || 0)}
                         />
                         <PrintLabelValue
@@ -143,16 +170,10 @@ export default function PrintBillCard({ bill }) {
                             className="border-t border-slate-200 pt-1.5"
                             valueClassName="normal-case text-slate-900"
                         />
-                        {/* <PrintLabelValue
-                            label="Total Due"
-                            value={formatCurrency(amountDue)}
-                            className="border-t border-slate-200 pt-1.5"
-                            valueClassName="normal-case text-slate-900"
-                        /> */}
                     </div>
                 </div>
 
-                <div className="flex items-start justify-between gap-4 pt-4 text-xs print:text-xs">
+                <div className="flex items-end justify-between gap-4 pt-4 text-xs print:text-xs">
                     <div>
                         <div className="mt-10 text-xs font-semibold text-slate-700">
                             {bill?.meterReading?.reader?.name || 'System'}
