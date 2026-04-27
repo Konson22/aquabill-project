@@ -1,22 +1,13 @@
-import {
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
-import { logout } from '@/routes';
-import { Link, router } from '@inertiajs/react';
-import { BookOpen, LogOut, Settings, User } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import { LogOut, Settings } from 'lucide-react';
+
+
 
 export function UserMenuContent({ user }) {
     const cleanup = useMobileNavigation();
-
-    const handleLogout = () => {
-        cleanup();
-        router.flushAll();
-    };
 
     return (
         <>
@@ -28,51 +19,15 @@ export function UserMenuContent({ user }) {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
                 <DropdownMenuItem asChild>
-                    <Link
-                        className="block w-full"
-                        href={route('profile.edit')}
-                        as="button"
-                        prefetch
-                        onClick={cleanup}
-                    >
-                        <User className="mr-2" />
-                        Profile
-                    </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                    <Link
-                        className="block w-full"
-                        href={route('settings.index')}
-                        as="button"
-                        prefetch
-                        onClick={cleanup}
-                    >
+                    <Link className="block w-full" href={route('profile.edit')} as="button" prefetch onClick={cleanup}>
                         <Settings className="mr-2" />
                         Settings
-                    </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                    <Link
-                        className="block w-full"
-                        href={route('docs.index')}
-                        as="button"
-                        prefetch
-                        onClick={cleanup}
-                    >
-                        <BookOpen className="mr-2" />
-                        Documentation
                     </Link>
                 </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-                <Link
-                    className="block w-full"
-                    href={logout()}
-                    as="button"
-                    onClick={handleLogout}
-                    data-test="logout-button"
-                >
+                <Link className="block w-full" method="post" href={route('logout')} as="button" onClick={cleanup}>
                     <LogOut className="mr-2" />
                     Log out
                 </Link>

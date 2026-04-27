@@ -2,42 +2,48 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TariffHistory extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'tariff_id',
         'name',
-        'price',
+        'price_per_unit',
         'fixed_charge',
         'description',
-        'effective_from',
-        'effective_to',
         'created_by',
     ];
 
+    /**
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
-            'price' => 'decimal:2',
+            'price_per_unit' => 'decimal:2',
             'fixed_charge' => 'decimal:2',
-            'effective_from' => 'date',
-            'effective_to' => 'date',
         ];
     }
 
-    public function tariff()
+    /**
+     * Get the tariff this history belongs to.
+     *
+     * @return BelongsTo<Tariff, TariffHistory>
+     */
+    public function tariff(): BelongsTo
     {
         return $this->belongsTo(Tariff::class);
     }
 
-    public function creator()
+    /**
+     * Get the user who created this history row.
+     *
+     * @return BelongsTo<User, TariffHistory>
+     */
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 }
-

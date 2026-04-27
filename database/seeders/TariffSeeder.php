@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Tariff;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class TariffSeeder extends Seeder
@@ -13,19 +12,12 @@ class TariffSeeder extends Seeder
      */
     public function run(): void
     {
-        // Tariffs mapped to customer types: DOMESTIC only
-        $tariffs = [
+        Tariff::updateOrCreate(
+            ['name' => 'DOMESTIC'],
             [
-                'name' => 'DOMESTIC',
-                'price' => 4000,
-                'fixed_charge' => 2500,
-                'description' => 'Domestic residential water tariff',
+                'price_per_unit' => 50.00,
+                'fixed_charge' => 0.00,
             ],
-        ];
-
-        foreach ($tariffs as $tariff) {
-            Tariff::create($tariff);
-        }
+        );
     }
 }
-

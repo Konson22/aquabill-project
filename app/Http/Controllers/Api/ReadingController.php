@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Bill;
 use App\Models\Customer;
 use App\Models\Meter;
 use App\Models\MeterReading;
-use Carbon\Carbon;
+use App\Services\BillService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +15,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ReadingController extends Controller
 {
-
-    public function store(Request $request)
+    public function store(Request $request, BillService $billService)
     {
         $input = $request->has('readings') ? $request->input('readings') : $request->all();
 
@@ -36,7 +34,7 @@ class ReadingController extends Controller
             try {
                 // Mobile app sends home_id (same as customer_id per API contract)
                 $normalized = $itemData;
-                if (isset($normalized['home_id']) && !isset($normalized['customer_id'])) {
+                if (isset($normalized['home_id']) && ! isset($normalized['customer_id'])) {
                     $normalized['customer_id'] = $normalized['home_id'];
                 }
 
@@ -51,26 +49,27 @@ class ReadingController extends Controller
                 ])->validate();
 
                 // Resolve meter and customer (match MeterReadingController: meter with customer.tariff)
-                if (!empty($validated['meter_id'])) {
+                if (! empty($validated['meter_id'])) {
                     $meter = Meter::with('customer.tariff')->findOrFail($validated['meter_id']);
                     $customer = $meter->customer;
                 } else {
-                    $customer = Customer::with(['meter', 'tariff'])->findOrFail($validated['customer_id']);
-                    $meter = $customer->meter;
+                    $customer = Customer::with(['meters', 'tariff'])->findOrFail($validated['customer_id']);
+                    $meter = $customer->meters->first();
                 }
 
-                if (!$customer) {
+                if (! $customer) {
                     $errors[] = ['index' => $index, 'message' => "Reading #{$index}: Meter must be associated with a customer."];
+
                     continue;
                 }
-                if (!$meter) {
+                if (! $meter) {
                     $errors[] = ['index' => $index, 'message' => "Reading #{$index}: No meter found for customer {$validated['customer_id']}."];
+
                     continue;
                 }
 
                 // Fetch the latest reading from database to validate against
                 $dbLastReading = MeterReading::where('meter_id', $meter->id)
-                    ->where('customer_id', $customer->id)
                     ->orderBy('reading_date', 'desc')
                     ->orderBy('id', 'desc')
                     ->first();
@@ -80,22 +79,15 @@ class ReadingController extends Controller
                         'index' => $index,
                         'message' => "Current reading ({$validated['current_reading']}) must be greater than the last recorded reading ({$dbLastReading->current_reading}).",
                     ];
+
                     continue;
                 }
-
-                // Get previous reading if not provided
-                if (!isset($validated['previous_reading']) || $validated['previous_reading'] === null) {
-                    $validated['previous_reading'] = $dbLastReading ? $dbLastReading->current_reading : 0;
-                }
-
-                // Calculate consumption units
-                $consumption = max(0, $validated['current_reading'] - $validated['previous_reading']);
 
                 // Handle image upload (API: base64 or file)
                 $imagePath = null;
 
                 // Case 1: Base64 Image
-                if (!empty($itemData['image']) &&
+                if (! empty($itemData['image']) &&
                     is_string($itemData['image']) &&
                     str_starts_with($itemData['image'], 'data:image')
                 ) {
@@ -110,99 +102,62 @@ class ReadingController extends Controller
                         $image = preg_replace("/^data:image\/(.*?);base64,/", '', $imageData);
                         $image = str_replace(' ', '+', $image);
 
-                        $imageName = 'reading_' . time() . '_' . $index . '.' . $extension;
+                        $imageName = 'reading_'.time().'_'.$index.'.'.$extension;
 
                         // Store in storage/app/public/readings
                         Storage::disk('public')->put(
-                            'readings/' . $imageName,
+                            'readings/'.$imageName,
                             base64_decode($image)
                         );
 
-                        $imagePath = 'readings/' . $imageName;
+                        $imagePath = 'readings/'.$imageName;
 
                     } catch (\Exception $e) {
-                        Log::error('Base64 image upload failed: ' . $e->getMessage());
+                        Log::error('Base64 image upload failed: '.$e->getMessage());
                     }
 
-                // Case 2: Nested file upload (readings[index][image])
+                    // Case 2: Nested file upload (readings[index][image])
                 } elseif ($request->hasFile("readings.{$index}.image")) {
 
                     $imagePath = $request
                         ->file("readings.{$index}.image")
                         ->store('readings', 'public');
 
-                // Case 3: Single file upload
-                } elseif ($request->hasFile("image") && count($items) === 1) {
+                    // Case 3: Single file upload
+                } elseif ($request->hasFile('image') && count($items) === 1) {
 
                     $imagePath = $request
-                        ->file("image")
+                        ->file('image')
                         ->store('readings', 'public');
                 }
 
-                DB::beginTransaction();
+                $bill = DB::transaction(function () use ($validated, $meter, $imagePath, $billService) {
+                    $reading = MeterReading::create([
+                        'meter_id' => $meter->id,
+                        'reading_date' => $validated['reading_date'],
+                        'current_reading' => $validated['current_reading'],
+                        'previous_reading' => $validated['previous_reading'] ?? null,
+                        'recorded_by' => Auth::id(),
+                        'image' => $imagePath,
+                        'notes' => $validated['notes'] ?? null,
+                    ]);
 
-                // Create the reading
-                $reading = MeterReading::create([
-                    'meter_id' => $meter->id,
-                    'customer_id' => $customer->id,
-                    'reading_date' => $validated['reading_date'],
-                    'current_reading' => $validated['current_reading'],
-                    'previous_reading' => $validated['previous_reading'],
-                    'read_by' => Auth::id(),
-                    'status' => 'billed',
-                    'image' => $imagePath,
-                    'notes' => $validated['notes'] ?? null,
-                ]);
+                    // Generate bill + forwarding logic (kept in BillService for consistency)
+                    $bill = $billService->generateForMeter($reading->meter_id);
 
-                // Billing logic
-                $tariff = $customer->tariff;
-                $tariffRate = $tariff ? $tariff->price : 0;
-                $fixedCharge = $tariff ? $tariff->fixed_charge : 0;
-                $consumptionAmount = $consumption * $tariffRate;
-                // Previous balance from last bill and update its status if still pending
-                $lastBill = Bill::where('customer_id', $customer->id)
-                    ->orderByDesc('id')
-                    ->first();
+                    return [$reading, $bill];
+                });
 
-                $previousBalance = 0;
-                if ($lastBill) {
-                    if ($lastBill->status === 'pending') {
-                        $lastBill->update(['status' => 'forwarded']);
-                    }
-                    $previousBalance = (float) $lastBill->balance;
-                }
+                [$reading, $createdBill] = $bill;
 
-                // Generate unique bill number
-                $billCount = Bill::count();
-                $billNumber = 'BILL-' . str_pad($billCount + 1, 8, '0', STR_PAD_LEFT);
-
-                // Calculate billing period and due date
-                $readingDate = Carbon::parse($validated['reading_date']);
-
-                // Create the bill (amount computed on model from water_consumption_volume * tariff + fix_charges)
-                $bill = Bill::create([
-                    'bill_number' => $billNumber,
-                    'meter_reading_id' => $reading->id,
-                    'customer_id' => $customer->id,
-                    'billing_period_start' => $readingDate->copy()->startOfMonth(),
-                    'billing_period_end' => $readingDate->copy()->endOfMonth(),
-                    'tariff' => $tariffRate,
-                    'fix_charges' => $fixedCharge,
-                    'water_consumption_volume' => $consumption,
-                    'previous_balance' => $previousBalance,
-                    'due_date' => $readingDate->copy()->addDays(14),
-                ]);
-
-                DB::commit();
                 $results[] = [
                     'customer_id' => $customer->id,
                     'reading_id' => $reading->id,
-                    'bill_number' => $bill->bill_number,
-                    'total' => $bill->total_amount,
+                    'bill_number' => $createdBill ? 'BILL-'.$createdBill->id : null,
+                    'total' => $createdBill?->total_amount ?? 0,
                     'index' => $index,
                 ];
             } catch (\Exception $e) {
-                DB::rollBack();
                 Log::error("Failed to process reading at index {$index}", [
                     'error' => $e->getMessage(),
                     'item_data' => $itemData,
@@ -215,11 +170,11 @@ class ReadingController extends Controller
         }
 
         return response()->json([
-            'message' => count($results) . ' readings processed.',
+            'message' => count($results).' readings processed.',
             'success_count' => count($results),
             'error_count' => count($errors),
             'results' => $results,
-            'errors' => $errors
+            'errors' => $errors,
         ], (count($errors) > 0 && count($results) === 0) ? 422 : 201);
     }
 }

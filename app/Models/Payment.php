@@ -2,20 +2,20 @@
 
 namespace App\Models;
 
+use Database\Factories\PaymentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
+    /** @use HasFactory<PaymentFactory> */
     use HasFactory;
 
     protected $fillable = [
-        'payable_type',
-        'payable_id',
+        'customer_id',
+        'bill_id',
         'amount',
-        'payable_total',
-        'amount_paid',
-        'balance_after',
         'payment_date',
         'payment_method',
         'reference_number',
@@ -23,29 +23,37 @@ class Payment extends Model
         'notes',
     ];
 
-    protected function casts(): array
+    protected $casts = [
+        'payment_date' => 'date',
+        'amount' => 'decimal:2',
+    ];
+
+    /**
+     * Get the customer who made the payment.
+     *
+     * @return BelongsTo<Customer, Payment>
+     */
+    public function customer(): BelongsTo
     {
-        return [
-            'payment_date' => 'date',
-            'amount' => 'decimal:2',
-            'payable_total' => 'decimal:2',
-            'amount_paid' => 'decimal:2',
-            'balance_after' => 'decimal:2',
-        ];
+        return $this->belongsTo(Customer::class);
     }
 
     /**
-     * Get the parent payable model (Bill or Invoice).
+     * Get the bill the payment was applied to.
+     *
+     * @return BelongsTo<Bill, Payment>
      */
-    public function payable()
+    public function bill(): BelongsTo
     {
-        return $this->morphTo();
+        return $this->belongsTo(Bill::class);
     }
 
     /**
-     * Get the user who received this payment.
+     * Get the user who received the payment.
+     *
+     * @return BelongsTo<User, Payment>
      */
-    public function receivedBy()
+    public function receiver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'received_by');
     }

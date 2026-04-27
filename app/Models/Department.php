@@ -7,20 +7,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Department extends Model
 {
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
+        'description',
     ];
 
-    /**
-     * Users in this department.
-     */
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function roles(): HasMany
+    {
+        return $this->hasMany(Role::class);
     }
 }

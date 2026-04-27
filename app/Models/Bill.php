@@ -2,160 +2,96 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Builder;
+use Database\Factories\BillFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Bill extends Model
 {
+    /** @use HasFactory<BillFactory> */
     use HasFactory;
 
     protected $fillable = [
-        'bill_number',
-        'meter_reading_id',
         'customer_id',
-        'billing_period_start',
-        'billing_period_end',
-        'tariff',
-        'fix_charges',
-        'water_consumption_volume',
+        'meter_id',
+        'reading_id',
+        'consumption',
+        'unit_price',
+        'fixed_charge',
+        'current_charge',
         'previous_balance',
-        'due_date',
+        'total_amount',
         'status',
+        'due_date',
     ];
 
     /**
-     * Accessors to include when serializing (e.g. to JSON for Inertia).
+     * The attributes that should be cast.
      *
-     * @var array<int, string>
+     * @return array<string, string>
      */
-    protected $appends = [
-        'amount',
-        'total_amount',
-        'amount_paid',
-        'current_balance',
-    ];
-
     protected function casts(): array
     {
         return [
-            'billing_period_start' => 'date',
-            'billing_period_end' => 'date',
             'due_date' => 'date',
-            'tariff' => 'decimal:2',
-            'fix_charges' => 'decimal:2',
-            'water_consumption_volume' => 'decimal:2',
+            'consumption' => 'decimal:2',
+            'unit_price' => 'decimal:2',
+            'fixed_charge' => 'decimal:2',
+            'current_charge' => 'decimal:2',
             'previous_balance' => 'decimal:2',
+            'total_amount' => 'decimal:2',
         ];
     }
 
     /**
-     * Get current period amount (water_consumption_volume * tariff + fix_charges).
+     * Get the customer that owns the bill.
+     *
+     * @return BelongsTo<Customer, Bill>
      */
-    public function getAmountAttribute(): float
-    {
-        return (float) $this->water_consumption_volume * (float) $this->tariff + (float) $this->fix_charges;
-    }
-
-    /**
-     * Get total amount (amount + previous_balance).
-     */
-    public function getTotalAmountAttribute(): float
-    {
-        return (float) $this->amount + (float) $this->previous_balance;
-    }
-
-    /** @var float|null Cached amount paid to avoid duplicate queries when multiple accessors need it. */
-    protected $amountPaidResolved;
-
-    /**
-     * Get total amount paid from payments.
-     */
-    public function getAmountPaidAttribute(): float
-    {
-        if ($this->amountPaidResolved === null) {
-            $this->amountPaidResolved = (float) ($this->payments_sum_amount ?? $this->payments()->sum('amount'));
-        }
-
-        return $this->amountPaidResolved;
-    }
-
-    /**
-     * Get balance (total_amount - amount_paid).
-     */
-    public function getBalanceAttribute(): float
-    {
-        return $this->total_amount - $this->amount_paid;
-    }
-
-    /**
-     * Alias for balance (for frontend compatibility).
-     */
-    public function getCurrentBalanceAttribute(): float
-    {
-        return $this->balance;
-    }
-
-    /**
-     * Get balance after (same as balance for compatibility).
-     */
-    public function getBalanceAfterAttribute(): float
-    {
-        return $this->balance;
-    }
-
-    /**
-     * Scope: bills that are fully paid (balance <= 0).
-     */
-    public function scopeFullyPaid(Builder $q): Builder
-    {
-        return $q->whereRaw(
-            '(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance) <= COALESCE((SELECT SUM(amount) FROM payments WHERE payable_type = ? AND payable_id = bills.id), 0)',
-            [self::class]
-        );
-    }
-
-    /**
-     * Scope: bills with outstanding balance (pending or partial paid).
-     */
-    public function scopeUnpaid(Builder $q): Builder
-    {
-        return $q->whereRaw(
-            '(bills.water_consumption_volume * bills.tariff + bills.fix_charges + bills.previous_balance) > COALESCE((SELECT SUM(amount) FROM payments WHERE payable_type = ? AND payable_id = bills.id), 0)',
-            [self::class]
-        );
-    }
-
-    public function meterReading()
-    {
-        return $this->belongsTo(MeterReading::class);
-    }
-
-    public function customer()
+    public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
     }
 
     /**
-     * Get all payments for this bill.
+     * Get the meter associated with the bill.
+     *
+     * @return BelongsTo<Meter, Bill>
      */
-    public function payments()
+    public function meter(): BelongsTo
     {
-        return $this->morphMany(Payment::class, 'payable');
+        return $this->belongsTo(Meter::class);
     }
 
     /**
-     * Most recent payment on this bill (by id).
+     * Get the reading associated with the bill.
+     *
+     * @return BelongsTo<MeterReading, Bill>
      */
-    public function latestPayment()
+    public function reading(): BelongsTo
     {
-        return $this->morphOne(Payment::class, 'payable')->latestOfMany();
+        return $this->belongsTo(MeterReading::class, 'reading_id');
     }
 
-    protected static function booted(): void
+    /**
+     * Payments applied to this bill.
+     *
+     * @return HasMany<Payment, Bill>
+     */
+    public function payments(): HasMany
     {
-        static::deleting(function (Bill $bill) {
-            $bill->payments()->delete();
-        });
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Get the service charges associated with this bill.
+     *
+     * @return HasMany<ServiceCharge, Bill>
+     */
+    public function serviceCharges(): HasMany
+    {
+        return $this->hasMany(ServiceCharge::class);
     }
 }

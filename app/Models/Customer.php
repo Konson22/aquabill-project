@@ -2,90 +2,111 @@
 
 namespace App\Models;
 
+use Database\Factories\CustomerFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Customer extends Model
 {
+    /** @use HasFactory<CustomerFactory> */
     use HasFactory;
 
     protected $fillable = [
+        'account_number',
+        'customer_type',
         'name',
         'phone',
         'email',
-        'zone_id',
-        'area_id',
-        'tariff_id',
+        'national_id',
         'address',
-        'plot_number',
-        'property_type',
-        'contract_date',
-        'meter_install_date',
-        'supply_status',
-        'meter_disconnect_date',
+        'zone_id',
+        'tariff_id',
+        'connection_date',
+        'status',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
-            'contract_date' => 'date',
-            'meter_install_date' => 'date',
-            'meter_disconnect_date' => 'date',
+            'connection_date' => 'date',
         ];
     }
 
-    public function zone()
+    protected static function booted(): void
+    {
+        static::creating(function (Customer $customer) {
+            if (empty($customer->account_number)) {
+                $latestCustomer = static::orderBy('id', 'desc')->first();
+                $nextId = $latestCustomer ? $latestCustomer->id + 1 : 1;
+                $customer->account_number = 'WTR-'.str_pad((string) $nextId, 6, '0', STR_PAD_LEFT);
+            }
+        });
+    }
+
+    /**
+     * Get the zone that the customer belongs to.
+     *
+     * @return BelongsTo<Zone, Customer>
+     */
+    public function zone(): BelongsTo
     {
         return $this->belongsTo(Zone::class);
     }
 
-    public function area()
-    {
-        return $this->belongsTo(Area::class);
-    }
-
-    public function tariff()
+    /**
+     * Get the tariff that the customer belongs to.
+     *
+     * @return BelongsTo<Tariff, Customer>
+     */
+    public function tariff(): BelongsTo
     {
         return $this->belongsTo(Tariff::class);
     }
 
-    public function meter()
-    {
-        return $this->hasOne(Meter::class)->latestOfMany();
-    }
-
-    public function meters()
+    /**
+     * Get the meters for the customer.
+     *
+     * @return HasMany<Meter, Customer>
+     */
+    public function meters(): HasMany
     {
         return $this->hasMany(Meter::class);
     }
 
-    public function bills()
+    /**
+     * Get the bills for the customer.
+     *
+     * @return HasMany<Bill, Customer>
+     */
+    public function bills(): HasMany
     {
         return $this->hasMany(Bill::class);
     }
 
-    public function latestBill()
+    /**
+     * Get the payments for the customer.
+     *
+     * @return HasMany<Payment, Customer>
+     */
+    public function payments(): HasMany
     {
-        return $this->hasOne(Bill::class)->latestOfMany();
+        return $this->hasMany(Payment::class);
     }
 
-    public function invoices()
+    /**
+     * Get the service charges for the customer.
+     *
+     * @return HasMany<ServiceCharge, Customer>
+     */
+    public function serviceCharges(): HasMany
     {
-        return $this->hasMany(Invoice::class);
-    }
-
-    public function readings()
-    {
-        return $this->hasMany(MeterReading::class);
-    }
-
-    public function latestReading()
-    {
-        return $this->hasOne(MeterReading::class)->latestOfMany();
-    }
-
-    public function meterHistory()
-    {
-        return $this->hasMany(MeterHistory::class)->orderBy('assigned_at', 'desc');
+        return $this->hasMany(ServiceCharge::class);
     }
 }

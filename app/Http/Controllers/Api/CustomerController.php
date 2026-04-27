@@ -19,45 +19,46 @@ class CustomerController extends Controller
 
             $query = Customer::query()
                 ->with([
-                    'meter',
                     'zone',
-                    'area',
                     'tariff',
-                    'latestReading',
-                    'latestBill' => function ($q) {
-                        $q->withSum('payments', 'amount')
-                            ->with('latestPayment');
+                    'meters.lastReading',
+                    'bills' => function ($q) {
+                        $q->withSum('payments', 'amount')->latest();
                     },
                 ]);
 
             // If user has a zone assigned, only fetch customers in that zone; otherwise fetch all.
-            $query->when($user?->zone_id, function ($q) use ($user) {
-                $q->where('zone_id', $user->zone_id);
+            $zoneId = data_get($user, 'zone_id');
+            $query->when($zoneId, function ($q) use ($zoneId) {
+                $q->where('zone_id', $zoneId);
             });
 
             $customers = $query->latest()
                 ->get()
                 ->map(function ($customer) {
+                    $meter = $customer->meters->sortByDesc('id')->first();
+                    $lastReading = $meter?->lastReading;
+
                     return [
                         'home_id' => $customer->id,
                         'address' => $customer->address,
-                        'plot_number' => $customer->plot_number,
+                        'plot_number' => null,
                         'customer_name' => $customer->name,
-                        'meter' => $customer->meter ? [
-                            'id' => $customer->meter->id,
-                            'meter_number' => $customer->meter->meter_number,
-                            'status' => $customer->meter->status,
+                        'meter' => $meter ? [
+                            'id' => $meter->id,
+                            'meter_number' => $meter->meter_number,
+                            'status' => $meter->status,
                         ] : null,
                         'zone' => $customer->zone?->name,
-                        'area' => $customer->area?->name,
+                        'area' => null,
                         'tariff' => [
                             'name' => $customer->tariff?->name ?? 'N/A',
-                            'price' => $customer->tariff?->price ?? 0,
-                            'fixed_charge' => $customer->tariff?->fixed_charge ?? 0,
+                            'price' => (float) ($customer->tariff?->price_per_unit ?? 0),
+                            'fixed_charge' => (float) ($customer->tariff?->fixed_charge ?? 0),
                         ],
                         'latest_reading' => [
-                            'current_reading' => $customer->latestReading?->current_reading ?? 0,
-                            'reading_date' => $customer->latestReading?->reading_date ?? 'N/A',
+                            'current_reading' => (float) ($lastReading?->current_reading ?? 0),
+                            'reading_date' => $lastReading?->reading_date ?? 'N/A',
                         ],
                         'previous_balance' => $this->previousBalanceFromLatestBill($customer),
                     ];
@@ -80,16 +81,14 @@ class CustomerController extends Controller
      */
     private function previousBalanceFromLatestBill(Customer $customer): float
     {
-        $bill = $customer->latestBill;
+        $bill = $customer->bills->first();
         if (! $bill) {
             return 0;
         }
 
-        $payment = $bill->latestPayment;
-        if ($payment?->balance_after !== null) {
-            return round((float) $payment->balance_after, 2);
-        }
+        $paid = (float) ($bill->payments_sum_amount ?? 0);
+        $total = (float) $bill->total_amount;
 
-        return round((float) $bill->balance, 2);
+        return round(max(0.0, $total - $paid), 2);
     }
 }

@@ -2,14 +2,15 @@
 
 namespace Database\Seeders;
 
-use App\Models\Area;
 use App\Models\Customer;
 use App\Models\Meter;
+use App\Models\MeterReading;
 use App\Models\Tariff;
 use App\Models\Zone;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
 
 class CustomerSeeder extends Seeder
 {
@@ -18,156 +19,112 @@ class CustomerSeeder extends Seeder
      */
     public function run(): void
     {
-        $jsonPath = base_path('customers.json');
-
-        if (! File::exists($jsonPath)) {
-            $this->command->error("File not found: $jsonPath");
-
-            return;
-        }
-
-        $customersData = json_decode(File::get($jsonPath), true);
-
-        if (! is_array($customersData)) {
-            $this->command->error("Invalid JSON format in $jsonPath");
-
-            return;
-        }
-
+        $zones = Zone::all();
         $tariffs = Tariff::all();
-        $domesticTariff = $tariffs->where('name', 'DOMESTIC')->first();
 
-        // We only have one tariff (DOMESTIC), but keep
-        // common variations mapped back to DOMESTIC.
-        $tariffMap = [
-            'DOMESTIC' => $domesticTariff,
-            'DOMESTRIC' => $domesticTariff,
-            'DOMESTI' => $domesticTariff,
-            'DOESTIC' => $domesticTariff,
-            'DOMESTICKI' => $domesticTariff,
-            'GH' => $domesticTariff,
-            'RE' => $domesticTariff,
-            'PUB' => $domesticTariff,
-        ];
-
-        $defaultTariff = $domesticTariff ?? $tariffs->first();
-        if (! $defaultTariff) {
-            $defaultTariff = Tariff::create([
-                'name' => 'DOMESTIC',
-                'price' => 4000,
-                'fixed_charge' => 2000,
-                'description' => 'Default system tariff',
-            ]);
-        }
-
-        $jebelZone = Zone::where('name', 'JEBEL SUK')->first();
-        if (! $jebelZone) {
-            $this->command->error('Zone "JEBEL SUK" not found. Run ZoneSeeder to create it before running this seeder.');
-
+        if ($zones->isEmpty() || $tariffs->isEmpty()) {
             return;
         }
 
-        $otherZone = $jebelZone;
-        $otherArea = Area::where('name', 'HAI GWONGOROKI')->first();
+        $jsonPath = (string) (env('CUSTOMERS_SEED_PATH') ?: base_path('customer.json'));
+        if (File::exists($jsonPath)) {
+            $raw = File::get($jsonPath);
+            $rows = json_decode($raw, true);
 
-        if (! $otherArea) {
-            $this->command->error('Area "HAI GWONGOROKI" not found. Run AreaSeeder to create it before running this seeder.');
+            if (is_array($rows)) {
+                foreach ($rows as $row) {
+                    if (! is_array($row)) {
+                        continue;
+                    }
 
-            return;
+                    $accountNumber = trim((string) Arr::get($row, 'meterNo', ''));
+                    $name = trim((string) Arr::get($row, 'customerName', ''));
+
+                    if ($accountNumber === '' || $name === '') {
+                        continue;
+                    }
+
+                    $area = trim((string) Arr::get($row, 'area', ''));
+                    $housePlotNo = trim((string) Arr::get($row, 'housePlotNo', ''));
+                    $addressParts = array_values(array_filter([$area, $housePlotNo === '' ? null : 'Plot '.$housePlotNo]));
+                    $address = $addressParts !== [] ? implode(', ', $addressParts) : $area;
+
+                    $tariff = $tariffs->firstWhere('name', 'DOMESTIC') ?? $tariffs->first();
+                    $customerType = 'residential';
+
+                    $zone = $zones->firstWhere('name', 'Jebel') ?? $zones->first();
+
+                    $connectionDate = $this->parseConnectionDate(Arr::get($row, 'contractDate'));
+
+                    $customer = Customer::updateOrCreate(
+                        ['account_number' => $accountNumber],
+                        [
+                            'customer_type' => $customerType,
+                            'name' => $name,
+                            'phone' => preg_replace('/\D+/', '', (string) Arr::get($row, 'tel', '')) ?: (string) Arr::get($row, 'tel', ''),
+                            'email' => null,
+                            'national_id' => null,
+                            'address' => $address !== '' ? $address : $area,
+                            'zone_id' => $zone->id,
+                            'tariff_id' => $tariff->id,
+                            'connection_date' => $connectionDate,
+                            'status' => 'active',
+                        ],
+                    );
+
+                    $meter = Meter::updateOrCreate(
+                        ['meter_number' => $accountNumber],
+                        [
+                            'customer_id' => $customer->id,
+                            'status' => 'active',
+                        ],
+                    );
+
+                    $initialReading = $this->parseInitialReading(Arr::get($row, 'initialReading'));
+                    if ($initialReading !== null) {
+                        MeterReading::updateOrCreate(
+                            [
+                                'meter_id' => $meter->id,
+                                'reading_date' => ($connectionDate ?? now())->toDateString(),
+                            ],
+                            [
+                                'previous_reading' => 0,
+                                'current_reading' => $initialReading,
+                                'recorded_by' => null,
+                                'notes' => 'Initial reading (seed)',
+                                'is_initial' => true,
+                            ],
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+   function parseConnectionDate(mixed $value): ?Carbon
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
         }
 
-        $allAreas = Area::with('zone')->get();
-        $reader = \App\Models\User::first();
+        try {
+            return Carbon::parse($value)->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 
-        $this->command->info('Starting customer seeding from customers.json...');
-        $bar = $this->command->getOutput()->createProgressBar(count($customersData));
-        $bar->start();
-
-        foreach ($customersData as $data) {
-            $name = $data['customerName'] ?? 'Unknown Customer';
-            $phone = $data['tel'] ?? null;
-
-            if ($phone) {
-                $phone = substr(preg_replace('/[^0-9]/', '', (string) $phone), 0, 15);
-            }
-
-            $addressBlock = trim($data['area'] ?? '');
-            $area = null;
-            $zone = null;
-
-            if (! empty($addressBlock)) {
-                $area = $allAreas->where('name', $addressBlock)->first();
-
-                if (! $area) {
-                    $cleanAddress = str_replace('"', '', $addressBlock);
-                    $area = $allAreas->where('name', $cleanAddress)->first();
-                }
-
-                if (! $area) {
-                    $area = $allAreas->first(function ($a) use ($addressBlock) {
-                        return str_contains(Str::upper($addressBlock), Str::upper($a->name));
-                    });
-                }
-
-                if (! $area) {
-                    $area = $allAreas->first(function ($a) use ($addressBlock) {
-                        return str_contains(Str::upper($a->name), Str::upper($addressBlock));
-                    });
-                }
-
-                if ($area) {
-                    $zone = $area->zone;
-                }
-            }
-
-            if (! $area) {
-                $zone = $otherZone;
-                $area = $otherArea;
-            }
-
-            if (! str_starts_with(Str::upper($zone->name ?? ''), 'JEBEL')) {
-                $bar->advance();
-
-                continue;
-            }
-
-            $tariffName = Str::upper(trim((string) ($data['tariff'] ?? '')));
-            $tariff = $tariffMap[$tariffName] ?? $defaultTariff;
-
-            $customer = Customer::create([
-                'name' => $name,
-                'phone' => $phone,
-                'zone_id' => $zone->id,
-                'area_id' => $area->id,
-                'tariff_id' => $tariff?->id,
-                'address' => $addressBlock ?: 'No address provided',
-                'plot_number' => (string) ($data['housePlotNo'] ?? ''),
-                // Always ensure a non-null property_type (DB column is non-nullable)
-                'property_type' => $tariffName !== '' ? $tariffName : 'RESIDENTIAL',
-                'supply_status' => 'active',
-            ]);
-
-            $meterNumber = $data['meterNo'] ?? null;
-
-            if ($meterNumber !== null && $meterNumber !== 0 && $meterNumber !== '0' && $meterNumber !== '') {
-                $cleanMeterNumber = str_replace([' ', 'TRM'], '', (string) $meterNumber);
-                $exists = Meter::where('meter_number', $cleanMeterNumber)->exists();
-                $finalMeterNumber = $exists ? $cleanMeterNumber.'-'.$customer->id : $cleanMeterNumber;
-
-                $meter = Meter::create([
-                    'customer_id' => $customer->id,
-                    'meter_number' => $finalMeterNumber,
-                    'status' => 'active',
-                ]);
-
-                // Initial meter readings are now seeded exclusively
-                // in MeterReadingSeeder using customers.json.
-            }
-
-            $bar->advance();
+    private function parseInitialReading(mixed $value): ?float
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return null;
         }
 
-        $bar->finish();
-        $this->command->info("\nSeeding of ".count($customersData).' customers from customers.json completed successfully.');
+        $normalized = str_replace(',', '', trim($value));
+        if (! preg_match('/-?\d+(\.\d+)?/', $normalized, $matches)) {
+            return null;
+        }
+
+        return (float) $matches[0];
     }
 }

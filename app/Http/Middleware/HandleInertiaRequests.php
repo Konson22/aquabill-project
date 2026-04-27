@@ -2,8 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Bill;
-use App\Models\Meter;
+use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -37,29 +36,15 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $shared = [
+        [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
+
+        return array_merge(parent::share($request), [
             ...parent::share($request),
             'name' => config('app.name'),
+            'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user() ? $request->user()->load('roles', 'department') : null,
             ],
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-        ];
-
-        if ($request->user()) {
-            // Overdue readings: active meters that have been read at least once but not in the last 30 days
-            $shared['overdue_reading_count'] = Meter::where('status', 'active')
-                ->whereHas('readings')
-                ->whereDoesntHave('readings', function ($q) {
-                    $q->where('reading_date', '>=', now()->subDays(30));
-                })
-                ->count();
-            // Overdue bills: unpaid (pending/partial) and due date in the past
-            $shared['overdue_bill_count'] = Bill::whereIn('status', ['pending', 'partial paid'])
-                ->where('due_date', '<', now())
-                ->count();
-        }
-
-        return $shared;
+        ]);
     }
 }

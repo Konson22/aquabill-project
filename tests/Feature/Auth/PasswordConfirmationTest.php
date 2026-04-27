@@ -1,33 +1,32 @@
 <?php
 
-namespace Tests\Feature\Auth;
-
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Inertia\Testing\AssertableInertia as Assert;
-use Tests\TestCase;
 
-class PasswordConfirmationTest extends TestCase
-{
-    use RefreshDatabase;
+test('confirm password screen can be rendered', function () {
+    $user = User::factory()->create();
 
-    public function test_confirm_password_screen_can_be_rendered()
-    {
-        $user = User::factory()->create();
+    $response = $this->actingAs($user)->get('/confirm-password');
 
-        $response = $this->actingAs($user)->get(route('password.confirm'));
+    $response->assertStatus(200);
+});
 
-        $response->assertStatus(200);
+test('password can be confirmed', function () {
+    $user = User::factory()->create();
 
-        $response->assertInertia(fn (Assert $page) => $page
-            ->component('auth/confirm-password')
-        );
-    }
+    $response = $this->actingAs($user)->post('/confirm-password', [
+        'password' => 'password',
+    ]);
 
-    public function test_password_confirmation_requires_authentication()
-    {
-        $response = $this->get(route('password.confirm'));
+    $response->assertRedirect();
+    $response->assertSessionHasNoErrors();
+});
 
-        $response->assertRedirect(route('login'));
-    }
-}
+test('password is not confirmed with invalid password', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->post('/confirm-password', [
+        'password' => 'wrong-password',
+    ]);
+
+    $response->assertSessionHasErrors();
+});

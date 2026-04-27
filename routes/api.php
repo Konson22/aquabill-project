@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::post('/login', [AuthController::class, 'login']);
-// Route::get('/test', [CustomerController::class, 'index']);
+Route::get('/test', [CustomerController::class, 'index']);
 
 // Protected routes
 Route::middleware('auth:sanctum')->name('api.')->group(function () {
@@ -18,5 +18,8 @@ Route::middleware('auth:sanctum')->name('api.')->group(function () {
     })->name('user');
 
     Route::apiResource('customers', CustomerController::class);
+    Route::get('/service-charge-types', function () {
+        return \App\Models\ServiceChargeType::all();
+    });
     Route::apiResource('readings', ReadingController::class)->only(['index', 'store']);
 });

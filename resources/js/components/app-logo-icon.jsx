@@ -1,12 +1,5 @@
 export default function AppLogoIcon(props) {
     return (
-        <div className="">
-            <img
-                className="h-16 w-16"
-                src="/logo.png"
-                alt="App Logo"
-                {...props}
-            />
-        </div>
+        <img className="h-10 w-16" src="/logo.png" alt="Logo" />
     );
 }

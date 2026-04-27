@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Zone;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 class ZoneSeeder extends Seeder
 {
@@ -13,17 +12,14 @@ class ZoneSeeder extends Seeder
      */
     public function run(): void
     {
-        $zones = [
-            'JEBEL SUK',
-        ];
-
-        foreach ($zones as $zoneName) {
-            Zone::updateOrCreate(
-                ['name' => $zoneName],
-                [
-                    'description' => "Service zone for $zoneName",
-                ]
-            );
-        }
+        Zone::updateOrCreate(
+            ['name' => 'Jebel'],
+            [
+                'supply_day' => 'Monday',
+                'supply_time' => '08:00:00',
+                'description' => 'Default zone for all customers.',
+                'status' => 'active',
+            ],
+        );
     }
 }

@@ -50,7 +50,8 @@ export default function PrintBillCard({ bill }) {
                     }
                     @media print {
                         .bill-print-root {
-                            background-color: #eee !important;
+                            border: 1px solid #eee !important;
+                            background-color: #fff !important;
                             font-size: 11px !important;
                         }
                         .bill-print-root::before {
@@ -71,7 +72,7 @@ export default function PrintBillCard({ bill }) {
                     }
                 `}
             </style>
-            <div className="bill-print-root mt-3 mb-4 w-full bg-gray-200 p-3 text-base print:text-xs">
+            <div className="bill-print-root mt-3 mb-4 w-full bg-white p-3 text-base print:text-xs">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <div className="h-16 w-16">
                         <img

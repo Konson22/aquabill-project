@@ -1,167 +1,122 @@
 import { NavMain } from '@/components/nav-main';
-import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-} from '@/components/ui/sidebar';
-import { usePage } from '@inertiajs/react';
-import {
-    BarChart3,
-    ClipboardList,
-    CreditCard,
-    FileText,
-    Gauge,
-    LayoutGrid,
+import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { Link, usePage } from '@inertiajs/react';
+import { 
+    LayoutGrid, 
+    Store, 
+    Users, 
+    FileText, 
+    ShoppingCart, 
+    Package, 
+    CreditCard, 
+    Clock, 
     MapPin,
-    Receipt,
-    Shield,
-    Users,
+    Bed,
+    Calendar,
+    LogOut,
+    BookOpen,
+    Settings
 } from 'lucide-react';
-import { route } from 'ziggy-js';
+import AppLogo from './app-logo';
 
-const adminNavItems = [
-    {
-        title: 'Dashboard',
-        href: route('dashboard'),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'General Report',
-        href: route('general-report'),
-        icon: BarChart3,
-    },
-    {
-        title: 'Customers',
-        href: route('customers.index'),
-        icon: Users,
-    },
-    {
-        title: 'Billing',
-        href: route('bills'),
-        icon: Receipt,
-    },
-    {
-        title: 'Payments',
-        href: route('payments'),
-        icon: CreditCard,
-    },
-    {
-        title: 'Invoices',
-        href: route('invoices'),
-        icon: FileText,
-    },
-    {
-        title: 'Meters',
-        href: route('meters'),
-        icon: Gauge,
-    },
-    {
-        title: 'Meter Readings',
-        href: route('meter-readings'),
-        icon: ClipboardList,
-    },
-    {
-        title: 'Zones',
-        href: route('zones.index'),
-        icon: MapPin,
-    },
-    {
-        title: 'Tariff',
-        href: route('tariffs.index'),
-        icon: FileText,
-    },
-    {
-        title: 'Users',
-        href: route('users.index'),
-        icon: Shield,
-    },
-];
+const getNavItems = (user) => {
+    const department = user?.department?.name || 'admin';
+    const isAdmin = user?.email === 'admin@gmail.com';
 
-const financeNavItems = [
-    {
-        title: 'Dashboard',
-        href: route('dashboard'),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Bills',
-        href: route('bills'),
-        icon: Receipt,
-    },
-    {
-        title: 'Invoices',
-        href: route('invoices'),
-        icon: FileText,
-    },
-    {
-        title: 'Payments',
-        href: route('payments'),
-        icon: CreditCard,
-    },
-    {
-        title: 'Customers',
-        href: route('customers.index'),
-        icon: Users,
-    },
-    {
-        title: 'Tariff',
-        href: route('tariffs.index'),
-        icon: FileText,
-    },
-];
+    const items = [
+        { title: 'Dashboard', url: route('dashboard'), icon: LayoutGrid }
+    ];
 
-const metersNavItems = [
-    {
-        title: 'Dashboard',
-        href: route('dashboard'),
-        icon: LayoutGrid,
-    },
-    {
-        title: 'Customers',
-        href: route('dashboard-meter-department.customers.index'),
-        icon: Users,
-    },
-    {
-        title: 'Meters',
-        href: route('meters'),
-        icon: Gauge,
-    },
-    {
-        title: 'Meter Readings',
-        href: route('meter-readings'),
-        icon: ClipboardList,
-    },
-    {
-        title: 'Zones',
-        href: route('zones.index'),
-        icon: MapPin,
-    },
-];
+    // System Admin sees everything
+    if (isAdmin) {
+        return [
+            ...items,
+            { title: 'User Management', url: route('users.index'), icon: Users },
+            { title: 'Customers', url: route('customers.index'), icon: Users },
+            { title: 'Zones', url: route('zones.index'), icon: MapPin },
+            { title: 'Meters', url: route('meters.index'), icon: MapPin },
+            { title: 'Meter Readings', url: route('readings.index'), icon: MapPin },
+            { title: 'Bills', url: route('bills.index'), icon: FileText },
+            { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard },
+            { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
+            { title: 'Staff List', url: '#', icon: Users },
+            { title: 'Revenue', url: '#', icon: CreditCard },
+            { title: 'System Logs', url: '#', icon: FileText },
+            { title: 'System Settings', url: route('admin.settings'), icon: Settings }
+        ];
+    }
+
+    if (department === 'admin') {
+        items.push(
+            { title: 'User Management', url: route('users.index'), icon: Users },
+            { title: 'Customers', url: route('customers.index'), icon: Users },
+            { title: 'Zones', url: route('zones.index'), icon: MapPin },
+            { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
+            { title: 'Bills', url: route('bills.index'), icon: FileText },
+            { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard },
+            { title: 'System Logs', url: '#', icon: FileText },
+            { title: 'System Settings', url: route('admin.settings'), icon: Settings }
+        );
+    } else if (department === 'finance') {
+        items.push(
+            { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
+            { title: 'Revenue', url: '#', icon: CreditCard },
+            { title: 'Bills', url: route('bills.index'), icon: FileText },
+            { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard }
+        );
+    } else if (department === 'ledger') {
+        items.push(
+            { title: 'Zones', url: route('zones.index'), icon: MapPin },
+            { title: 'Meters', url: route('meters.index'), icon: MapPin },
+            { title: 'Meter Readings', url: route('readings.index'), icon: MapPin },
+            { title: 'Billing Cycles', url: '#', icon: Calendar }
+        );
+    } else if (department === 'hr') {
+        items.push(
+            { title: 'Staff List', url: '#', icon: Users },
+            { title: 'Attendance', url: '#', icon: Clock }
+        );
+    } else if (department === 'customer_care') {
+        items.push(
+            { title: 'Customers', url: route('customers.index'), icon: Users },
+            { title: 'Complaints', url: '#', icon: FileText },
+            { title: 'Tickets', url: '#', icon: Clock }
+        );
+    }
+
+    return items;
+};
 
 export function AppSidebar() {
     const { auth } = usePage().props;
-    const user = auth.user;
+    const mainNavItems = getNavItems(auth.user);
+
+    const footerNavItems = [
+        {
+            title: 'Help Center',
+            url: '#',
+            icon: BookOpen,
+        }
+    ];
 
     return (
-        <Sidebar
-            collapsible="icon"
-            variant="inset"
-            className="bg-sidebar pt-20 text-white"
-        >
+        <Sidebar collapsible="icon" variant="sidebar">
+            <SidebarHeader>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton size="lg" asChild>
+                            <Link href={route('dashboard')}>
+                                <AppLogo />
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarHeader>
+
             <SidebarContent>
-                {/* <NavMain items={dashboardItems} label="Platform" /> */}
-                {user && user.department === 'admin' && (
-                    <NavMain items={adminNavItems} label="Admin Department" />
-                )}
-                {user && user.department === 'finance' && (
-                    <NavMain items={financeNavItems} label="" />
-                )}
-                {user && user.department === 'meters' && (
-                    <NavMain items={metersNavItems} label="Meters Department" />
-                )}
+                <NavMain items={mainNavItems} />
             </SidebarContent>
 
-            <SidebarFooter>{/* <NavUser /> */}</SidebarFooter>
         </Sidebar>
     );
 }

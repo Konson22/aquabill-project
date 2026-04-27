@@ -11,26 +11,14 @@ class CheckDepartment
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
-    public function handle(Request $request, Closure $next, string ...$departments): Response
+    public function handle(Request $request, Closure $next, string $department): Response
     {
-        if (! $request->user()) {
-            abort(403, 'Unauthorized');
-        }
-
-        $userDepartment = $request->user()->department;
-
-        // Admin can access all pages
-        if ($userDepartment === 'admin') {
+        if ($request->user() && $request->user()->department?->name === $department) {
             return $next($request);
         }
 
-        if (! in_array($userDepartment, $departments)) {
-            abort(403, 'Access denied. You do not have permission to access this department.');
-        }
-
-        return $next($request);
+        abort(403, 'Unauthorized access to this department dashboard.');
     }
 }
-

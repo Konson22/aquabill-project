@@ -3,102 +3,54 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
 use App\Models\User;
-use App\Models\Zone;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request): Response
     {
-        $users = User::with('department')->latest()->paginate(10);
-        $users = $users->through(fn ($user) => array_merge($user->toArray(), [
-            'department' => $user->getRelationValue('department')?->name,
-        ]));
-        $departments = Department::orderBy('name')->get(['id', 'name']);
-        $zones = Zone::orderBy('name')->get(['id', 'name']);
+        $search = $request->string('search')->trim()->toString();
 
-        return Inertia::render('admin/dashboard/users/index', [
-            'users' => $users,
-            'departments' => $departments,
-            'zones' => $zones,
-        ]);
-    }
-
-    public function show(User $user)
-    {
-        $user->load('department');
-
-        return Inertia::render('admin/dashboard/users/show', [
-            'user' => array_merge($user->toArray(), [
-                'department' => $user->getRelationValue('department')?->name,
-            ]),
-        ]);
-    }
-
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255|unique:users',
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'department' => 'required|string|in:admin,finance,meters',
-        ]);
-
-        $department = Department::where('name', $request->department)->firstOrFail();
-
-        User::create([
-            'name' => $request->name,
-            'password' => Hash::make($request->password),
-            'department_id' => $department->id,
-            'role' => 'staff',
-        ]);
-
-        return redirect()->back();
-    }
-
-    public function update(Request $request, User $user)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255|unique:users,name,'.$user->id,
-            'department' => 'required|string|in:admin,finance,meters',
-            'zone_id' => ['nullable', Rule::when(
-                $request->filled('zone_id') && $request->zone_id !== '__all__',
-                'exists:zones,id'
-            )],
-            'password' => ['nullable', 'confirmed', Rules\Password::defaults()],
-        ]);
-
-        $department = Department::where('name', $request->department)->firstOrFail();
-
-        $zoneId = $request->input('zone_id');
-        if ($zoneId === '' || $zoneId === '__all__' || ! $request->filled('zone_id')) {
-            $zoneId = null;
-        }
-
-        $user->update([
-            'name' => $request->name,
-            'department_id' => $department->id,
-            'zone_id' => $zoneId,
-        ]);
-
-        if ($request->filled('password')) {
-            $user->update([
-                'password' => Hash::make($request->password),
+        $users = User::query()
+            ->with([
+                'department:id,name',
+                'roles:id,name',
+            ])
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->latest()
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $user->status,
+                'last_login_at' => $user->last_login_at,
+                'created_at' => $user->created_at,
+                'department' => $user->department ? [
+                    'id' => $user->department->id,
+                    'name' => $user->department->name,
+                ] : null,
+                'roles' => $user->roles->map(fn ($role) => [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                ])->values(),
             ]);
-        }
 
-        return redirect()->back();
-    }
-
-    public function destroy(User $user)
-    {
-        $user->delete();
-
-        return redirect()->back();
+        return Inertia::render('admin/users/index', [
+            'users' => $users,
+            'filters' => [
+                'search' => $search,
+            ],
+        ]);
     }
 }

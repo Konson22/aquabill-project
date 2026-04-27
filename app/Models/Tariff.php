@@ -2,36 +2,52 @@
 
 namespace App\Models;
 
+use Database\Factories\TariffFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tariff extends Model
 {
+    /** @use HasFactory<TariffFactory> */
     use HasFactory;
 
     protected $fillable = [
         'name',
-        'price',
+        'price_per_unit',
         'fixed_charge',
-        'description',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
-            'price' => 'decimal:2',
+            'price_per_unit' => 'decimal:2',
             'fixed_charge' => 'decimal:2',
         ];
     }
 
-    public function homes()
+    /**
+     * Get the customers for the tariff.
+     *
+     * @return HasMany<Customer, Tariff>
+     */
+    public function customers(): HasMany
     {
         return $this->hasMany(Customer::class);
     }
 
-    public function histories()
+    /**
+     * Get the history snapshots for the tariff.
+     *
+     * @return HasMany<TariffHistory, Tariff>
+     */
+    public function histories(): HasMany
     {
         return $this->hasMany(TariffHistory::class);
     }
 }
-
