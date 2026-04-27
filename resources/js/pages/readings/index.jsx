@@ -104,9 +104,13 @@ export default function MeterReadings({ readings, filters }) {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
-                            <FileSpreadsheet className="mr-2 h-4 w-4" />
-                            Export CSV
+                        <Button variant="outline" size="sm" asChild>
+                            <a href={`/readings/export?${new URLSearchParams(
+                                Object.entries({ search, from: dateFrom, to: dateTo }).filter(([_, v]) => v)
+                            ).toString()}`}>
+                                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                Export CSV
+                            </a>
                         </Button>
                         <Button size="sm">
                             <Plus className="mr-2 h-4 w-4" />
@@ -190,15 +194,6 @@ export default function MeterReadings({ readings, filters }) {
                                     <tr key={reading.id} className="hover:bg-muted/30 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                {reading.image_url ? (
-                                                    <div className="h-10 w-10 rounded-lg overflow-hidden border shadow-sm flex-shrink-0">
-                                                        <img src={reading.image_url} alt="Reading proof" className="h-full w-full object-cover" />
-                                                    </div>
-                                                ) : (
-                                                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 border border-dashed">
-                                                        <Camera className="h-4 w-4 text-muted-foreground/30" />
-                                                    </div>
-                                                )}
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-semibold">{formatReadingDate(reading.reading_date)}</span>
                                                     <span className="text-[10px] text-muted-foreground">ID: #{reading.id}</span>

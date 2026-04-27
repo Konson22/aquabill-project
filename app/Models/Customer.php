@@ -81,6 +81,14 @@ class Customer extends Model
     }
 
     /**
+     * Get the readings for the customer through their meters.
+     */
+    public function readings(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    {
+        return $this->hasManyThrough(MeterReading::class, Meter::class);
+    }
+
+    /**
      * Get the bills for the customer.
      *
      * @return HasMany<Bill, Customer>

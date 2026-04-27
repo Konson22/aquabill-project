@@ -76,4 +76,80 @@ class MeterReadingController extends Controller
             'reading' => $reading,
         ]);
     }
+
+    public function export(Request $request)
+    {
+        $search = trim((string) $request->string('search'));
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        $query = MeterReading::with(['meter.customer', 'recorder'])
+            ->where('is_initial', false)
+            ->when($search !== '', function ($q) use ($search) {
+                $q->whereHas('meter', function ($mq) use ($search) {
+                    $mq->where('meter_number', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($cq) use ($search) {
+                            $cq->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when($from, fn ($q) => $q->whereDate('reading_date', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('reading_date', '<=', $to))
+            ->orderBy('id', 'desc');
+
+        $filename = "meter_readings_" . date('Y-m-d_His') . ".csv";
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$filename",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        // Calculate summaries
+        $totalConsumption = (clone $query)->sum('meter_readings.consumption');
+        $customersCount = (clone $query)->join('meters', 'meter_readings.meter_id', '=', 'meters.id')
+                                      ->distinct('meters.customer_id')
+                                      ->count('meters.customer_id');
+        $totalAmount = (clone $query)->join('bills', 'meter_readings.id', '=', 'bills.reading_id')
+                                   ->sum('bills.total_amount');
+
+        $callback = function() use($query, $totalConsumption, $customersCount, $totalAmount) {
+            $file = fopen('php://output', 'w');
+            
+            // Write Summary Header
+            fputcsv($file, ['Export Summary']);
+            fputcsv($file, ['Unique Customers', $customersCount]);
+            fputcsv($file, ['Total Consumption (m3)', number_format((float)$totalConsumption, 2, '.', '')]);
+            fputcsv($file, ['Total Bill Amount (SSP)', number_format((float)$totalAmount, 2, '.', '')]);
+            fputcsv($file, []); // Empty line separator
+
+            $columns = [
+                'ID', 'Meter Number', 'Customer Name', 'Previous Reading', 'Current Reading', 'Consumption', 'Reading Date', 'Recorded By', 'Bill Amount', 'Bill Status'
+            ];
+            fputcsv($file, $columns);
+
+            $query->chunk(500, function($readings) use($file) {
+                $readings->load('bill');
+                foreach ($readings as $reading) {
+                    fputcsv($file, [
+                        $reading->id,
+                        $reading->meter->meter_number ?? 'N/A',
+                        $reading->meter->customer->name ?? 'N/A',
+                        $reading->previous_reading,
+                        $reading->current_reading,
+                        $reading->consumption,
+                        $reading->reading_date ? \Carbon\Carbon::parse($reading->reading_date)->format('Y-m-d H:i') : 'N/A',
+                        $reading->recorder->name ?? 'System',
+                        $reading->bill ? $reading->bill->total_amount : '0.00',
+                        $reading->bill ? ucfirst($reading->bill->status) : 'N/A',
+                    ]);
+                }
+            });
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
 }

@@ -12,7 +12,7 @@ class CustomerController extends Controller
     {
         $customers = Customer::with(['zone', 'tariff', 'meters.lastReading'])
             ->latest()
-            ->paginate(10);
+            ->paginate(100);
 
         $serviceChargeTypes = \App\Models\ServiceChargeType::all();
 
@@ -28,7 +28,10 @@ class CustomerController extends Controller
             'zone',
             'tariff',
             'meters.lastReading',
-            'bills' => fn ($query) => $query->latest()->limit(10),
+            'bills' => fn ($query) => $query->latest()->limit(50),
+            'readings' => fn ($query) => $query->latest()->limit(50),
+            'payments' => fn ($query) => $query->latest()->limit(50),
+            'serviceCharges' => fn ($query) => $query->latest()->limit(50),
         ]);
 
         return Inertia::render('customers/show', [

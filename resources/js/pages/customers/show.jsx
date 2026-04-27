@@ -13,7 +13,14 @@ import {
     Receipt,
     User,
     Wrench,
+    CreditCard,
+    Activity,
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CustomerBills from './components/customer-bills';
+import CustomerReadings from './components/customer-readings';
+import CustomerPayments from './components/customer-payments';
+import CustomerServiceCharges from './components/customer-service-charges';
 
 export default function Show({ customer }) {
     const breadcrumbs = [
@@ -143,95 +150,45 @@ export default function Show({ customer }) {
                     </Card>
                 </div>
 
-                {/* Meters + Bills */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-                        <div className="flex items-center justify-between px-5 py-4 border-b bg-muted/20">
-                            <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
-                                Meters
-                            </h2>
-                            <Badge variant="outline" className="text-[10px] font-mono">
-                                {(customer?.meters?.length ?? 0).toString().padStart(2, '0')}
-                            </Badge>
-                        </div>
-                        <div className="p-5">
-                            {customer?.meters?.length ? (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/30 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                <th className="px-3 py-3">Meter #</th>
-                                                <th className="px-3 py-3">Type</th>
-                                                <th className="px-3 py-3 text-right">Last Reading</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {customer.meters.map((meter) => (
-                                                <tr key={meter.id} className="hover:bg-muted/20 transition-colors">
-                                                    <td className="px-3 py-3 font-mono font-bold text-primary">
-                                                        {meter.meter_number ?? '—'}
-                                                    </td>
-                                                    <td className="px-3 py-3 capitalize text-muted-foreground">
-                                                        {meter.meter_type ?? '—'}
-                                                    </td>
-                                                    <td className="px-3 py-3 text-right font-mono font-bold">
-                                                        {meter.last_reading?.current_reading ?? meter.lastReading?.current_reading ?? '—'}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                    No meters found for this customer.
-                                </div>
-                            )}
-                        </div>
+                {/* Customer Data Tabs */}
+                <Tabs defaultValue="bills" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4 h-auto p-1 bg-muted/30">
+                        <TabsTrigger value="bills" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                            <Receipt className="mr-2 h-4 w-4" />
+                            Bills
+                        </TabsTrigger>
+                        <TabsTrigger value="readings" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                            <Droplet className="mr-2 h-4 w-4" />
+                            Readings
+                        </TabsTrigger>
+                        <TabsTrigger value="payments" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            Payments
+                        </TabsTrigger>
+                        <TabsTrigger value="charges" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                            <Wrench className="mr-2 h-4 w-4" />
+                            Service Charges
+                        </TabsTrigger>
+                    </TabsList>
+                    
+                    <div className="mt-4">
+                        <TabsContent value="bills" className="m-0 border-none p-0 outline-none">
+                            <CustomerBills bills={customer?.bills} />
+                        </TabsContent>
+                        
+                        <TabsContent value="readings" className="m-0 border-none p-0 outline-none">
+                            <CustomerReadings readings={customer?.readings} />
+                        </TabsContent>
+                        
+                        <TabsContent value="payments" className="m-0 border-none p-0 outline-none">
+                            <CustomerPayments payments={customer?.payments} />
+                        </TabsContent>
+                        
+                        <TabsContent value="charges" className="m-0 border-none p-0 outline-none">
+                            <CustomerServiceCharges serviceCharges={customer?.serviceCharges} />
+                        </TabsContent>
                     </div>
-
-                    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-                        <div className="flex items-center justify-between px-5 py-4 border-b bg-muted/20">
-                            <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
-                                Recent Bills
-                            </h2>
-                            <Badge variant="outline" className="text-[10px] font-mono">
-                                {(customer?.bills?.length ?? 0).toString().padStart(2, '0')}
-                            </Badge>
-                        </div>
-                        <div className="p-5">
-                            {customer?.bills?.length ? (
-                                <div className="space-y-3">
-                                    {customer.bills.slice(0, 5).map((bill) => (
-                                        <div key={bill.id} className="flex items-center justify-between gap-4 rounded-lg border p-4 hover:bg-muted/20 transition-colors">
-                                            <div className="min-w-0">
-                                                <p className="font-bold text-sm text-foreground flex items-center gap-2">
-                                                    <Receipt className="h-4 w-4 text-muted-foreground" />
-                                                    Invoice #{String(bill.id).padStart(6, '0')}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Issued {formatDate(bill.created_at)} • Due {formatDate(bill.due_date)}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <Badge variant="outline" className="capitalize text-[10px]">
-                                                    {bill.status ?? '—'}
-                                                </Badge>
-                                                <span className="font-mono font-black text-sm">
-                                                    {bill.total_amount ?? bill.total ?? '—'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                    No bills found for this customer.
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                </Tabs>
             </div>
         </AppLayout>
     );

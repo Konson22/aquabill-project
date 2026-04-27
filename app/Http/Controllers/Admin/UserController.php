@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Department;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -48,9 +52,73 @@ class UserController extends Controller
 
         return Inertia::render('admin/users/index', [
             'users' => $users,
+            'departments' => Department::select('id', 'name')->get(),
+            'roles' => Role::select('id', 'name')->get(),
             'filters' => [
                 'search' => $search,
             ],
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'password' => ['required', 'confirmed', Password::defaults()],
+            'department_id' => ['nullable', 'exists:departments,id'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['exists:roles,id'],
+        ]);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'department_id' => $validated['department_id'] ?? null,
+            'status' => 'active',
+        ]);
+
+        if (! empty($validated['roles'])) {
+            $user->roles()->sync($validated['roles']);
+        }
+
+        return back()->with('success', 'User created successfully.');
+    }
+
+    public function show(User $user): Response
+    {
+        $user->load([
+            'department:id,name',
+            'roles:id,name',
+        ]);
+
+        $user->loadCount([
+            'recordedReadings',
+            'receivedPayments',
+        ]);
+
+        return Inertia::render('admin/users/show', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $user->status,
+                'last_login_at' => $user->last_login_at,
+                'created_at' => $user->created_at,
+                'department' => $user->department ? [
+                    'id' => $user->department->id,
+                    'name' => $user->department->name,
+                ] : null,
+                'roles' => $user->roles->map(fn ($role) => [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                ])->values(),
+                'performance' => [
+                    'readings_count' => $user->recorded_readings_count,
+                    'payments_count' => $user->received_payments_count,
+                ],
+            ]
         ]);
     }
 }

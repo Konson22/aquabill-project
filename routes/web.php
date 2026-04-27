@@ -43,6 +43,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('customers/{customer}/service-charges', [\App\Http\Controllers\ServiceChargeController::class, 'store'])->name('customers.service-charges.store');
     Route::resource('tariffs', TariffController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     Route::resource('meters', MeterController::class)->only(['index']);
+    Route::get('readings/export', [MeterReadingController::class, 'export'])->name('readings.export');
     Route::resource('readings', MeterReadingController::class)->only(['index', 'store', 'show']);
     Route::resource('zones', ZoneController::class)->only(['index']);
     Route::resource('service-charges', \App\Http\Controllers\ServiceChargeController::class);
@@ -56,6 +57,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Keeping these for now if needed, or we can move them inside admin prefix
     Route::prefix('admin')->middleware('department:admin')->group(function () {
         Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+        Route::post('/users', [AdminUserController::class, 'store'])->name('users.store');
+        Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
 
         Route::get('/roles', function () {
             return Inertia\Inertia::render('admin/roles/index');

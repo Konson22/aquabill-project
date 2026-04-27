@@ -17,13 +17,15 @@ export default function PrintBillCard({ bill }) {
         if (!raw) return '—';
         return raw.split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
     })();
+    const meterReading = bill?.reading;
     const tariff = customer?.tariff || bill?.home?.tariff || {};
-    const meterReading = bill?.meter_reading;
-    // Calculate consumption
-    const consumption =
-    meterReading?.current_reading - meterReading?.previous_reading || 0;
-    const VOLUM_CHARGES = consumption * tariff.price;
-    const totalAmount = Number(VOLUM_CHARGES || 0) + Number(bill?.fix_charges || 0) + Number(bill?.previous_balance || 0);
+    
+    // Values from Bill model directly
+    const consumption = bill?.consumption || meterReading?.consumption || 0;
+    const volumeCharges = bill?.current_charge || 0;
+    const fixedCharges = bill?.fixed_charge || 0;
+    const previousBalance = bill?.previous_balance || 0;
+    const totalAmount = bill?.total_amount || 0;
 
     return (
         <>
@@ -111,7 +113,7 @@ export default function PrintBillCard({ bill }) {
                             value={customerDisplayName}
                         />
                         <PrintLabelValue
-                            label="Tariff"
+                            label="Cus Types"
                             value={tariff?.name || '—'}
                         />
                         <PrintLabelValue
@@ -129,11 +131,11 @@ export default function PrintBillCard({ bill }) {
                     <div className="flex-1 space-y-1.5 text-xs">
                         <PrintLabelValue
                             label="Date"
-                            value={formatDateLong(bill?.billing_period_end)}
+                            value={formatDateLong(meterReading?.reading_date || bill?.created_at)}
                         />
                         <PrintLabelValue
                             label="Meter No"
-                            value={meterReading?.meter?.meter_number || '—'}
+                            value={bill?.meter?.meter_number || '—'}
                         />
                         <PrintLabelValue
                             label="Previous Reading"
@@ -151,19 +153,19 @@ export default function PrintBillCard({ bill }) {
                     <div className="flex-1 space-y-1.5 text-xs">
                         <PrintLabelValue
                             label="Outstanding Balance"
-                            value={formatCurrency(bill?.previous_balance || 0)}
+                            value={formatCurrency(previousBalance)}
                         />
                         <PrintLabelValue
                             label="Fixed Charges"
-                            value={formatCurrency(bill?.fix_charges || 0)}
+                            value={formatCurrency(fixedCharges)}
                         />
                         <PrintLabelValue
                             label="Tariff"
-                            value={formatCurrency(bill?.tariff || 0)}
+                            value={formatCurrency(bill?.unit_price || 0)}
                         />
                         <PrintLabelValue
                             label="Volume Charges"
-                            value={formatCurrency(VOLUM_CHARGES || 0)}
+                            value={formatCurrency(volumeCharges)}
                         />
                         <PrintLabelValue
                             label="Total"
@@ -177,7 +179,7 @@ export default function PrintBillCard({ bill }) {
                 <div className="flex items-end justify-between gap-4 pt-4 text-xs print:text-xs">
                     <div>
                         <div className="mt-10 text-xs font-semibold text-slate-700">
-                            {bill?.meterReading?.reader?.name || 'System'}
+                            {meterReading?.recorder?.name || 'System'}
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
                             Sign: Billing Officer
