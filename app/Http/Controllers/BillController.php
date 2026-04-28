@@ -71,7 +71,7 @@ class BillController extends Controller
      */
     public function show(Bill $bill): Response
     {
-        $bill->load(['customer.zone', 'meter', 'reading']);
+        $bill->load(['customer.zone', 'customer.tariff', 'meter', 'reading']);
 
         return Inertia::render('bills/show', [
             'bill' => $bill,
@@ -83,7 +83,7 @@ class BillController extends Controller
      */
     public function print(Bill $bill): Response
     {
-        $bill->load(['customer.zone', 'meter', 'reading']);
+        $bill->load(['customer.zone', 'customer.tariff', 'meter', 'reading']);
 
         return Inertia::render('bills/print-single', [
             'bill' => $bill,
@@ -101,7 +101,7 @@ class BillController extends Controller
             ->unique()
             ->values();
 
-        $bills = Bill::with(['customer.zone', 'meter', 'reading'])
+        $bills = Bill::with(['customer.zone', 'customer.tariff', 'meter', 'reading'])
             ->whereIn('id', $ids)
             ->orderBy('id')
             ->get();

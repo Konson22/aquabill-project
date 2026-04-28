@@ -3,9 +3,9 @@ import { Head } from '@inertiajs/react';
 import { useEffect } from 'react';
 
 export default function PrintMultiple({ bills }) {
-    useEffect(() => {
-        window.print();
-    }, []);
+    // useEffect(() => {
+    //     window.print();
+    // }, []);
 
     return (
         <>

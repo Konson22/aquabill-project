@@ -2,6 +2,8 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { 
     ChevronLeft, 
     Printer,
@@ -10,7 +12,10 @@ import {
     Camera,
     Info,
     CreditCard,
-    Droplets
+    Droplets,
+    User,
+    Phone,
+    Calendar
 } from 'lucide-react';
 
 const formatDate = (dateString) => {
@@ -34,7 +39,6 @@ export default function Show({ reading }) {
         { title: `Reading #${reading.id}`, href: `/readings/${reading.id}` },
     ];
 
-    console.log("image", reading.image_url);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -76,100 +80,131 @@ export default function Show({ reading }) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Left: Reading Image */}
-                    <div className="md:col-span-1">
-                        <div className="bg-card rounded-xl border shadow-sm overflow-hidden aspect-[4/3] flex items-center justify-center bg-muted/30">
-                            {reading.image_url ? (
-                                <img src={reading.image_url} alt="Reading proof" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="flex flex-col items-center gap-2 text-muted-foreground/40">
-                                    <Camera className="h-10 w-10" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">No Image</span>
+                <Card className="border-border shadow-sm overflow-hidden flex flex-col divide-y">
+                    {/* Top Section: Data & Details */}
+                    <div className="p-6 md:p-8 space-y-8 bg-card">
+                        
+                        {/* Customer Details Section */}
+                        <section>
+                            <h3 className="text-xs font-bold text-primary tracking-widest uppercase mb-4 flex items-center gap-2">
+                                <User className="h-4 w-4" /> Customer Information
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-6">
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Customer Name</p>
+                                    <p className="font-medium text-foreground">{reading.meter.customer.name}</p>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Right: Details Table */}
-                    <div className="md:col-span-2 space-y-6">
-                        <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                            <div className="px-6 py-4 border-b bg-muted/20">
-                                <h3 className="font-bold flex items-center gap-2">
-                                    <Droplets className="h-4 w-4 text-blue-500" />
-                                    Reading Details
-                                </h3>
+                                {reading.meter.customer.phone && (
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Phone Number</p>
+                                        <p className="font-medium flex items-center gap-1.5 text-foreground">
+                                            <Phone className="h-3 w-3 text-muted-foreground" />
+                                            {reading.meter.customer.phone}
+                                        </p>
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Location / Zone</p>
+                                    <p className="font-medium flex items-center gap-1.5 text-foreground">
+                                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                                        {reading.meter.customer.zone?.name || 'Unassigned'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Meter Number</p>
+                                    <p className="font-mono bg-muted/50 px-2 py-0.5 rounded text-sm text-foreground inline-flex">
+                                        {reading.meter.meter_number}
+                                    </p>
+                                </div>
                             </div>
-                            <table className="w-full text-sm">
-                                <tbody className="divide-y">
-                                    <tr>
-                                        <td className="px-6 py-4 text-muted-foreground font-medium">Previous Reading</td>
-                                        <td className="px-6 py-4 font-mono text-right">{reading.previous_reading} m³</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-6 py-4 text-muted-foreground font-medium">Current Reading</td>
-                                        <td className="px-6 py-4 font-mono text-right font-bold">{reading.current_reading} m³</td>
-                                    </tr>
-                                    <tr className="bg-primary/5">
-                                        <td className="px-6 py-4 text-primary font-bold">Total Consumption</td>
-                                        <td className="px-6 py-4 text-primary font-black text-right text-lg">{reading.consumption} m³</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-6 py-4 text-muted-foreground font-medium">Reading Date</td>
-                                        <td className="px-6 py-4 text-right">{formatDate(reading.reading_date)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-6 py-4 text-muted-foreground font-medium">Recorded By</td>
-                                        <td className="px-6 py-4 text-right">{reading.recorder?.name || 'System'}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        </section>
 
-                        {/* Bill Card */}
-                        {reading.bill && (
-                            <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                                <div className="px-6 py-4 border-b bg-muted/20 flex justify-between items-center">
-                                    <h3 className="font-bold flex items-center gap-2">
-                                        <CreditCard className="h-4 w-4 text-emerald-500" />
-                                        Billing Summary
-                                    </h3>
-                                    <Badge variant={reading.bill.status === 'paid' ? 'success' : 'destructive'} className="capitalize">
-                                        {reading.bill.status}
-                                    </Badge>
+                        <Separator />
+
+                        {/* Reading Details Section */}
+                        <section>
+                            <h3 className="text-xs font-bold text-blue-500 tracking-widest uppercase mb-4 flex items-center gap-2">
+                                <Droplets className="h-4 w-4" /> Reading Data
+                            </h3>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                                <div className="bg-muted/20 p-4 rounded-xl border">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Previous</p>
+                                    <p className="font-mono text-lg">{reading.previous_reading} <span className="text-xs text-muted-foreground">m³</span></p>
                                 </div>
-                                <div className="p-6">
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-muted/20 p-4 rounded-xl border">
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Current</p>
+                                    <p className="font-mono text-lg font-bold">{reading.current_reading} <span className="text-xs text-muted-foreground">m³</span></p>
+                                </div>
+                                <div className="bg-primary/5 p-4 rounded-xl border border-primary/20">
+                                    <p className="text-[10px] text-primary uppercase tracking-wider font-bold mb-1">Consumption</p>
+                                    <p className="font-mono text-2xl font-black text-primary">{reading.consumption} <span className="text-sm font-medium">m³</span></p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Reading Date</p>
+                                    <p className="font-medium text-sm text-foreground flex items-center gap-1.5">
+                                        <Calendar className="h-3 w-3 text-muted-foreground" />
+                                        {formatDate(reading.reading_date)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Recorded By</p>
+                                    <p className="font-medium text-sm text-foreground">
+                                        {reading.recorder?.name || 'System'}
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+
+                        {reading.bill && (
+                            <>
+                                <Separator />
+                                {/* Billing Summary Section */}
+                                <section>
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-xs font-bold text-emerald-500 tracking-widest uppercase flex items-center gap-2">
+                                            <CreditCard className="h-4 w-4" /> Billing Summary
+                                        </h3>
+                                        <Badge variant={reading.bill.status === 'paid' ? 'success' : 'destructive'} className="capitalize">
+                                            {reading.bill.status}
+                                        </Badge>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                                         <div>
-                                            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Usage Charge</p>
-                                            <p className="font-mono font-bold italic">SSP {reading.bill.current_charge}</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Usage Charge</p>
+                                            <p className="font-mono text-sm font-bold">SSP {reading.bill.current_charge}</p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Fixed Charge</p>
-                                            <p className="font-mono font-bold italic">SSP {reading.bill.fixed_charge}</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Fixed Charge</p>
+                                            <p className="font-mono text-sm font-bold">SSP {reading.bill.fixed_charge}</p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Arrears</p>
-                                            <p className="font-mono font-bold italic text-red-500">SSP {reading.bill.previous_balance}</p>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Arrears</p>
+                                            <p className="font-mono text-sm font-bold text-red-500">SSP {reading.bill.previous_balance}</p>
                                         </div>
-                                        <div className="bg-primary/5 p-2 rounded-lg">
-                                            <p className="text-[10px] uppercase font-bold text-primary mb-1">Total Due</p>
-                                            <p className="text-xl font-black text-primary italic">SSP {reading.bill.total_amount}</p>
+                                        <div>
+                                            <p className="text-[10px] text-primary uppercase tracking-wider font-bold mb-1">Total Due</p>
+                                            <p className="font-mono text-base font-black text-primary">SSP {reading.bill.total_amount}</p>
                                         </div>
                                     </div>
-                                    <Button asChild className="w-full mt-6" variant="outline">
+
+                                    <Button asChild variant="outline" size="sm" className="w-full">
                                         <Link href={`/bills/${reading.bill.id}`}>
                                             View Full Bill Details
                                             <ArrowUpRight className="ml-2 h-4 w-4" />
                                         </Link>
                                     </Button>
-                                </div>
-                            </div>
+                                </section>
+                            </>
                         )}
 
-                        {/* Notes */}
+                        {/* Notes Section */}
                         {reading.notes && (
-                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3">
+                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3 mt-6">
                                 <Info className="h-5 w-5 text-amber-600 flex-shrink-0" />
                                 <div className="text-sm">
                                     <p className="font-bold text-amber-800 uppercase text-[10px] tracking-widest mb-1">Notes</p>
@@ -178,7 +213,29 @@ export default function Show({ reading }) {
                             </div>
                         )}
                     </div>
-                </div>
+
+                    {/* Bottom Section: Image */}
+                    <div className="bg-muted/10 p-6 md:p-8 flex flex-col">
+                        <h3 className="text-xs font-bold text-muted-foreground tracking-widest uppercase mb-4 flex items-center gap-2">
+                            <Camera className="h-4 w-4" /> Reading Proof
+                        </h3>
+                        <div className="w-full flex-1 rounded-xl overflow-hidden border shadow-sm bg-background flex items-center justify-center min-h-[400px]">
+                            {reading.image_url ? (
+                                <img src={reading.image_url} alt="Reading proof" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="flex flex-col items-center gap-3 text-muted-foreground/40 p-8 text-center">
+                                    <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                                        <Camera className="h-8 w-8" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-foreground">No Image Provided</p>
+                                        <p className="text-xs mt-1">A photo of the meter reading was not uploaded.</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </Card>
             </div>
         </AppLayout>
     );
