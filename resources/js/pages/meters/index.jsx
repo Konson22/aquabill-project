@@ -1,8 +1,20 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Search,
     Plus,
@@ -23,7 +35,47 @@ const breadcrumbs = [
     },
 ];
 
-export default function Meters({ meters }) {
+export default function Meters({ meters, filters = {} }) {
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const isTypingSearch = useMemo(() => (filters?.search ?? '') !== search, [filters?.search, search]);
+
+    const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
+        meter_number: '',
+        status: 'active',
+    });
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            router.get(
+                route('meters.index'),
+                { search: search || undefined },
+                { preserveScroll: true, preserveState: true, replace: true, only: ['meters', 'filters'] },
+            );
+        }, 300);
+
+        return () => clearTimeout(timeout);
+    }, [search]);
+
+    const handleCreateModalOpen = (open) => {
+        setIsCreateModalOpen(open);
+        if (!open) {
+            reset();
+            clearErrors();
+        }
+    };
+
+    const handleCreateMeter = (event) => {
+        event.preventDefault();
+        post(route('meters.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsCreateModalOpen(false);
+                reset();
+            },
+        });
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Water Meters Management" />
@@ -39,10 +91,66 @@ export default function Meters({ meters }) {
                             Track meter installation, operational status, and link meters to customer accounts.
                         </p>
                     </div>
-                    <Button size="sm">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Install New Meter
-                    </Button>
+                    <Dialog open={isCreateModalOpen} onOpenChange={handleCreateModalOpen}>
+                        <DialogTrigger asChild>
+                            <Button size="sm">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Install New Meter
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                            <form onSubmit={handleCreateMeter} className="space-y-4">
+                                <DialogHeader>
+                                    <DialogTitle>Create New Meter</DialogTitle>
+                                    <DialogDescription>
+                                        Add a new meter unit and set its initial operational status.
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="meter_number">Meter Number</Label>
+                                    <Input
+                                        id="meter_number"
+                                        value={data.meter_number}
+                                        onChange={(event) => setData('meter_number', event.target.value)}
+                                        placeholder="Enter meter number"
+                                        required
+                                    />
+                                    {errors.meter_number && (
+                                        <p className="text-sm text-destructive">{errors.meter_number}</p>
+                                    )}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label>Status</Label>
+                                    <Select
+                                        value={data.status}
+                                        onValueChange={(value) => setData('status', value)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="active">Active</SelectItem>
+                                            <SelectItem value="inactive">Inactive</SelectItem>
+                                            <SelectItem value="broken">Broken</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.status && <p className="text-sm text-destructive">{errors.status}</p>}
+                                </div>
+
+                                <DialogFooter>
+                                    <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={processing}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        {processing ? 'Saving...' : 'Create Meter'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
                 </div>
 
                 {/* Status Overview Cards */}
@@ -70,13 +178,14 @@ export default function Meters({ meters }) {
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             placeholder="Search by meter number or customer..."
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
                             className="pl-10"
                         />
                     </div>
-                    <Button variant="outline" size="sm">
-                        <Settings className="mr-2 h-4 w-4" />
-                        Batch Actions
-                    </Button>
+                    <div className="text-sm text-muted-foreground">
+                        {isTypingSearch ? 'Searching…' : `${meters.total} meter(s)`}
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -115,7 +224,9 @@ export default function Meters({ meters }) {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                                 <MapPin className="h-3 w-3" />
-                                                {meter.customer?.address?.substring(0, 20)}...
+                                                {meter.customer?.address
+                                                    ? `${meter.customer.address.substring(0, 20)}...`
+                                                    : 'No address'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -138,6 +249,13 @@ export default function Meters({ meters }) {
                                         </td>
                                     </tr>
                                 ))}
+                                {meters.data.length === 0 && (
+                                    <tr>
+                                        <td colSpan="5" className="px-6 py-12 text-center text-sm text-muted-foreground">
+                                            No meters found for your search.
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>

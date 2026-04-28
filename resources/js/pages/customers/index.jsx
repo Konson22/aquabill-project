@@ -63,9 +63,11 @@ export default function Customers({ customers, serviceChargeTypes }) {
                             <Download className="mr-2 h-4 w-4" />
                             Export
                         </Button>
-                        <Button size="sm">
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Customer
+                        <Button size="sm" asChild>
+                            <Link href="/customers/create">
+                                <Plus className="mr-2 h-4 w-4" />
+                                New Customer
+                            </Link>
                         </Button>
                     </div>
                 </div>

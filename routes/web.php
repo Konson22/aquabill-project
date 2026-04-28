@@ -12,6 +12,8 @@ use App\Http\Controllers\Departments\HRController;
 use App\Http\Controllers\Departments\LedgerController;
 use App\Http\Controllers\MeterController;
 use App\Http\Controllers\MeterReadingController;
+use App\Http\Controllers\ServiceChargeController;
+use App\Http\Controllers\ServiceChargeTypeController;
 use App\Http\Controllers\TariffController;
 use App\Http\Controllers\ZoneController;
 use Illuminate\Support\Facades\Route;
@@ -39,14 +41,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         })->name('reports.water-usage');
     });
 
-    Route::resource('customers', CustomerController::class)->only(['index', 'show']);
-    Route::post('customers/{customer}/service-charges', [\App\Http\Controllers\ServiceChargeController::class, 'store'])->name('customers.service-charges.store');
+    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'show']);
+    Route::post('customers/{customer}/service-charges', [ServiceChargeController::class, 'store'])->name('customers.service-charges.store');
     Route::resource('tariffs', TariffController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
-    Route::resource('meters', MeterController::class)->only(['index']);
+    Route::resource('meters', MeterController::class)->only(['index', 'store']);
     Route::get('readings/export', [MeterReadingController::class, 'export'])->name('readings.export');
     Route::resource('readings', MeterReadingController::class)->only(['index', 'store', 'show']);
     Route::resource('zones', ZoneController::class)->only(['index']);
-    Route::resource('service-charges', \App\Http\Controllers\ServiceChargeController::class);
+    Route::resource('service-charges', ServiceChargeController::class);
     Route::get('bills/{bill}/print', [BillController::class, 'print'])->name('bills.print');
     Route::get('bills/bulk-print', [BillController::class, 'bulkPrint'])->name('bills.bulk-print');
     Route::get('bills/printing-list', [BillController::class, 'printingList'])->name('bills.printing-list');
@@ -72,7 +74,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return Inertia\Inertia::render('admin/setting/index');
         })->name('admin.settings');
 
-        Route::resource('settings/service-charges', \App\Http\Controllers\ServiceChargeTypeController::class)->names([
+        Route::resource('settings/service-charges', ServiceChargeTypeController::class)->names([
             'index' => 'admin.service-charges.index',
             'store' => 'admin.service-charges.store',
             'update' => 'admin.service-charges.update',
