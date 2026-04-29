@@ -133,7 +133,8 @@ export default function Meters({ meters, filters = {} }) {
                                         <SelectContent>
                                             <SelectItem value="active">Active</SelectItem>
                                             <SelectItem value="inactive">Inactive</SelectItem>
-                                            <SelectItem value="broken">Broken</SelectItem>
+                                            <SelectItem value="maintenance">Maintenance</SelectItem>
+                                            <SelectItem value="damage">Damage</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     {errors.status && <p className="text-sm text-destructive">{errors.status}</p>}

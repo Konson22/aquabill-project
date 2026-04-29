@@ -6,6 +6,7 @@ use Database\Factories\ZoneFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Zone extends Model
 {
@@ -28,5 +29,13 @@ class Zone extends Model
     public function customers(): HasMany
     {
         return $this->hasMany(Customer::class);
+    }
+
+    /**
+     * Get the bills for the zone.
+     */
+    public function bills(): HasManyThrough
+    {
+        return $this->hasManyThrough(Bill::class, Customer::class);
     }
 }

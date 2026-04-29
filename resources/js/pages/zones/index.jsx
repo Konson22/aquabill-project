@@ -11,6 +11,8 @@ import {
     Edit2,
     CalendarDays
 } from 'lucide-react';
+import { useState } from 'react';
+import CreateZoneModal from './components/create-zone-modal';
 
 const breadcrumbs = [
     {
@@ -20,6 +22,8 @@ const breadcrumbs = [
 ];
 
 export default function Zones({ zones }) {
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Billing Zones" />
@@ -35,7 +39,7 @@ export default function Zones({ zones }) {
                             Manage geographic billing areas, water supply schedules, and customer density.
                         </p>
                     </div>
-                    <Button size="sm">
+                    <Button size="sm" onClick={() => setIsCreateModalOpen(true)}>
                         <Plus className="mr-2 h-4 w-4" />
                         New Zone
                     </Button>
@@ -93,6 +97,11 @@ export default function Zones({ zones }) {
                     ))}
                 </div>
             </div>
+
+            <CreateZoneModal 
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+            />
         </AppLayout>
     );
 }

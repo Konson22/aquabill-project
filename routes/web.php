@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\BillPaymentController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\CustomerDisconnectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Departments\AdminController;
 use App\Http\Controllers\Departments\CustomerCareController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Departments\HRController;
 use App\Http\Controllers\Departments\LedgerController;
 use App\Http\Controllers\MeterController;
 use App\Http\Controllers\MeterReadingController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ServiceChargeController;
 use App\Http\Controllers\ServiceChargeTypeController;
 use App\Http\Controllers\TariffController;
@@ -32,22 +34,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/customer-care', [CustomerCareController::class, 'index'])->middleware('department:customer_care')->name('customer-care');
 
     Route::prefix('reports')->group(function () {
-        Route::get('/revenue', function () {
-            return Inertia\Inertia::render('reports/revenue');
-        })->name('reports.revenue');
+        Route::get('/revenue', [ReportController::class, 'revenue'])->name('reports.revenue');
 
-        Route::get('/water-usage', function () {
-            return Inertia\Inertia::render('reports/water-usage');
-        })->name('reports.water-usage');
+        Route::get('/water-usage', [ReportController::class, 'waterUsage'])->name('reports.water-usage');
     });
 
-    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'show']);
+    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show']);
+    Route::get('disconnections', [CustomerDisconnectionController::class, 'index'])->name('disconnections.index');
+    Route::post('customers/{customer}/notify-disconnection', [CustomerDisconnectionController::class, 'notify'])->name('customers.notify-disconnection');
+    Route::post('customers/{customer}/disconnect', [CustomerDisconnectionController::class, 'disconnect'])->name('customers.disconnect');
+    Route::post('customers/{customer}/reconnect', [CustomerDisconnectionController::class, 'reconnect'])->name('customers.reconnect');
     Route::post('customers/{customer}/service-charges', [ServiceChargeController::class, 'store'])->name('customers.service-charges.store');
     Route::resource('tariffs', TariffController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
-    Route::resource('meters', MeterController::class)->only(['index', 'store']);
+    Route::post('meters/{meter}/replace', [MeterController::class, 'replace'])->name('meters.replace');
+    Route::resource('meters', MeterController::class)->only(['index', 'store', 'update']);
     Route::get('readings/export', [MeterReadingController::class, 'export'])->name('readings.export');
     Route::resource('readings', MeterReadingController::class)->only(['index', 'store', 'show']);
-    Route::resource('zones', ZoneController::class)->only(['index']);
+    Route::resource('zones', ZoneController::class)->only(['index', 'store']);
+    Route::post('service-charges/{service_charge}/confirm-payment', [ServiceChargeController::class, 'confirmPayment'])->name('service-charges.confirm-payment');
     Route::resource('service-charges', ServiceChargeController::class);
     Route::get('bills/{bill}/print', [BillController::class, 'print'])->name('bills.print');
     Route::get('bills/bulk-print', [BillController::class, 'bulkPrint'])->name('bills.bulk-print');
@@ -58,9 +62,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Keeping these for now if needed, or we can move them inside admin prefix
     Route::prefix('admin')->middleware('department:admin')->group(function () {
-        Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
-        Route::post('/users', [AdminUserController::class, 'store'])->name('users.store');
-        Route::get('/users/{user}', [AdminUserController::class, 'show'])->name('users.show');
+        Route::resource('/users', AdminUserController::class);
 
         Route::get('/roles', function () {
             return Inertia\Inertia::render('admin/roles/index');

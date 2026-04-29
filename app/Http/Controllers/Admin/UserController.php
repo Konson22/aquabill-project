@@ -118,7 +118,61 @@ class UserController extends Controller
                     'readings_count' => $user->recorded_readings_count,
                     'payments_count' => $user->received_payments_count,
                 ],
-            ]
+            ],
         ]);
+    }
+
+    public function edit(User $user): Response
+    {
+        $user->load(['roles:id']);
+
+        return Inertia::render('admin/users/edit', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'department_id' => $user->department_id,
+                'roles' => $user->roles->pluck('id')->map(fn ($id) => (string) $id),
+            ],
+            'departments' => Department::select('id', 'name')->get(),
+            'roles' => Role::select('id', 'name')->get(),
+        ]);
+    }
+
+    public function update(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email,'.$user->id],
+            'password' => ['nullable', 'confirmed', Password::defaults()],
+            'department_id' => ['nullable', 'exists:departments,id'],
+            'roles' => ['nullable', 'array'],
+            'roles.*' => ['exists:roles,id'],
+        ]);
+
+        $user->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'department_id' => $validated['department_id'] ?? null,
+        ]);
+
+        if ($request->filled('password')) {
+            $user->update([
+                'password' => Hash::make($validated['password']),
+            ]);
+        }
+
+        if (isset($validated['roles'])) {
+            $user->roles()->sync($validated['roles']);
+        }
+
+        return redirect()->route('users.index')->with('success', 'User updated successfully.');
+    }
+
+    public function destroy(User $user)
+    {
+        $user->delete();
+
+        return back()->with('success', 'User deleted successfully.');
     }
 }

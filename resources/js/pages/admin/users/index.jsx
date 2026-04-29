@@ -15,7 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Search, Shield, UserCog, Plus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Shield, UserCog, Plus, Loader2, Eye, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 export default function UsersIndex({ users, departments, roles, filters }) {
@@ -62,6 +62,12 @@ export default function UsersIndex({ users, departments, roles, filters }) {
         if (!open) {
             reset();
             clearErrors();
+        }
+    };
+
+    const handleDeleteUser = (user) => {
+        if (confirm(`Are you sure you want to delete ${user.name}?`)) {
+            router.delete(route('users.destroy', user.id));
         }
     };
 
@@ -233,6 +239,7 @@ export default function UsersIndex({ users, departments, roles, filters }) {
                                     <th className="px-4 py-3">Roles</th>
                                     <th className="px-4 py-3">Status</th>
                                     <th className="px-4 py-3 text-right">Last Login</th>
+                                    <th className="px-4 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -275,11 +282,33 @@ export default function UsersIndex({ users, departments, roles, filters }) {
                                         <td className="px-4 py-4 text-right text-sm text-muted-foreground">
                                             {user.last_login_at ? new Date(user.last_login_at).toLocaleString() : '—'}
                                         </td>
+                                        <td className="px-4 py-4 text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" asChild>
+                                                    <Link href={route('users.show', user.id)}>
+                                                        <Eye className="h-4 w-4" />
+                                                    </Link>
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" asChild>
+                                                    <Link href={route('users.edit', user.id)}>
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Link>
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => handleDeleteUser(user)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                                 {users.data.length === 0 && (
                                     <tr>
-                                        <td colSpan="5" className="px-4 py-12 text-center text-muted-foreground">
+                                        <td colSpan="6" className="px-4 py-12 text-center text-muted-foreground">
                                             No users found.
                                         </td>
                                     </tr>

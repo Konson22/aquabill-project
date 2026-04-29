@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
+use App\Models\ServiceCharge;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class ServiceChargeController extends Controller
 {
@@ -11,11 +14,11 @@ class ServiceChargeController extends Controller
      */
     public function index()
     {
-        $charges = \App\Models\ServiceCharge::with(['customer', 'serviceChargeType', 'issuer'])
+        $charges = ServiceCharge::with(['customer', 'serviceChargeType', 'issuer'])
             ->latest('issued_date')
             ->paginate(15);
 
-        return \Inertia\Inertia::render('service-charges/index', [
+        return Inertia::render('service-charges/index', [
             'charges' => $charges,
         ]);
     }
@@ -31,7 +34,7 @@ class ServiceChargeController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request, \App\Models\Customer $customer)
+    public function store(Request $request, Customer $customer)
     {
         $validated = $request->validate([
             'service_charge_type_id' => 'required|exists:service_charge_types,id',
@@ -40,7 +43,7 @@ class ServiceChargeController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $serviceCharge = \App\Models\ServiceCharge::create([
+        $serviceCharge = ServiceCharge::create([
             'customer_id' => $customer->id,
             'service_charge_type_id' => $validated['service_charge_type_id'],
             'amount' => $validated['amount'],
@@ -83,8 +86,17 @@ class ServiceChargeController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    /**
+     * Confirm payment for the service charge.
+     */
+    public function confirmPayment(Request $request, string $id)
     {
-        //
+        $charge = ServiceCharge::findOrFail($id);
+
+        $charge->update([
+            'status' => 'paid',
+        ]);
+
+        return back()->with('success', 'Service charge payment confirmed.');
     }
 }

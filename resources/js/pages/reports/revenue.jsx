@@ -23,6 +23,15 @@ import {
     TrendingUp,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 const breadcrumbs = [
     {
@@ -43,6 +52,7 @@ function formatMoney(value) {
 
 export default function RevenueReport({
     summary,
+    chartData = [],
     rows,
     filters,
 }) {
@@ -53,7 +63,7 @@ export default function RevenueReport({
         payments_count: 0,
     };
 
-    const safeRows = rows ?? [];
+    const safeRows = rows.data ?? [];
     const safeFilters = filters ?? { search: '', from: '', to: '' };
 
     const [search, setSearch] = useState(safeFilters.search ?? '');
@@ -118,7 +128,7 @@ export default function RevenueReport({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Card className="shadow-sm">
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
@@ -163,21 +173,6 @@ export default function RevenueReport({
                             <div className="mt-1 text-xs text-muted-foreground">Unpaid balances (arrears included)</div>
                         </CardContent>
                     </Card>
-
-                    <Card className="shadow-sm">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-semibold text-muted-foreground">Payments</CardTitle>
-                                <div className="h-9 w-9 rounded-full bg-purple-50 flex items-center justify-center text-purple-700">
-                                    <Receipt className="h-4 w-4" />
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-black">{Number(safeSummary.payments_count ?? 0).toLocaleString()}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Count of payments in period</div>
-                        </CardContent>
-                    </Card>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -188,16 +183,55 @@ export default function RevenueReport({
                                     <CardTitle className="text-base">Revenue Trend</CardTitle>
                                     <div className="text-xs text-muted-foreground">Chart placeholder (hook to backend series later)</div>
                                 </div>
-                                <Badge variant="outline" className="text-[10px] uppercase tracking-widest">
-                                    Coming soon
+                                <Badge variant="outline" className="text-[10px] uppercase tracking-widest text-emerald-600 border-emerald-200 bg-emerald-50">
+                                    Live Data
                                 </Badge>
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="h-48 rounded-lg border bg-muted/20 flex items-center justify-center text-sm text-muted-foreground">
-                                <span className="flex items-center gap-2">
-                                    <LineChart className="h-4 w-4" /> Revenue chart
-                                </span>
+                            <div className="h-64 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartData}>
+                                        <defs>
+                                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                        <XAxis 
+                                            dataKey="date" 
+                                            axisLine={false} 
+                                            tickLine={false} 
+                                            tick={{ fontSize: 10, fill: '#888' }}
+                                            dy={10}
+                                        />
+                                        <YAxis 
+                                            axisLine={false} 
+                                            tickLine={false} 
+                                            tick={{ fontSize: 10, fill: '#888' }}
+                                            tickFormatter={(value) => `SSP ${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`}
+                                        />
+                                        <Tooltip 
+                                            contentStyle={{ 
+                                                borderRadius: '12px', 
+                                                border: '1px solid #e2e8f0',
+                                                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                                                fontSize: '12px',
+                                                fontWeight: 'bold'
+                                            }}
+                                            formatter={(value) => [`SSP ${value.toLocaleString()}`, 'Revenue']}
+                                        />
+                                        <Area 
+                                            type="monotone" 
+                                            dataKey="revenue" 
+                                            stroke="#10b981" 
+                                            strokeWidth={3}
+                                            fillOpacity={1} 
+                                            fill="url(#colorRevenue)" 
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
                             </div>
                         </CardContent>
                     </Card>
@@ -287,10 +321,20 @@ export default function RevenueReport({
                             Tip: once the backend is wired, we can add pagination and export.
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" disabled>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={!rows.prev_page_url}
+                                onClick={() => router.get(rows.prev_page_url, { search, from, to }, { preserveState: true })}
+                            >
                                 <ChevronLeft className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="sm" disabled>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={!rows.next_page_url}
+                                onClick={() => router.get(rows.next_page_url, { search, from, to }, { preserveState: true })}
+                            >
                                 <ChevronRight className="h-4 w-4" />
                             </Button>
                         </div>

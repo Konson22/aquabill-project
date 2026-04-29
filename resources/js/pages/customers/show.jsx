@@ -22,8 +22,17 @@ import CustomerBills from './components/customer-bills';
 import CustomerReadings from './components/customer-readings';
 import CustomerPayments from './components/customer-payments';
 import CustomerServiceCharges from './components/customer-service-charges';
+import DisconnectionManagement from './components/disconnection-management';
+import MeterStatusModal from './components/meter-status-modal';
+import ReplaceMeterModal from './components/replace-meter-modal';
+import { useState } from 'react';
+import { BellOff, PowerOff } from 'lucide-react';
 
 export default function Show({ customer }) {
+    const [selectedMeter, setSelectedMeter] = useState(null);
+    const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+    const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false);
+
     const breadcrumbs = [
         { title: 'Customers', href: '/customers' },
         { title: customer?.account_number ?? 'Customer', href: customer ? `/customers/${customer.id}` : '/customers' },
@@ -52,6 +61,7 @@ export default function Show({ customer }) {
     const unpaidBills = bills.filter((bill) => bill?.status === 'unpaid').length;
     const overdueBills = bills.filter((bill) => bill?.status === 'overdue').length;
     const meters = customer?.meters ?? [];
+    const meterHistories = customer?.meterHistories ?? customer?.meter_histories ?? [];
     const unpaidAmount = bills
         .filter((bill) => bill?.status !== 'paid')
         .reduce((carry, bill) => carry + Number(bill?.total_amount ?? bill?.total ?? 0), 0);
@@ -175,10 +185,14 @@ export default function Show({ customer }) {
                 <Card className="rounded-xl border shadow-sm">
                     <CardContent className="p-4 md:p-6">
                         <Tabs defaultValue="customer-info" className="w-full">
-                            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg bg-muted/40 p-1 md:grid-cols-6">
+                            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg bg-muted/40 p-1 md:grid-cols-7">
                                 <TabsTrigger value="customer-info" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
                                     <User className="mr-2 h-4 w-4" />
-                                    Customer Info
+                                    Info
+                                </TabsTrigger>
+                                <TabsTrigger value="disconnections" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                                    <PowerOff className="mr-2 h-4 w-4" />
+                                    Status
                                 </TabsTrigger>
                                 <TabsTrigger value="bills" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
                                     <Receipt className="mr-2 h-4 w-4" />
@@ -190,7 +204,7 @@ export default function Show({ customer }) {
                                 </TabsTrigger>
                                 <TabsTrigger value="meters" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
                                     <Gauge className="mr-2 h-4 w-4" />
-                                    Meter Info
+                                    Meters
                                 </TabsTrigger>
                                 <TabsTrigger value="payments" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
                                     <CreditCard className="mr-2 h-4 w-4" />
@@ -198,7 +212,7 @@ export default function Show({ customer }) {
                                 </TabsTrigger>
                                 <TabsTrigger value="charges" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
                                     <Wrench className="mr-2 h-4 w-4" />
-                                    Service Charges
+                                    Charges
                                 </TabsTrigger>
                             </TabsList>
 
@@ -250,6 +264,10 @@ export default function Show({ customer }) {
                                     </div>
                                 </TabsContent>
 
+                                <TabsContent value="disconnections" className="m-0 border-none p-0 outline-none">
+                                    <DisconnectionManagement customer={customer} />
+                                </TabsContent>
+
                                 <TabsContent value="bills" className="m-0 border-none p-0 outline-none">
                                     <CustomerBills bills={customer?.bills} />
                                 </TabsContent>
@@ -277,9 +295,35 @@ export default function Show({ customer }) {
                                                                 Type: {meter?.meter_type ?? '—'}
                                                             </p>
                                                         </div>
-                                                        <Badge variant={meter?.status === 'active' ? 'success' : 'secondary'} className="w-fit capitalize text-[10px]">
-                                                            {meter?.status ?? 'unknown'}
-                                                        </Badge>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge variant={meter?.status === 'active' ? 'success' : 'secondary'} className="w-fit capitalize text-[10px]">
+                                                                {meter?.status ?? 'unknown'}
+                                                            </Badge>
+                                                            <div className="flex items-center gap-1">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-7 text-[10px] font-bold uppercase tracking-widest text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                                                                    onClick={() => {
+                                                                        setSelectedMeter(meter);
+                                                                        setIsStatusModalOpen(true);
+                                                                    }}
+                                                                >
+                                                                    Status
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-7 text-[10px] font-bold uppercase tracking-widest text-destructive hover:bg-destructive/10"
+                                                                    onClick={() => {
+                                                                        setSelectedMeter(meter);
+                                                                        setIsReplaceModalOpen(true);
+                                                                    }}
+                                                                >
+                                                                    Replace
+                                                                </Button>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-muted-foreground md:grid-cols-3">
                                                         <p>
@@ -296,6 +340,43 @@ export default function Show({ customer }) {
                                             ))}
                                         </div>
                                     )}
+
+                                    {meterHistories.length > 0 && (
+                                        <div className="mt-8 space-y-4">
+                                            <div className="flex items-center gap-2 border-b pb-2">
+                                                <Activity className="h-4 w-4 text-muted-foreground" />
+                                                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Meter Replacement History</h3>
+                                            </div>
+                                            <div className="space-y-3">
+                                                {meterHistories.map((history) => (
+                                                    <div key={history.id} className="rounded-lg border bg-muted/20 p-4 text-sm shadow-sm">
+                                                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                                            <div>
+                                                                <p className="font-mono font-bold text-foreground">
+                                                                    {history.meter?.meter_number ?? 'Unknown Meter'}
+                                                                </p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    Unassigned on: {formatDate(history.unassigned_at)}
+                                                                </p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="text-xs font-medium text-foreground">Reason: {history.reason}</p>
+                                                                <p className="text-[10px] text-muted-foreground">Final Reading: {history.final_reading}</p>
+                                                            </div>
+                                                        </div>
+                                                        {history.notes && (
+                                                            <div className="mt-2 border-t pt-2 text-[11px] italic text-muted-foreground">
+                                                                Notes: {history.notes}
+                                                            </div>
+                                                        )}
+                                                        <div className="mt-2 text-[10px] text-muted-foreground">
+                                                            Processed by: {history.replaced_by?.name ?? history.replacedBy?.name ?? 'System'}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </TabsContent>
 
                                 <TabsContent value="payments" className="m-0 border-none p-0 outline-none">
@@ -310,6 +391,18 @@ export default function Show({ customer }) {
                     </CardContent>
                 </Card>
             </div>
+
+            <MeterStatusModal
+                meter={selectedMeter}
+                isOpen={isStatusModalOpen}
+                onClose={() => setIsStatusModalOpen(false)}
+            />
+
+            <ReplaceMeterModal
+                meter={selectedMeter}
+                isOpen={isReplaceModalOpen}
+                onClose={() => setIsReplaceModalOpen(false)}
+            />
         </AppLayout>
     );
 }

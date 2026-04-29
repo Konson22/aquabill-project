@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Customer extends Model
 {
@@ -83,7 +84,7 @@ class Customer extends Model
     /**
      * Get the readings for the customer through their meters.
      */
-    public function readings(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    public function readings(): HasManyThrough
     {
         return $this->hasManyThrough(MeterReading::class, Meter::class);
     }
@@ -116,5 +117,24 @@ class Customer extends Model
     public function serviceCharges(): HasMany
     {
         return $this->hasMany(ServiceCharge::class);
+    }
+
+    /**
+     * Get the meter history for the customer.
+     *
+     * @return HasMany<MeterHistory, Customer>
+     */
+    public function meterHistories(): HasMany
+    {
+        return $this->hasMany(MeterHistory::class);
+    }
+    /**
+     * Get the disconnections for the customer.
+     *
+     * @return HasMany<Disconnection, Customer>
+     */
+    public function disconnections(): HasMany
+    {
+        return $this->hasMany(Disconnection::class);
     }
 }

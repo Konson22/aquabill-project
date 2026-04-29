@@ -59,4 +59,14 @@ class Meter extends Model
     {
         return $this->hasMany(Bill::class);
     }
+
+    /**
+     * Get the history of this meter.
+     *
+     * @return HasMany<MeterHistory, Meter>
+     */
+    public function history(): HasMany
+    {
+        return $this->hasMany(MeterHistory::class);
+    }
 }

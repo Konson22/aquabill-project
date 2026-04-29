@@ -39,12 +39,17 @@ import {
     DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import ConfirmPaymentModal from './components/confirm-payment-modal';
 
 export default function ServiceChargesIndex({ charges }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [dateFilter, setDateFilter] = useState('all');
     const [showFilters, setShowFilters] = useState(false);
+
+    // Modal state
+    const [selectedCharge, setSelectedCharge] = useState(null);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
     const breadcrumbs = [
         { title: 'Dashboard', href: '/dashboard' },
@@ -324,7 +329,14 @@ export default function ServiceChargesIndex({ charges }) {
                                                             Print Receipt
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator className="my-1" />
-                                                        <DropdownMenuItem className="rounded-md py-2 px-3 text-sm font-bold cursor-pointer text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+                                                        <DropdownMenuItem 
+                                                            className="rounded-md py-2 px-3 text-sm font-bold cursor-pointer text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                                            onSelect={() => {
+                                                                setSelectedCharge(charge);
+                                                                setIsPaymentModalOpen(true);
+                                                            }}
+                                                            disabled={charge.status === 'paid'}
+                                                        >
                                                             <CheckCircle2 className="mr-2 h-4 w-4" />
                                                             Confirm Payment
                                                         </DropdownMenuItem>
@@ -382,6 +394,12 @@ export default function ServiceChargesIndex({ charges }) {
                     </div>
                 </div>
             </div>
+
+            <ConfirmPaymentModal 
+                charge={selectedCharge}
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+            />
         </AppLayout>
     );
 }
