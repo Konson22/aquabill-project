@@ -13,6 +13,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { MapPin, Activity, Calendar, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function ReadingModal({ customer, isOpen, onClose }) {
@@ -27,17 +34,18 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
 
     useEffect(() => {
         if (isOpen && customer?.meters?.length > 0) {
-            const firstMeter = customer.meters[0];
-            setSelectedMeter(firstMeter);
-            setData({
-                meter_id: firstMeter.id.toString(),
-                current_reading: '',
-                reading_date: new Date().toISOString().split('T')[0],
-                notes: '',
-            });
+            const meterIdToSelect = data.meter_id || customer.meters[0].id.toString();
+            const meter = customer.meters.find(m => m.id.toString() === meterIdToSelect) || customer.meters[0];
+
+            setSelectedMeter(meter);
+            setData(prevData => ({
+                ...prevData,
+                meter_id: meter.id.toString(),
+            }));
             clearErrors();
         }
     }, [customer, isOpen]);
+
 
     const submit = (e) => {
         e.preventDefault();
@@ -66,18 +74,17 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
                     </DialogHeader>
 
                     <div className="grid gap-4 py-4">
-                        {/* Static Meter Info */}
                         <div className="grid gap-2">
-                            <Label>Meter Details</Label>
-                            {selectedMeter ? (
-                                <div className="flex items-center justify-between p-3 rounded-lg border bg-blue-50/50 border-blue-100">
+                            <Label>Assigned Meter</Label>
+                            {customer.meters?.length > 0 ? (
+                                <div className="bg-muted/30 p-3 rounded-lg border flex items-center justify-between h-14">
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-bold text-blue-900">{selectedMeter.meter_number}</span>
-                                        <span className="text-[10px] text-blue-700 uppercase font-black tracking-tighter">
-                                            {selectedMeter.status} • {selectedMeter.meter_type}
+                                        <span className="font-bold text-sm">{customer.meters[0].meter_number}</span>
+                                        <span className="text-[10px] text-muted-foreground uppercase">
+                                            {customer.meters[0].status} • {customer.meters[0].meter_type || 'Standard'}
                                         </span>
                                     </div>
-                                    <Badge variant="outline" className="bg-white border-blue-200">Active</Badge>
+                                    <Activity className="h-4 w-4 text-indigo-500 opacity-50" />
                                 </div>
                             ) : (
                                 <Alert variant="destructive" className="py-2">
@@ -87,7 +94,6 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
                                     </AlertDescription>
                                 </Alert>
                             )}
-                            {errors.meter_id && <p className="text-xs text-red-500">{errors.meter_id}</p>}
                         </div>
 
                         {/* Previous Reading Info */}
@@ -95,10 +101,10 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
                             <div className="bg-muted/50 p-3 rounded-lg border flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <MapPin className="h-3 w-3" />
-                                    <span>Previous Reading</span>
+                                    <span>Previous Reading </span>
                                 </div>
                                 <span className="font-mono font-bold text-sm">
-                                    {selectedMeter.last_reading?.current_reading || 0} m³
+                                    {selectedMeter.last_reading || 0} m³
                                 </span>
                             </div>
                         )}
@@ -140,7 +146,7 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
                         </div>
 
                         {/* Warning if current < previous */}
-                        {selectedMeter && data.current_reading && parseFloat(data.current_reading) < (selectedMeter.last_reading?.current_reading || 0) && (
+                        {selectedMeter && data.current_reading && parseFloat(data.current_reading) < (selectedMeter.last_reading || 0) && (
                             <Alert variant="destructive" className="py-2">
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertDescription className="text-[10px]">

@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace App\Http\Controllers;
 
@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Disconnection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 
 class CustomerDisconnectionController extends Controller
 {
@@ -23,7 +24,7 @@ class CustomerDisconnectionController extends Controller
             ->latest()
             ->paginate(50);
 
-        return Inertia::render('admin/disconnections/index', [
+        return Inertia::render('connection-management/index', [
             'stats' => $stats,
             'disconnections' => $disconnections,
         ]);
@@ -61,7 +62,7 @@ class CustomerDisconnectionController extends Controller
 
         $disconnection = $customer->disconnections()->whereIn('status', ['notified', 'grace_period'])->latest()->first();
 
-        if (!$disconnection) {
+        if (! $disconnection) {
             $disconnection = Disconnection::create([
                 'customer_id' => $customer->id,
                 'notified_at' => now(),
@@ -80,15 +81,18 @@ class CustomerDisconnectionController extends Controller
                 'disconnection_type' => $request->disconnection_type,
                 'disconnected_at' => now(),
                 'disconnected_by' => Auth::id(),
-                'notes' => $disconnection->notes . "\n\nActual disconnection (" . str_replace('_', ' ', $request->disconnection_type) . ") performed on " . now()->toDateTimeString(),
+                'notes' => $disconnection->notes."\n\nActual disconnection (".str_replace('_', ' ', $request->disconnection_type).') performed on '.now()->toDateTimeString(),
             ]);
         }
 
         $customer->update(['status' => 'disconnected']);
 
-        // If meter_removed, we should probably set meter status to inactive or unassign it
+        // If meter_removed, unassign the meter so it can be reassigned later.
         if ($request->disconnection_type === 'meter_removed') {
-            $customer->meters()->update(['status' => 'inactive']);
+            $customer->meters()->update([
+                'status' => 'inactive',
+                'customer_id' => null,
+            ]);
         }
 
         return back()->with('success', 'Customer disconnected successfully.');
@@ -103,7 +107,7 @@ class CustomerDisconnectionController extends Controller
                 'status' => 'reconnected',
                 'reconnected_at' => now(),
                 'reconnected_by' => Auth::id(),
-                'notes' => $disconnection->notes . "\n\nReconnection performed on " . now()->toDateTimeString(),
+                'notes' => $disconnection->notes."\n\nReconnection performed on ".now()->toDateTimeString(),
             ]);
         }
 

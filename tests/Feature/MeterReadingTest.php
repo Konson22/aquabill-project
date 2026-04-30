@@ -167,3 +167,53 @@ test('readings index does not include initial readings', function () {
     expect($ids)->toContain($normal->id);
     expect($ids)->not->toContain($initial->id);
 });
+
+test('meter reassignment does not reuse previous customer last reading', function () {
+    $tariff = Tariff::create([
+        'name' => 'Residential',
+        'price_per_unit' => 50,
+        'fixed_charge' => 500,
+    ]);
+    $zone = Zone::create(['name' => 'Test Zone']);
+
+    $firstCustomer = Customer::create([
+        'customer_type' => 'residential',
+        'name' => 'First Customer',
+        'phone' => '123456789',
+        'address' => 'Address 1',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+    ]);
+
+    $secondCustomer = Customer::create([
+        'customer_type' => 'residential',
+        'name' => 'Second Customer',
+        'phone' => '987654321',
+        'address' => 'Address 2',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+    ]);
+
+    $meter = Meter::create([
+        'customer_id' => $firstCustomer->id,
+        'meter_number' => 'MTR-REASSIGN-001',
+    ]);
+
+    MeterReading::create([
+        'meter_id' => $meter->id,
+        'reading_date' => now()->subDays(5),
+        'previous_reading' => 0,
+        'current_reading' => 120,
+    ]);
+
+    $meter->update(['customer_id' => $secondCustomer->id]);
+
+    $newReading = MeterReading::create([
+        'meter_id' => $meter->id,
+        'reading_date' => now(),
+        'current_reading' => 35,
+    ]);
+
+    expect($newReading->previous_reading)->toEqual(0);
+    expect((int) $newReading->customer_id)->toBe($secondCustomer->id);
+});

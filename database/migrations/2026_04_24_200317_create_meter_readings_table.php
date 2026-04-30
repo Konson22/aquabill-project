@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('meter_readings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('meter_id')->constrained('meters')->onDelete('cascade');
+            $table->string('meter_number')->nullable();
+            $table->unsignedBigInteger('meter_id');
             $table->date('reading_date');
             $table->decimal('previous_reading', 10, 2);
             $table->decimal('current_reading', 10, 2);
@@ -24,9 +25,11 @@ return new class extends Migration
             $table->boolean('is_initial')->default(false);
             $table->timestamps();
 
+            $table->index('meter_number');
             $table->index('meter_id');
             $table->index('is_initial');
             $table->index('reading_date');
+            $table->index(['meter_number', 'reading_date']);
             $table->index(['meter_id', 'reading_date']);
         });
     }

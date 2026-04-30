@@ -1,11 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import ReadingModal from '@/components/reading-modal';
 import ServiceChargeModal from '@/components/service-charge-modal';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Search,
     Plus,
@@ -17,8 +17,10 @@ import {
     ChevronRight,
     ExternalLink,
     Activity,
-    CreditCard
+    CreditCard,
+    X
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const breadcrumbs = [
     {
@@ -27,10 +29,28 @@ const breadcrumbs = [
     },
 ];
 
-export default function Customers({ customers, serviceChargeTypes }) {
+export default function Customers({ customers, serviceChargeTypes, zones = [], filters = {} }) {
     const [isReadingModalOpen, setIsReadingModalOpen] = useState(false);
     const [isServiceChargeModalOpen, setIsServiceChargeModalOpen] = useState(false);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const [zoneId, setZoneId] = useState(filters?.zone_id ?? 'all');
+    const isTypingSearch = useMemo(() => (filters?.search ?? '') !== search, [filters?.search, search]);
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            router.get(
+                route('customers.index'),
+                { 
+                    search: search || undefined,
+                    zone_id: zoneId === 'all' ? undefined : zoneId
+                },
+                { preserveScroll: true, preserveState: true, replace: true, only: ['customers', 'filters'] },
+            );
+        }, 300);
+
+        return () => clearTimeout(timeout);
+    }, [search, zoneId]);
 
     const handleRecordReading = (customer) => {
         setSelectedCustomer(customer);
@@ -72,20 +92,50 @@ export default function Customers({ customers, serviceChargeTypes }) {
                     </div>
                 </div>
 
-                {/* Filters & Actions */}
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-card p-4 rounded-xl border shadow-sm">
                     <div className="relative w-full md:w-96">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            placeholder="Search by name, account #, or phone..."
+                            placeholder="Search by name, meter #, or phone..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
                             className="pl-10"
                         />
+                        {isTypingSearch && (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <Activity className="h-3 w-3 text-primary animate-pulse" />
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
-                            <Filter className="mr-2 h-4 w-4" />
-                            Filter
-                        </Button>
+                        <div className="w-48">
+                            <Select value={zoneId} onValueChange={setZoneId}>
+                                <SelectTrigger className="h-10">
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                                        <SelectValue placeholder="All Zones" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Zones</SelectItem>
+                                    {zones.map((zone) => (
+                                        <SelectItem key={zone.id} value={zone.id.toString()}>
+                                            {zone.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {zoneId !== 'all' && (
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => setZoneId('all')}
+                                className="h-10 w-10 text-muted-foreground hover:text-destructive"
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        )}
                     </div>
                 </div>
 

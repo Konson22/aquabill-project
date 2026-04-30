@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('customer_id')->constrained()->onDelete('cascade');
-            $table->foreignId('meter_id')->constrained()->onDelete('cascade');
+            $table->string('meter_number')->nullable();
+            $table->unsignedBigInteger('meter_id');
             $table->foreignId('reading_id')->constrained('meter_readings')->onDelete('cascade');
 
             $table->decimal('consumption', 10, 2);
@@ -32,6 +33,7 @@ return new class extends Migration
 
             // Prevent duplicate bills for the same reading
             $table->unique('reading_id');
+            $table->index('meter_number');
         });
     }
 

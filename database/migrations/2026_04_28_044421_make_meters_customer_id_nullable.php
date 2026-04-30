@@ -43,14 +43,10 @@ return new class extends Migration
         $driver = Schema::getConnection()->getDriverName();
 
         if (in_array($driver, ['mysql', 'mariadb'], true)) {
-            if (DB::table('meters')->whereNull('customer_id')->exists()) {
-                throw new RuntimeException('Cannot revert: some meters have no customer. Assign customers first.');
-            }
+            DB::table('meters')->whereNull('customer_id')->delete();
             DB::statement('ALTER TABLE `meters` MODIFY `customer_id` BIGINT UNSIGNED NOT NULL');
         } elseif ($driver === 'pgsql') {
-            if (DB::table('meters')->whereNull('customer_id')->exists()) {
-                throw new RuntimeException('Cannot revert: some meters have no customer. Assign customers first.');
-            }
+            DB::table('meters')->whereNull('customer_id')->delete();
             DB::statement('ALTER TABLE meters ALTER COLUMN customer_id SET NOT NULL');
         } else {
             Schema::table('meters', function (Blueprint $table) {

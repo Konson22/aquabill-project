@@ -42,6 +42,7 @@ export default function Meters({ meters, filters = {} }) {
 
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         meter_number: '',
+        last_reading: '0',
         status: 'active',
     });
 
@@ -95,7 +96,7 @@ export default function Meters({ meters, filters = {} }) {
                         <DialogTrigger asChild>
                             <Button size="sm">
                                 <Plus className="mr-2 h-4 w-4" />
-                                Install New Meter
+                                Add New Meter
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-md">
@@ -118,6 +119,21 @@ export default function Meters({ meters, filters = {} }) {
                                     />
                                     {errors.meter_number && (
                                         <p className="text-sm text-destructive">{errors.meter_number}</p>
+                                    )}
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="last_reading">Initial/Last Reading (m³)</Label>
+                                    <Input
+                                        id="last_reading"
+                                        type="number"
+                                        step="0.01"
+                                        value={data.last_reading}
+                                        onChange={(event) => setData('last_reading', event.target.value)}
+                                        placeholder="0.00"
+                                    />
+                                    {errors.last_reading && (
+                                        <p className="text-sm text-destructive">{errors.last_reading}</p>
                                     )}
                                 </div>
 
@@ -196,7 +212,7 @@ export default function Meters({ meters, filters = {} }) {
                                 <tr className="border-b bg-muted/50 transition-colors text-xs uppercase tracking-wider">
                                     <th className="px-6 py-4 font-bold text-muted-foreground">Meter Number</th>
                                     <th className="px-6 py-4 font-bold text-muted-foreground">Customer</th>
-                                    <th className="px-6 py-4 font-bold text-muted-foreground">Location</th>
+                                    <th className="px-6 py-4 font-bold text-muted-foreground">Last Reading</th>
                                     <th className="px-6 py-4 font-bold text-muted-foreground">Status</th>
                                     <th className="px-6 py-4 font-bold text-muted-foreground text-right">Actions</th>
                                 </tr>
@@ -223,15 +239,12 @@ export default function Meters({ meters, filters = {} }) {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                                <MapPin className="h-3 w-3" />
-                                                {meter.customer?.address
-                                                    ? `${meter.customer.address.substring(0, 20)}...`
-                                                    : 'No address'}
+                                            <div className="flex items-center gap-1 text-sm font-mono font-bold">
+                                                {meter.last_reading || 0} <span className="text-[10px] text-muted-foreground">m³</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <Badge 
+                                            <Badge
                                                 variant={meter.status === 'active' ? 'success' : 'secondary'}
                                                 className="rounded-md font-mono text-[10px]"
                                             >
@@ -279,15 +292,15 @@ export default function Meters({ meters, filters = {} }) {
                                     >
                                         {link.url ? (
                                             <Link href={link.url}>
-                                                {link.label === '&laquo; Previous' ? <ChevronLeft className="h-4 w-4" /> : 
-                                                 link.label === 'Next &raquo;' ? <ChevronRight className="h-4 w-4" /> : 
-                                                 link.label}
+                                                {link.label === '&laquo; Previous' ? <ChevronLeft className="h-4 w-4" /> :
+                                                    link.label === 'Next &raquo;' ? <ChevronRight className="h-4 w-4" /> :
+                                                        link.label}
                                             </Link>
                                         ) : (
                                             <span>
-                                                {link.label === '&laquo; Previous' ? <ChevronLeft className="h-4 w-4" /> : 
-                                                 link.label === 'Next &raquo;' ? <ChevronRight className="h-4 w-4" /> : 
-                                                 link.label}
+                                                {link.label === '&laquo; Previous' ? <ChevronLeft className="h-4 w-4" /> :
+                                                    link.label === 'Next &raquo;' ? <ChevronRight className="h-4 w-4" /> :
+                                                        link.label}
                                             </span>
                                         )}
                                     </Button>

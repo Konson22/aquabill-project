@@ -17,8 +17,21 @@ class Meter extends Model
     protected $fillable = [
         'customer_id',
         'meter_number',
+        'last_reading',
         'status',
     ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'last_reading' => 'decimal:2',
+        ];
+    }
 
     /**
      * Get the customer that owns the meter.
@@ -45,7 +58,7 @@ class Meter extends Model
      *
      * @return HasOne<MeterReading, Meter>
      */
-    public function lastReading(): HasOne
+    public function latestReading(): HasOne
     {
         return $this->hasOne(MeterReading::class)->latestOfMany(['reading_date', 'id']);
     }

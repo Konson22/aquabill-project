@@ -31,6 +31,7 @@ class BillService
 
         // 1. Get latest meter reading that does NOT already have a bill
         $reading = $meter->readings()
+            ->where('customer_id', $customer->id)
             ->whereDoesntHave('bill')
             ->latest('reading_date')
             ->first();
@@ -84,6 +85,7 @@ class BillService
         return DB::transaction(function () use ($customer, $meter, $reading, $consumption, $unitPrice, $fixedCharge, $currentCharge, $previousBalance, $totalAmount) {
             return Bill::create([
                 'customer_id' => $customer->id,
+                'meter_number' => $meter->meter_number,
                 'meter_id' => $meter->id,
                 'reading_id' => $reading->id,
                 // 'tariff_id' removed as per user request, using snapshots instead

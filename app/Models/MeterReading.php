@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Database\Factories\MeterReadingFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 
 class MeterReading extends Model
 {
@@ -15,6 +17,8 @@ class MeterReading extends Model
 
     protected $fillable = [
         'meter_id',
+        'meter_number',
+        'customer_id',
         'reading_date',
         'previous_reading',
         'current_reading',
@@ -46,19 +50,30 @@ class MeterReading extends Model
     /**
      * Get the full URL for the reading image.
      */
-    protected function imageUrl(): \Illuminate\Database\Eloquent\Casts\Attribute
+    protected function imageUrl(): Attribute
     {
-        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
-            get: fn () => $this->image ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->image) : null,
+        return Attribute::make(
+            get: fn () => $this->image ? Storage::disk('public')->url($this->image) : null,
         );
     }
 
     protected static function booted(): void
     {
         static::creating(function (MeterReading $reading) {
+            if ($reading->customer_id === null) {
+                $meterCustomerId = Meter::query()->whereKey($reading->meter_id)->value('customer_id');
+                $reading->customer_id = $meterCustomerId;
+            }
+
+            if ($reading->meter_number === null) {
+                $meterNumber = Meter::query()->whereKey($reading->meter_id)->value('meter_number');
+                $reading->meter_number = $meterNumber;
+            }
+
             // Fetch previous reading if not provided or explicitly null
             if ($reading->previous_reading === null) {
                 $lastReading = static::where('meter_id', $reading->meter_id)
+                    ->where('customer_id', $reading->customer_id)
                     ->orderBy('reading_date', 'desc')
                     ->orderBy('id', 'desc')
                     ->first();
@@ -73,6 +88,12 @@ class MeterReading extends Model
             if ($reading->consumption < 0) {
                 throw new \InvalidArgumentException("Current reading ({$reading->current_reading}) cannot be less than previous reading ({$reading->previous_reading}).");
             }
+        });
+
+        static::created(function (MeterReading $reading) {
+            $reading->meter()->update([
+                'last_reading' => $reading->current_reading,
+            ]);
         });
     }
 

@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Customer;
 use App\Models\Meter;
-use App\Models\MeterReading;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Carbon\Carbon;
@@ -72,36 +71,27 @@ class CustomerSeeder extends Seeder
                         ],
                     );
 
-                    $meter = Meter::updateOrCreate(
-                        ['meter_number' => $accountNumber],
-                        [
-                            'customer_id' => $customer->id,
-                            'status' => 'active',
-                        ],
-                    );
-
                     $initialReading = $this->parseInitialReading(Arr::get($row, 'initialReading'));
+
+                    $meterAttributes = [
+                        'customer_id' => $customer->id,
+                        'status' => 'active',
+                    ];
+
                     if ($initialReading !== null) {
-                        MeterReading::updateOrCreate(
-                            [
-                                'meter_id' => $meter->id,
-                                'reading_date' => ($connectionDate ?? now())->toDateString(),
-                            ],
-                            [
-                                'previous_reading' => 0,
-                                'current_reading' => $initialReading,
-                                'recorded_by' => null,
-                                'notes' => 'Initial reading (seed)',
-                                'is_initial' => true,
-                            ],
-                        );
+                        $meterAttributes['last_reading'] = $initialReading;
                     }
+
+                    Meter::updateOrCreate(
+                        ['meter_number' => $accountNumber],
+                        $meterAttributes,
+                    );
                 }
             }
         }
     }
 
-   function parseConnectionDate(mixed $value): ?Carbon
+    public function parseConnectionDate(mixed $value): ?Carbon
     {
         if (! is_string($value) || trim($value) === '') {
             return null;

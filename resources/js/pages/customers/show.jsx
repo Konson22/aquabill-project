@@ -16,8 +16,11 @@ import {
     Receipt,
     User,
     Wrench,
+    BellOff,
+    PowerOff,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ReadingModal from '@/components/reading-modal';
 import CustomerBills from './components/customer-bills';
 import CustomerReadings from './components/customer-readings';
 import CustomerPayments from './components/customer-payments';
@@ -26,12 +29,13 @@ import DisconnectionManagement from './components/disconnection-management';
 import MeterStatusModal from './components/meter-status-modal';
 import ReplaceMeterModal from './components/replace-meter-modal';
 import { useState } from 'react';
-import { BellOff, PowerOff } from 'lucide-react';
 
-export default function Show({ customer }) {
+export default function Show({ customer, unassignedMeters = [] }) {
     const [selectedMeter, setSelectedMeter] = useState(null);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false);
+    const [isReadingModalOpen, setIsReadingModalOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('customer-info');
 
     const breadcrumbs = [
         { title: 'Customers', href: '/customers' },
@@ -84,11 +88,26 @@ export default function Show({ customer }) {
                     </Link>
 
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" disabled>
-                            <Wrench className="mr-2 h-4 w-4" />
-                            Edit Customer
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setActiveTab('disconnections')}
+                            className="text-orange-600 hover:text-orange-700"
+                        >
+                            <PowerOff className="mr-2 h-4 w-4" />
+                            Disconnection
                         </Button>
-                        <Button size="sm" disabled className="bg-blue-600 hover:bg-blue-700">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={route('customers.edit', customer.id)}>
+                                <Wrench className="mr-2 h-4 w-4" />
+                                Edit Customer
+                            </Link>
+                        </Button>
+                        <Button 
+                            size="sm" 
+                            className="bg-blue-600 hover:bg-blue-700"
+                            onClick={() => setIsReadingModalOpen(true)}
+                        >
                             <Droplet className="mr-2 h-4 w-4" />
                             Record Reading
                         </Button>
@@ -184,7 +203,7 @@ export default function Show({ customer }) {
                 {/* Customer Data Tabs */}
                 <Card className="rounded-xl border shadow-sm">
                     <CardContent className="p-4 md:p-6">
-                        <Tabs defaultValue="customer-info" className="w-full">
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                             <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg bg-muted/40 p-1 md:grid-cols-7">
                                 <TabsTrigger value="customer-info" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
                                     <User className="mr-2 h-4 w-4" />
@@ -400,8 +419,15 @@ export default function Show({ customer }) {
 
             <ReplaceMeterModal
                 meter={selectedMeter}
+                unassignedMeters={unassignedMeters}
                 isOpen={isReplaceModalOpen}
                 onClose={() => setIsReplaceModalOpen(false)}
+            />
+
+            <ReadingModal
+                customer={customer}
+                isOpen={isReadingModalOpen}
+                onClose={() => setIsReadingModalOpen(false)}
             />
         </AppLayout>
     );

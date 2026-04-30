@@ -39,7 +39,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/water-usage', [ReportController::class, 'waterUsage'])->name('reports.water-usage');
     });
 
-    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show']);
+    Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
     Route::get('disconnections', [CustomerDisconnectionController::class, 'index'])->name('disconnections.index');
     Route::post('customers/{customer}/notify-disconnection', [CustomerDisconnectionController::class, 'notify'])->name('customers.notify-disconnection');
     Route::post('customers/{customer}/disconnect', [CustomerDisconnectionController::class, 'disconnect'])->name('customers.disconnect');
@@ -76,7 +76,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return Inertia\Inertia::render('admin/setting/index');
         })->name('admin.settings');
 
-        Route::resource('settings/service-charges', ServiceChargeTypeController::class)->names([
+        Route::resource('settings/service-charges', ServiceChargeTypeController::class)->only([
+            'index',
+            'store',
+            'update',
+            'destroy',
+        ])->names([
             'index' => 'admin.service-charges.index',
             'store' => 'admin.service-charges.store',
             'update' => 'admin.service-charges.update',

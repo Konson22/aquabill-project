@@ -13,16 +13,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from '@inertiajs/react';
 import { Loader2, AlertTriangle } from 'lucide-react';
+import { useEffect } from 'react';
 import InputError from '@/components/input-error';
 
-export default function ReplaceMeterModal({ meter, isOpen, onClose }) {
+export default function ReplaceMeterModal({ meter, unassignedMeters = [], isOpen, onClose }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        final_reading: '',
+        final_reading: meter?.last_reading || 0,
         reason: 'Faulty Mechanism',
         notes: '',
-        new_meter_number: '',
+        new_meter_id: '',
         new_meter_status: 'active',
     });
+
+    // Update final_reading when meter changes
+    useEffect(() => {
+        if (meter) {
+            setData('final_reading', meter.last_reading || 0);
+        }
+    }, [meter]);
 
     const submit = (e) => {
         e.preventDefault();
@@ -50,14 +58,28 @@ export default function ReplaceMeterModal({ meter, isOpen, onClose }) {
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="new_meter_number">New Meter Number</Label>
-                                <Input
-                                    id="new_meter_number"
-                                    value={data.new_meter_number}
-                                    onChange={(e) => setData('new_meter_number', e.target.value)}
-                                    placeholder="WTR-..."
-                                />
-                                <InputError message={errors.new_meter_number} />
+                                <Label htmlFor="new_meter_id">Select New Meter</Label>
+                                <Select value={data.new_meter_id} onValueChange={(value) => setData('new_meter_id', value)}>
+                                    <SelectTrigger id="new_meter_id">
+                                        <SelectValue placeholder="Choose a meter..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {unassignedMeters.length > 0 ? (
+                                            unassignedMeters.map((m) => (
+                                                <SelectItem key={m.id} value={m.id.toString()}>
+                                                    <div className="flex justify-between w-full gap-4">
+                                                        {m.meter_number}
+                                                    </div>
+                                                </SelectItem>
+                                            ))
+                                        ) : (
+                                            <div className="px-2 py-4 text-center text-xs text-muted-foreground italic">
+                                                No unassigned meters available.
+                                            </div>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                <InputError message={errors.new_meter_id} />
                             </div>
                             <div className="grid gap-2">
                                 <Label>New Meter Status</Label>
@@ -77,17 +99,15 @@ export default function ReplaceMeterModal({ meter, isOpen, onClose }) {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="final_reading">Final Reading for Old Meter</Label>
-                            <Input
-                                id="final_reading"
-                                type="number"
-                                step="0.01"
-                                value={data.final_reading}
-                                onChange={(e) => setData('final_reading', e.target.value)}
-                                placeholder="0.00"
-                            />
-                            <InputError message={errors.final_reading} />
+                            <Label className="text-[10px] uppercase text-indigo-600 font-bold">New Meter Initial Reading</Label>
+                            <div className="bg-indigo-50/50 p-3 rounded-lg border border-indigo-100 font-mono text-sm font-bold flex justify-between items-center text-indigo-700">
+                                <span>{unassignedMeters.find(m => m.id.toString() === data.new_meter_id)?.last_reading || 0}</span>
+                                <span className="text-xs opacity-50 uppercase">m³</span>
+                            </div>
                         </div>
+
+                        {/* Hidden input to satisfy the server-side final_reading requirement for the old meter */}
+                        <input type="hidden" value={data.final_reading} name="final_reading" />
 
                         <div className="grid gap-2">
                             <Label>Reason for Replacement</Label>

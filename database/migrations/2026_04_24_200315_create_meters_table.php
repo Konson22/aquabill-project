@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
             $table->string('meter_number')->unique();
+            $table->decimal('last_reading', 10, 2)->default(0);
             $table->enum('status', ['active', 'inactive', 'maintenance', 'damage'])->default('active');
             $table->timestamps();
         });

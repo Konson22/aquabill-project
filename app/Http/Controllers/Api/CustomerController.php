@@ -21,7 +21,7 @@ class CustomerController extends Controller
                 ->with([
                     'zone',
                     'tariff',
-                    'meters.lastReading',
+                    'meters.latestReading',
                     'bills' => function ($q) {
                         $q->withSum('payments', 'amount')->latest();
                     },
@@ -37,7 +37,7 @@ class CustomerController extends Controller
                 ->get()
                 ->map(function ($customer) {
                     $meter = $customer->meters->sortByDesc('id')->first();
-                    $lastReading = $meter?->lastReading;
+                    $lastReading = $meter?->latestReading;
 
                     return [
                         'home_id' => $customer->id,

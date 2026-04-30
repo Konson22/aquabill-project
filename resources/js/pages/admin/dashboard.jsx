@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { Shield, Building, Users, Droplets, TriangleAlert, TrendingUp } from 'lucide-react';
+import { Shield, Building, Users, Droplets, TriangleAlert, TrendingUp, PowerOff } from 'lucide-react';
 
 const stats = [
     { name: 'Revenue Report', value: 'View', icon: TrendingUp, color: 'text-emerald-700', bg: 'bg-emerald-100', href: '/reports/revenue' },
@@ -57,6 +57,13 @@ export default function AdminDashboard() {
                             >
                                 <Shield className="h-6 w-6 text-purple-600 mb-2" />
                                 <span className="block font-medium">Roles & Perms</span>
+                            </Link>
+                            <Link
+                                href="/disconnections"
+                                className="p-4 rounded-xl border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 transition-colors text-left"
+                            >
+                                <PowerOff className="h-6 w-6 text-rose-600 mb-2" />
+                                <span className="block font-medium">Disconnected Customers</span>
                             </Link>
                         </div>
                     </div>

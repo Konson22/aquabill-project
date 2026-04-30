@@ -2,7 +2,6 @@
 
 use App\Models\Customer;
 use App\Models\Meter;
-use App\Models\MeterReading;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Database\Seeders\CustomerSeeder;
@@ -118,7 +117,7 @@ test('customer seeder creates customers (fallback mode)', function () {
     expect(Customer::query()->where('tariff_id', $tariff->id)->exists())->toBeTrue();
 });
 
-test('customer seeder imports initial reading from json', function () {
+test('customer seeder stores initial reading on meter from json', function () {
     $jsonPath = base_path('__customers_seed_test__.json');
 
     File::put($jsonPath, json_encode([
@@ -157,9 +156,5 @@ test('customer seeder imports initial reading from json', function () {
     $meter = Meter::query()->where('meter_number', 'SSUWC/ZH/JB/2310000001')->first();
     expect($meter)->not->toBeNull();
     expect($meter->customer_id)->toBe($customer->id);
-
-    $reading = MeterReading::query()->where('meter_id', $meter->id)->first();
-    expect($reading)->not->toBeNull();
-    expect((float) $reading->current_reading)->toBe(41.0);
-    expect($reading->is_initial)->toBeTrue();
+    expect((float) $meter->last_reading)->toBe(41.0);
 });

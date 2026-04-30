@@ -70,6 +70,7 @@ class ReadingController extends Controller
 
                 // Fetch the latest reading from database to validate against
                 $dbLastReading = MeterReading::where('meter_id', $meter->id)
+                    ->where('customer_id', $customer->id)
                     ->orderBy('reading_date', 'desc')
                     ->orderBy('id', 'desc')
                     ->first();
@@ -134,6 +135,7 @@ class ReadingController extends Controller
                 $bill = DB::transaction(function () use ($validated, $meter, $imagePath, $billService) {
                     $reading = MeterReading::create([
                         'meter_id' => $meter->id,
+                        'customer_id' => $customer->id,
                         'reading_date' => $validated['reading_date'],
                         'current_reading' => $validated['current_reading'],
                         'previous_reading' => $validated['previous_reading'] ?? null,

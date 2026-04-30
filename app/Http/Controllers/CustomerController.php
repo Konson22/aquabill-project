@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Meter;
+use App\Models\MeterReading;
 use App\Models\ServiceCharge;
 use App\Models\ServiceChargeType;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -91,17 +93,40 @@ class CustomerController extends Controller
         return redirect()->route('customers.index')->with('success', 'Customer created successfully.');
     }
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $customers = Customer::with(['zone', 'tariff', 'meters.lastReading'])
+        $search = $request->input('search');
+        $zoneId = $request->input('zone_id');
+
+        $customers = Customer::query()
+            ->with(['zone', 'tariff', 'meters'])
+            ->when($search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%")
+                        ->orWhere('account_number', 'like', "%{$search}%")
+                        ->orWhereHas('meters', function ($mq) use ($search) {
+                            $mq->where('meter_number', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when($zoneId, function ($query, $zoneId) {
+                $query->where('zone_id', $zoneId);
+            })
             ->latest()
-            ->paginate(100);
+            ->paginate(100)
+            ->withQueryString();
+
+        $this->attachScopedLastReadingsToCustomers($customers->getCollection());
 
         $serviceChargeTypes = ServiceChargeType::all();
+        $zones = Zone::query()->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('customers/index', [
             'customers' => $customers,
             'serviceChargeTypes' => $serviceChargeTypes,
+            'zones' => $zones,
+            'filters' => $request->only(['search', 'zone_id']),
         ]);
     }
 
@@ -110,7 +135,7 @@ class CustomerController extends Controller
         $customer->load([
             'zone',
             'tariff',
-            'meters.lastReading',
+            'meters',
             'bills' => fn ($query) => $query->latest()->limit(50),
             'readings' => fn ($query) => $query->latest()->limit(50),
             'payments' => fn ($query) => $query->latest()->limit(50),
@@ -118,9 +143,69 @@ class CustomerController extends Controller
             'meterHistories' => fn ($query) => $query->with(['meter', 'replacedBy'])->latest(),
             'disconnections' => fn ($query) => $query->with(['disconnectedBy', 'reconnectedBy'])->latest(),
         ]);
+        $this->attachScopedLastReadingsToCustomers(collect([$customer]));
 
         return Inertia::render('customers/show', [
             'customer' => $customer,
+            'unassignedMeters' => Meter::whereNull('customer_id')->where('status', 'active')->get(['id', 'meter_number', 'last_reading']),
         ]);
+    }
+
+    private function attachScopedLastReadingsToCustomers(Collection $customers): void
+    {
+        $meters = $customers
+            ->flatMap(fn (Customer $customer) => $customer->meters)
+            ->filter(fn (Meter $meter) => $meter->customer_id !== null)
+            ->values();
+
+        if ($meters->isEmpty()) {
+            return;
+        }
+
+        $meterIds = $meters->pluck('id')->unique()->all();
+        $customerIds = $meters->pluck('customer_id')->unique()->all();
+
+        $latestReadings = MeterReading::query()
+            ->whereIn('meter_id', $meterIds)
+            ->whereIn('customer_id', $customerIds)
+            ->orderByDesc('reading_date')
+            ->orderByDesc('id')
+            ->get()
+            ->unique(fn (MeterReading $reading) => $reading->meter_id.'-'.$reading->customer_id)
+            ->keyBy(fn (MeterReading $reading) => $reading->meter_id.'-'.$reading->customer_id);
+
+        $meters->each(function (Meter $meter) use ($latestReadings): void {
+            $key = $meter->id.'-'.$meter->customer_id;
+            $meter->setRelation('latestReading', $latestReadings->get($key));
+        });
+    }
+
+    public function edit(Customer $customer): Response
+    {
+        return Inertia::render('customers/edit', [
+            'customer' => $customer,
+            'zones' => Zone::query()->orderBy('name')->get(['id', 'name']),
+            'tariffs' => Tariff::query()->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
+    public function update(Request $request, Customer $customer)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'national_id' => 'nullable|string|max:50',
+            'address' => 'nullable|string',
+            'customer_type' => 'required|string|in:residential,commercial,government',
+            'status' => 'required|string|in:active,inactive',
+            'zone_id' => 'required|exists:zones,id',
+            'tariff_id' => 'required|exists:tariffs,id',
+            'connection_date' => 'nullable|date',
+        ]);
+
+        $customer->update($validated);
+
+        return redirect()->route('customers.show', $customer->id)->with('success', 'Customer updated successfully.');
     }
 }

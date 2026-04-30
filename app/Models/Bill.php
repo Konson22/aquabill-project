@@ -15,6 +15,7 @@ class Bill extends Model
 
     protected $fillable = [
         'customer_id',
+        'meter_number',
         'meter_id',
         'reading_id',
         'consumption',

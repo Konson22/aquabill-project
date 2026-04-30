@@ -41,12 +41,14 @@ class MeterController extends Controller
         $validated = $request->validate([
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'meter_number' => ['required', 'string', 'max:255', 'unique:meters,meter_number'],
+            'last_reading' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'in:active,inactive,maintenance,damage'],
         ]);
 
         Meter::query()->create([
             'customer_id' => $validated['customer_id'] ?? null,
             'meter_number' => $validated['meter_number'],
+            'last_reading' => $validated['last_reading'] ?? 0,
             'status' => $validated['status'],
         ]);
 
@@ -72,7 +74,7 @@ class MeterController extends Controller
             'final_reading' => ['required', 'numeric', 'min:0'],
             'reason' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
-            'new_meter_number' => ['required', 'string', 'max:255', 'unique:meters,meter_number'],
+            'new_meter_id' => ['required', 'exists:meters,id'],
             'new_meter_status' => ['required', 'in:active,inactive,maintenance,damage'],
         ]);
 
@@ -95,10 +97,10 @@ class MeterController extends Controller
                 'status' => 'inactive',
             ]);
 
-            // 3. Create and assign the new meter
-            Meter::create([
+            // 3. Assign the existing unassigned meter
+            $newMeter = Meter::findOrFail($validated['new_meter_id']);
+            $newMeter->update([
                 'customer_id' => $customerId,
-                'meter_number' => $validated['new_meter_number'],
                 'status' => $validated['new_meter_status'],
             ]);
         });
