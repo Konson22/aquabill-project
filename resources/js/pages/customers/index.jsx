@@ -145,9 +145,8 @@ export default function Customers({ customers, serviceChargeTypes, zones = [], f
                         <table className="w-full text-left border-collapse">
                             <thead>
                                 <tr className="border-b bg-muted/50 transition-colors text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                    <th className="px-4 py-3">Account #</th>
                                     <th className="px-4 py-3">Customer Name</th>
-                                    <th className="px-4 py-3">Type</th>
+                                    <th className="px-4 py-3">Phone</th>
                                     <th className="px-4 py-3">Zone</th>
                                     <th className="px-4 py-3">Tariff</th>
                                     <th className="px-4 py-3">Status</th>
@@ -158,25 +157,19 @@ export default function Customers({ customers, serviceChargeTypes, zones = [], f
                                 {customers.data.map((customer) => (
                                     <tr key={customer.id} className="hover:bg-muted/30 transition-colors group">
                                         <td className="px-4 py-4">
-                                            <span className="font-mono text-sm font-bold text-primary">
-                                                {customer.account_number}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-foreground">{customer.name}</span>
-                                                <span className="text-xs text-muted-foreground">{customer.phone}</span>
-                                            </div>
+                                            <Link
+                                                href={route('customers.show', customer.id)}
+                                                className="font-medium text-foreground hover:text-primary hover:underline"
+                                            >
+                                                {customer.name}
+                                            </Link>
                                         </td>
                                         <td className="px-4 py-4 capitalize">
-                                            <span className="text-sm">{customer.customer_type}</span>
+                                            <span className="text-sm">{customer.phone}</span>
                                         </td>
                                         <td className="px-4 py-4">
                                             <div className="flex items-center gap-1">
                                                 <span className="text-sm font-medium">{customer.zone?.name}</span>
-                                                <Badge variant="outline" className="text-[10px] py-0 px-1 font-mono">
-                                                    {customer.zone?.supply_day ? 'Sch' : 'N/A'}
-                                                </Badge>
                                             </div>
                                         </td>
                                         <td className="px-4 py-4">
@@ -195,18 +188,18 @@ export default function Customers({ customers, serviceChargeTypes, zones = [], f
                                         <td className="px-4 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <Button 
-                                                    variant="outline" 
+                                                    variant="ghost" 
                                                     size="sm" 
-                                                    className="h-8 text-xs font-bold gap-1 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                                                    className="h-8 px-0 text-xs font-bold gap-1 text-indigo-600 hover:bg-transparent hover:text-indigo-700"
                                                     onClick={() => handleRecordReading(customer)}
                                                 >
                                                     <Activity className="h-3 w-3" />
                                                     Record
                                                 </Button>
                                                 <Button 
-                                                    variant="outline" 
+                                                    variant="ghost" 
                                                     size="sm" 
-                                                    className="h-8 text-xs font-bold gap-1 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                                                    className="h-8 px-0 text-xs font-bold gap-1 text-emerald-600 hover:bg-transparent hover:text-emerald-700"
                                                     onClick={() => handleCreateServiceCharge(customer)}
                                                 >
                                                     <CreditCard className="h-3 w-3" />
@@ -216,7 +209,7 @@ export default function Customers({ customers, serviceChargeTypes, zones = [], f
                                                     <Button
                                                         variant="ghost"
                                                         size="icon"
-                                                        className="h-8 w-8"
+                                                        className="h-8 w-8 shrink-0 p-0 hover:bg-transparent"
                                                         asChild
                                                     >
                                                         <Link href={`/customers/${customer.id}`}>
@@ -230,7 +223,7 @@ export default function Customers({ customers, serviceChargeTypes, zones = [], f
                                 ))}
                                 {customers.data.length === 0 && (
                                     <tr>
-                                        <td colSpan="7" className="px-4 py-12 text-center text-muted-foreground">
+                                        <td colSpan="6" className="px-4 py-12 text-center text-muted-foreground">
                                             No customers found. Click "New Customer" to get started.
                                         </td>
                                     </tr>

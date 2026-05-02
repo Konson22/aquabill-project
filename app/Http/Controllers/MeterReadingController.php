@@ -6,6 +6,7 @@ use App\Models\MeterReading;
 use App\Services\BillService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -47,10 +48,19 @@ class MeterReadingController extends Controller
     {
         $validated = $request->validate([
             'meter_id' => 'required|exists:meters,id',
+            'previous_reading' => 'nullable|numeric|min:0',
             'current_reading' => 'required|numeric|min:0',
             'reading_date' => 'required|date',
             'notes' => 'nullable|string',
         ]);
+
+        if (array_key_exists('previous_reading', $validated) && $validated['previous_reading'] !== null) {
+            if ((float) $validated['current_reading'] < (float) $validated['previous_reading']) {
+                throw ValidationException::withMessages([
+                    'current_reading' => __('The current reading must be greater than or equal to the previous reading.'),
+                ]);
+            }
+        }
 
         $validated['recorded_by'] = auth()->id();
 

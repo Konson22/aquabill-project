@@ -61,6 +61,22 @@ test('overdue bills page only shows unpaid bills with due_date in the past', fun
         'notes' => null,
     ]);
 
+    $readingUpcoming = MeterReading::query()->create([
+        'meter_id' => $meter->id,
+        'reading_date' => Carbon::today()->subDay(),
+        'current_reading' => 20,
+        'recorded_by' => $user->id,
+        'notes' => null,
+    ]);
+
+    $readingPaid = MeterReading::query()->create([
+        'meter_id' => $meter->id,
+        'reading_date' => Carbon::today(),
+        'current_reading' => 30,
+        'recorded_by' => $user->id,
+        'notes' => null,
+    ]);
+
     $overdue = Bill::query()->create([
         'customer_id' => $customer->id,
         'meter_id' => $meter->id,
@@ -78,7 +94,7 @@ test('overdue bills page only shows unpaid bills with due_date in the past', fun
     Bill::query()->create([
         'customer_id' => $customer->id,
         'meter_id' => $meter->id,
-        'reading_id' => $reading->id,
+        'reading_id' => $readingUpcoming->id,
         'consumption' => 10,
         'unit_price' => 1,
         'fixed_charge' => 0,
@@ -92,7 +108,7 @@ test('overdue bills page only shows unpaid bills with due_date in the past', fun
     Bill::query()->create([
         'customer_id' => $customer->id,
         'meter_id' => $meter->id,
-        'reading_id' => $reading->id,
+        'reading_id' => $readingPaid->id,
         'consumption' => 10,
         'unit_price' => 1,
         'fixed_charge' => 0,

@@ -143,9 +143,9 @@ export default function Bills({ bills }) {
                             </thead>
                             <tbody className="divide-y">
                                 {bills.data.map((bill) => (
-                                    <tr key={bill.id} className="hover:bg-muted/30 transition-colors group">
+                                    <tr key={bill.bill_no} className="hover:bg-muted/30 transition-colors group">
                                         <td className="px-6 py-4 text-center">
-                                            <span className="font-mono text-xs font-bold text-muted-foreground">#{String(bill.id).padStart(6, '0')}</span>
+                                            <span className="font-mono text-xs font-bold text-muted-foreground">#{String(bill.bill_no).padStart(6, '0')}</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">

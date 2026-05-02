@@ -140,7 +140,7 @@ export default function RevenueReport({
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-black text-emerald-700">{formatMoney(safeSummary.total_revenue)}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Gross billed amount for selected period</div>
+                            <div className="mt-1 text-xs text-muted-foreground">Total billed water current charges for selected period</div>
                         </CardContent>
                     </Card>
 
@@ -181,7 +181,7 @@ export default function RevenueReport({
                             <div className="flex items-center justify-between gap-3">
                                 <div>
                                     <CardTitle className="text-base">Revenue Trend</CardTitle>
-                                    <div className="text-xs text-muted-foreground">Chart placeholder (hook to backend series later)</div>
+                                    <div className="text-xs text-muted-foreground">Daily water charges issued plus service fees (matches summary)</div>
                                 </div>
                                 <Badge variant="outline" className="text-[10px] uppercase tracking-widest text-emerald-600 border-emerald-200 bg-emerald-50">
                                     Live Data

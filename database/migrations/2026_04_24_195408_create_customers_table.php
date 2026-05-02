@@ -19,10 +19,12 @@ return new class extends Migration
             $table->string('phone');
             $table->string('email')->nullable();
             $table->string('national_id')->nullable();
+            $table->string('plot_no')->nullable();
             $table->text('address');
             $table->foreignId('zone_id')->constrained('zones')->onDelete('cascade');
             $table->foreignId('tariff_id')->constrained('tariffs')->onDelete('cascade');
             $table->date('connection_date')->nullable();
+            $table->date('last_reading_date')->nullable();
             $table->enum('status', ['active', 'inactive', 'disconnected'])->default('active');
             $table->timestamps();
 

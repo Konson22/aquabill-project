@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('bills', function (Blueprint $table) {
             $table->id();
+            $table->string('bill_no')->unique();
 
             $table->foreignId('customer_id')->constrained()->onDelete('cascade');
             $table->string('meter_number')->nullable();

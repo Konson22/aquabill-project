@@ -22,9 +22,11 @@ class Customer extends Model
         'email',
         'national_id',
         'address',
+        'plot_no',
         'zone_id',
         'tariff_id',
         'connection_date',
+        'last_reading_date',
         'status',
     ];
 
@@ -37,17 +39,25 @@ class Customer extends Model
     {
         return [
             'connection_date' => 'date',
+            'last_reading_date' => 'date',
         ];
     }
 
     protected static function booted(): void
     {
         static::creating(function (Customer $customer) {
-            if (empty($customer->account_number)) {
-                $latestCustomer = static::orderBy('id', 'desc')->first();
-                $nextId = $latestCustomer ? $latestCustomer->id + 1 : 1;
-                $customer->account_number = 'WTR-'.str_pad((string) $nextId, 6, '0', STR_PAD_LEFT);
+            if (! empty($customer->account_number)) {
+                return;
             }
+
+            $maxSuffix = static::query()
+                ->where('account_number', 'like', 'WTR-%')
+                ->pluck('account_number')
+                ->map(fn (string $number): int => (int) substr($number, 4))
+                ->max() ?? 0;
+
+            $next = $maxSuffix + 1;
+            $customer->account_number = 'WTR-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
         });
     }
 
@@ -128,6 +138,7 @@ class Customer extends Model
     {
         return $this->hasMany(MeterHistory::class);
     }
+
     /**
      * Get the disconnections for the customer.
      *

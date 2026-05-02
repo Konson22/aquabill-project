@@ -88,6 +88,8 @@ class BillService
                 'meter_number' => $meter->meter_number,
                 'meter_id' => $meter->id,
                 'reading_id' => $reading->id,
+                // Optional bill number from mobile (stored on reading); server generates when empty.
+                'bill_no' => filled($reading->bill_no) ? $reading->bill_no : null,
                 // 'tariff_id' removed as per user request, using snapshots instead
                 'consumption' => $consumption,
                 'unit_price' => $unitPrice,

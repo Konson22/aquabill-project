@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('meters', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
+            $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
             $table->string('meter_number')->unique();
             $table->decimal('last_reading', 10, 2)->default(0);
             $table->enum('status', ['active', 'inactive', 'maintenance', 'damage'])->default('active');

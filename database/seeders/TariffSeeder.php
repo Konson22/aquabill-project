@@ -15,8 +15,8 @@ class TariffSeeder extends Seeder
         Tariff::updateOrCreate(
             ['name' => 'DOMESTIC'],
             [
-                'price_per_unit' => 50.00,
-                'fixed_charge' => 0.00,
+                'price_per_unit' => 4000,
+                'fixed_charge' => 2500,
             ],
         );
     }

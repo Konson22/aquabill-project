@@ -33,6 +33,7 @@ export default function EditCustomer({ customer, zones = [], tariffs = [] }) {
         email: customer.email || '',
         national_id: customer.national_id || '',
         address: customer.address || '',
+        plot_no: customer.plot_no || '',
         customer_type: customer.customer_type || 'residential',
         status: customer.status || 'active',
         zone_id: String(customer.zone_id || ''),
@@ -126,6 +127,16 @@ export default function EditCustomer({ customer, zones = [], tariffs = [] }) {
                                     placeholder="Enter full address"
                                 />
                                 <InputError message={errors.address} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="plot_no">Plot number</Label>
+                                <Input
+                                    id="plot_no"
+                                    value={data.plot_no}
+                                    onChange={(e) => setData('plot_no', e.target.value)}
+                                    placeholder="e.g. 12A"
+                                />
+                                <InputError message={errors.plot_no} />
                             </div>
                         </CardContent>
                     </Card>

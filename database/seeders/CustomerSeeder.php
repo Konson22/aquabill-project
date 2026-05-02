@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Customer;
 use App\Models\Meter;
+use App\Models\Subzone;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Carbon\Carbon;
@@ -18,12 +19,31 @@ class CustomerSeeder extends Seeder
      */
     public function run(): void
     {
-        $zones = Zone::all();
         $tariffs = Tariff::all();
 
-        if ($zones->isEmpty() || $tariffs->isEmpty()) {
+        if ($tariffs->isEmpty()) {
             return;
         }
+
+        $zone = Zone::updateOrCreate(
+            ['name' => 'Jebel'],
+            [
+                'supply_day' => 'Monday',
+                'supply_time' => '08:00:00',
+                'description' => 'Default zone for all customers.',
+                'status' => 'active',
+            ],
+        );
+
+        Subzone::updateOrCreate(
+            [
+                'zone_id' => $zone->id,
+                'name' => 'HAI GWONGOROKI',
+            ],
+            [
+                'status' => 'active',
+            ],
+        );
 
         $jsonPath = (string) (env('CUSTOMERS_SEED_PATH') ?: base_path('customer.json'));
         if (File::exists($jsonPath)) {
@@ -51,27 +71,31 @@ class CustomerSeeder extends Seeder
                     $tariff = $tariffs->firstWhere('name', 'DOMESTIC') ?? $tariffs->first();
                     $customerType = 'residential';
 
-                    $zone = $zones->firstWhere('name', 'Jebel') ?? $zones->first();
-
                     $connectionDate = $this->parseConnectionDate(Arr::get($row, 'contractDate'));
+                    $initialReading = $this->parseInitialReading(Arr::get($row, 'initialReading'));
+
+                    $customerAttributes = [
+                        'customer_type' => $customerType,
+                        'name' => $name,
+                        'phone' => preg_replace('/\D+/', '', (string) Arr::get($row, 'tel', '')) ?: (string) Arr::get($row, 'tel', ''),
+                        'email' => null,
+                        'national_id' => null,
+                        'address' => $address !== '' ? $address : $area,
+                        'plot_no' => $housePlotNo !== '' ? $housePlotNo : null,
+                        'zone_id' => $zone->id,
+                        'tariff_id' => $tariff->id,
+                        'connection_date' => $connectionDate,
+                        'status' => 'active',
+                    ];
+
+                    if ($initialReading !== null && $initialReading > 0) {
+                        $customerAttributes['last_reading_date'] = $connectionDate?->toDateString() ?? now()->toDateString();
+                    }
 
                     $customer = Customer::updateOrCreate(
                         ['account_number' => $accountNumber],
-                        [
-                            'customer_type' => $customerType,
-                            'name' => $name,
-                            'phone' => preg_replace('/\D+/', '', (string) Arr::get($row, 'tel', '')) ?: (string) Arr::get($row, 'tel', ''),
-                            'email' => null,
-                            'national_id' => null,
-                            'address' => $address !== '' ? $address : $area,
-                            'zone_id' => $zone->id,
-                            'tariff_id' => $tariff->id,
-                            'connection_date' => $connectionDate,
-                            'status' => 'active',
-                        ],
+                        $customerAttributes,
                     );
-
-                    $initialReading = $this->parseInitialReading(Arr::get($row, 'initialReading'));
 
                     $meterAttributes = [
                         'customer_id' => $customer->id,

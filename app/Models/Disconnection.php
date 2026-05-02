@@ -46,4 +46,17 @@ class Disconnection extends Model
     {
         return $this->belongsTo(User::class, 'reconnected_by');
     }
+
+    /**
+     * @return array{notified: int, grace_period: int, disconnected: int, reconnected: int}
+     */
+    public static function summaryStats(): array
+    {
+        return [
+            'notified' => static::query()->where('status', 'notified')->count(),
+            'grace_period' => static::query()->where('status', 'grace_period')->count(),
+            'disconnected' => static::query()->where('status', 'disconnected')->count(),
+            'reconnected' => static::query()->where('status', 'reconnected')->where('updated_at', '>=', now()->startOfMonth())->count(),
+        ];
+    }
 }

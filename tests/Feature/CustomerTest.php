@@ -2,13 +2,11 @@
 
 use App\Models\Customer;
 use App\Models\Meter;
+use App\Models\Subzone;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Database\Seeders\CustomerSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
-
-uses(RefreshDatabase::class);
 
 test('it auto generates account number on creation', function () {
     $tariff = Tariff::create([
@@ -95,16 +93,16 @@ test('customer belongs to a zone', function () {
     expect($tariff->customers)->toHaveCount(1);
 });
 
-test('customer seeder creates customers (fallback mode)', function () {
+test('customer seeder skips when seed file is missing', function () {
     putenv('CUSTOMERS_SEED_PATH='.base_path('__missing_customer_seed__.json'));
 
-    $tariff = Tariff::create([
+    Tariff::create([
         'name' => 'Residential',
         'price_per_unit' => 50,
         'fixed_charge' => 500,
     ]);
 
-    $zone = Zone::create([
+    Zone::create([
         'name' => 'Gudele',
         'supply_day' => 'Sunday',
         'supply_time' => '06:00:00',
@@ -112,9 +110,7 @@ test('customer seeder creates customers (fallback mode)', function () {
 
     $this->seed(CustomerSeeder::class);
 
-    expect(Customer::query()->count())->toBeGreaterThan(0);
-    expect(Customer::query()->where('zone_id', $zone->id)->exists())->toBeTrue();
-    expect(Customer::query()->where('tariff_id', $tariff->id)->exists())->toBeTrue();
+    expect(Customer::query()->count())->toBe(0);
 });
 
 test('customer seeder stores initial reading on meter from json', function () {
@@ -126,6 +122,7 @@ test('customer seeder stores initial reading on meter from json', function () {
             'customerName' => 'Test Customer',
             'contractDate' => '2025-01-01',
             'area' => 'JEBEL',
+            'housePlotNo' => '42B',
             'tariff' => 'DOMESTIC',
             'tel' => '926100009',
             'initialReading' => '41 ',
@@ -152,9 +149,14 @@ test('customer seeder stores initial reading on meter from json', function () {
     expect($customer)->not->toBeNull();
     expect($customer->tariff_id)->toBe($tariff->id);
     expect($customer->zone_id)->toBe($zone->id);
+    expect($customer->plot_no)->toBe('42B');
+
+    $subzone = Subzone::query()->where('zone_id', $zone->id)->where('name', 'HAI GWONGOROKI')->first();
+    expect($subzone)->not->toBeNull();
 
     $meter = Meter::query()->where('meter_number', 'SSUWC/ZH/JB/2310000001')->first();
     expect($meter)->not->toBeNull();
     expect($meter->customer_id)->toBe($customer->id);
     expect((float) $meter->last_reading)->toBe(41.0);
+    expect($customer->fresh()->last_reading_date?->toDateString())->toBe('2025-01-01');
 });

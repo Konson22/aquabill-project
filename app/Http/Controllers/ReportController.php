@@ -22,40 +22,77 @@ class ReportController extends Controller
         $from = $request->input('from');
         $to = $request->input('to');
 
-        // Summary Calculations (Overall or filtered?)
-        // The UI cards usually show totals for the selected period.
+        $billsInScope = Bill::query()
+            ->when($from, fn ($q) => $q->whereDate('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('created_at', '<=', $to))
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            });
 
-        $billsQuery = Bill::query();
-        $chargesQuery = ServiceCharge::query();
-        $paymentsQuery = Payment::query();
-
-        if ($from) {
-            $billsQuery->whereDate('created_at', '>=', $from);
-            $chargesQuery->whereDate('issued_date', '>=', $from);
-            $paymentsQuery->whereDate('payment_date', '>=', $from);
-        }
-
-        if ($to) {
-            $billsQuery->whereDate('created_at', '<=', $to);
-            $chargesQuery->whereDate('issued_date', '<=', $to);
-            $paymentsQuery->whereDate('payment_date', '<=', $to);
-        }
-
-        $totalRevenue = $billsQuery->sum('total_amount') + $chargesQuery->sum('amount');
-        $totalPaid = $paymentsQuery->sum('amount');
-
-        // Count paid service charges too (since they are not in payments table yet as per previous request)
-        $paidChargesSum = ServiceCharge::where('status', 'paid')
+        $chargesInScope = ServiceCharge::query()
             ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
             ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
-            ->sum('amount');
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            });
+
+        $paymentsInScope = Payment::query()
+            ->when($from, fn ($q) => $q->whereDate('payment_date', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('payment_date', '<=', $to))
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            });
+
+        /*
+         * Revenue is defined as billed water charges only.
+         * Keep this tied to bill current_charge (excluding carried balances and service charges).
+         */
+        $totalRevenue = (float) (clone $billsInScope)->sum('current_charge');
+        $totalPaid = (float) (clone $paymentsInScope)->sum('amount');
+
+        $paidChargesQuery = ServiceCharge::where('status', 'paid')
+            ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            });
+
+        $paidChargesSum = (float) $paidChargesQuery->sum('amount');
 
         $actualTotalPaid = $totalPaid + $paidChargesSum;
-        $totalOutstanding = $totalRevenue - $actualTotalPaid;
-        $paymentsCount = $paymentsQuery->count() + ServiceCharge::where('status', 'paid')
+
+        $billOutstanding = (float) (clone $billsInScope)
+            ->withSum('payments', 'amount')
+            ->get()
+            ->sum(fn (Bill $bill) => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
+
+        $chargeOutstanding = (float) ServiceCharge::query()
+            ->where('status', 'unpaid')
             ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
             ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
-            ->count();
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            })
+            ->sum('amount');
+
+        $totalOutstanding = $billOutstanding + $chargeOutstanding;
+
+        $paymentsCount = (clone $paymentsInScope)->count() + $paidChargesQuery->count();
 
         // Rows for the table (Recent Bills)
         $rowsQuery = Bill::with(['customer', 'payments'])
@@ -88,8 +125,25 @@ class ReportController extends Controller
         while ($currentDate <= $chartEnd) {
             $dateStr = $currentDate->toDateString();
 
-            $billDaySum = Bill::whereDate('created_at', $dateStr)->sum('total_amount');
-            $chargeDaySum = ServiceCharge::whereDate('issued_date', $dateStr)->sum('amount');
+            $billDaySum = Bill::query()
+                ->whereDate('created_at', $dateStr)
+                ->when(filled($search), function ($q) use ($search): void {
+                    $q->whereHas('customer', function ($c) use ($search): void {
+                        $c->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('account_number', 'like', '%'.$search.'%');
+                    });
+                })
+                ->sum('current_charge');
+
+            $chargeDaySum = ServiceCharge::query()
+                ->whereDate('issued_date', $dateStr)
+                ->when(filled($search), function ($q) use ($search): void {
+                    $q->whereHas('customer', function ($c) use ($search): void {
+                        $c->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('account_number', 'like', '%'.$search.'%');
+                    });
+                })
+                ->sum('amount');
 
             $dailyRevenue[] = [
                 'date' => $currentDate->format('M d'),

@@ -217,3 +217,82 @@ test('meter reassignment does not reuse previous customer last reading', functio
     expect($newReading->previous_reading)->toEqual(0);
     expect((int) $newReading->customer_id)->toBe($secondCustomer->id);
 });
+
+test('web reading store accepts previous_reading from request', function () {
+    $user = User::factory()->create();
+
+    $tariff = Tariff::create([
+        'name' => 'Residential',
+        'price_per_unit' => 50,
+        'fixed_charge' => 500,
+    ]);
+
+    $zone = Zone::create(['name' => 'Test Zone Web Store']);
+
+    $customer = Customer::create([
+        'account_number' => 'ACC-WEB-RD-1',
+        'customer_type' => 'residential',
+        'name' => 'Web Reader',
+        'phone' => '123456789',
+        'address' => '123 Main St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+    ]);
+
+    $meter = Meter::create([
+        'customer_id' => $customer->id,
+        'meter_number' => 'MTR-WEB-01',
+        'status' => 'active',
+        'last_reading' => 100,
+    ]);
+
+    $this->actingAs($user)->post(route('readings.store'), [
+        'meter_id' => $meter->id,
+        'previous_reading' => 100,
+        'current_reading' => 145,
+        'reading_date' => now()->toDateString(),
+        'notes' => 'ok',
+    ])->assertRedirect();
+
+    $reading = MeterReading::query()->where('meter_id', $meter->id)->latest('id')->first();
+
+    expect($reading)->not->toBeNull();
+    expect((float) $reading->previous_reading)->toBe(100.0);
+    expect((float) $reading->current_reading)->toBe(145.0);
+    expect((float) $reading->consumption)->toBe(45.0);
+});
+
+test('web reading store rejects current reading below submitted previous reading', function () {
+    $user = User::factory()->create();
+
+    $tariff = Tariff::create([
+        'name' => 'Residential',
+        'price_per_unit' => 50,
+        'fixed_charge' => 500,
+    ]);
+
+    $zone = Zone::create(['name' => 'Test Zone Web Store 2']);
+
+    $customer = Customer::create([
+        'account_number' => 'ACC-WEB-RD-2',
+        'customer_type' => 'residential',
+        'name' => 'Web Reader Two',
+        'phone' => '123456789',
+        'address' => '123 Main St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+    ]);
+
+    $meter = Meter::create([
+        'customer_id' => $customer->id,
+        'meter_number' => 'MTR-WEB-02',
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)->post(route('readings.store'), [
+        'meter_id' => $meter->id,
+        'previous_reading' => 100,
+        'current_reading' => 80,
+        'reading_date' => now()->toDateString(),
+    ])->assertSessionHasErrors('current_reading');
+});

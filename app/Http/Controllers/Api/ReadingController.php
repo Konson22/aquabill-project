@@ -12,6 +12,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class ReadingController extends Controller
 {
@@ -32,10 +35,10 @@ class ReadingController extends Controller
 
         foreach ($items as $index => $itemData) {
             try {
-                // Mobile app sends home_id (same as customer_id per API contract)
+                // Mobile app sends customer_id (same as customer_id per API contract)
                 $normalized = $itemData;
-                if (isset($normalized['home_id']) && ! isset($normalized['customer_id'])) {
-                    $normalized['customer_id'] = $normalized['home_id'];
+                if (isset($normalized['customer_id']) && ! isset($normalized['customer_id'])) {
+                    $normalized['customer_id'] = $normalized['customer_id'];
                 }
 
                 $validated = validator($normalized, [
@@ -46,6 +49,7 @@ class ReadingController extends Controller
                     'previous_reading' => ['nullable', 'numeric', 'min:0'],
                     'notes' => ['nullable', 'string'],
                     'image' => ['nullable', 'string'],
+                    'bill_no' => ['nullable', 'string', 'max:255', Rule::unique('bills', 'bill_no')],
                 ])->validate();
 
                 // Resolve meter and customer (match MeterReadingController: meter with customer.tariff)
@@ -58,12 +62,24 @@ class ReadingController extends Controller
                 }
 
                 if (! $customer) {
-                    $errors[] = ['index' => $index, 'message' => "Reading #{$index}: Meter must be associated with a customer."];
+                    $message = "Reading #{$index}: Meter must be associated with a customer.";
+                    Log::warning('Reading API: meter has no customer', [
+                        'index' => $index,
+                        'meter_id' => $meter->id ?? null,
+                        'item_data' => $itemData,
+                    ]);
+                    $errors[] = ['index' => $index, 'message' => $message];
 
                     continue;
                 }
                 if (! $meter) {
-                    $errors[] = ['index' => $index, 'message' => "Reading #{$index}: No meter found for customer {$validated['customer_id']}."];
+                    $message = "Reading #{$index}: No meter found for customer {$validated['customer_id']}.";
+                    Log::warning('Reading API: customer has no meter', [
+                        'index' => $index,
+                        'customer_id' => $validated['customer_id'] ?? null,
+                        'item_data' => $itemData,
+                    ]);
+                    $errors[] = ['index' => $index, 'message' => $message];
 
                     continue;
                 }
@@ -76,9 +92,17 @@ class ReadingController extends Controller
                     ->first();
 
                 if ($dbLastReading && $validated['current_reading'] <= $dbLastReading->current_reading) {
+                    $message = "Current reading ({$validated['current_reading']}) must be greater than the last recorded reading ({$dbLastReading->current_reading}).";
+                    Log::warning('Reading API: current reading not greater than last', [
+                        'index' => $index,
+                        'customer_id' => $customer->id,
+                        'meter_id' => $meter->id,
+                        'current_reading' => $validated['current_reading'],
+                        'last_reading' => $dbLastReading->current_reading,
+                    ]);
                     $errors[] = [
                         'index' => $index,
-                        'message' => "Current reading ({$validated['current_reading']}) must be greater than the last recorded reading ({$dbLastReading->current_reading}).",
+                        'message' => $message,
                     ];
 
                     continue;
@@ -113,8 +137,11 @@ class ReadingController extends Controller
 
                         $imagePath = 'readings/'.$imageName;
 
-                    } catch (\Exception $e) {
-                        Log::error('Base64 image upload failed: '.$e->getMessage());
+                    } catch (Throwable $e) {
+                        Log::error('Reading API: base64 image upload failed', [
+                            'index' => $index,
+                            'exception' => $e,
+                        ]);
                     }
 
                     // Case 2: Nested file upload (readings[index][image])
@@ -132,7 +159,11 @@ class ReadingController extends Controller
                         ->store('readings', 'public');
                 }
 
-                $bill = DB::transaction(function () use ($validated, $meter, $imagePath, $billService) {
+                $bill = DB::transaction(function () use ($validated, $meter, $customer, $imagePath, $billService) {
+                    $billNoFromApp = isset($validated['bill_no'])
+                        ? trim((string) $validated['bill_no'])
+                        : '';
+
                     $reading = MeterReading::create([
                         'meter_id' => $meter->id,
                         'customer_id' => $customer->id,
@@ -142,6 +173,7 @@ class ReadingController extends Controller
                         'recorded_by' => Auth::id(),
                         'image' => $imagePath,
                         'notes' => $validated['notes'] ?? null,
+                        'bill_no' => $billNoFromApp !== '' ? $billNoFromApp : null,
                     ]);
 
                     // Generate bill + forwarding logic (kept in BillService for consistency)
@@ -159,9 +191,21 @@ class ReadingController extends Controller
                     'total' => $createdBill?->total_amount ?? 0,
                     'index' => $index,
                 ];
-            } catch (\Exception $e) {
-                Log::error("Failed to process reading at index {$index}", [
-                    'error' => $e->getMessage(),
+            } catch (ValidationException $e) {
+                Log::warning('Reading API: validation failed', [
+                    'index' => $index,
+                    'errors' => $e->errors(),
+                    'item_data' => $itemData,
+                ]);
+                $errors[] = [
+                    'index' => $index,
+                    'message' => $e->getMessage(),
+                    'validation_errors' => $e->errors(),
+                ];
+            } catch (Throwable $e) {
+                Log::error('Reading API: failed to process reading', [
+                    'index' => $index,
+                    'exception' => $e,
                     'item_data' => $itemData,
                 ]);
                 $errors[] = [

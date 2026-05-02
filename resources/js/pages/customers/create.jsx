@@ -40,6 +40,7 @@ export default function CreateCustomer({ zones = [], tariffs = [], existingMeter
         email: '',
         national_id: '',
         address: '',
+        plot_no: '',
         customer_type: 'residential',
         status: 'active',
         zone_id: '',
@@ -140,6 +141,16 @@ export default function CreateCustomer({ zones = [], tariffs = [], existingMeter
                                     placeholder="Enter full address"
                                 />
                                 <InputError message={errors.address} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="plot_no">Plot number</Label>
+                                <Input
+                                    id="plot_no"
+                                    value={data.plot_no}
+                                    onChange={(e) => setData('plot_no', e.target.value)}
+                                    placeholder="e.g. 12A"
+                                />
+                                <InputError message={errors.plot_no} />
                             </div>
                         </CardContent>
                     </Card>

@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 
 export default function Login({ status, canResetPassword }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        login: '',
+        email: '',
         password: '',
         remember: false,
     });
@@ -63,20 +63,20 @@ export default function Login({ status, canResetPassword }) {
 
                         <form onSubmit={submit} className="grid gap-5">
                             <div className="grid gap-2">
-                                <Label htmlFor="login" className="text-neutral-700 font-medium ml-1">Email or Phone</Label>
+                                <Label htmlFor="email" className="text-neutral-700 font-medium ml-1">Email</Label>
                                 <Input
-                                    id="login"
-                                    type="text"
+                                    id="email"
+                                    type="email"
                                     required
                                     autoFocus
                                     tabIndex={1}
-                                    autoComplete="username"
-                                    value={data.login}
-                                    onChange={(e) => setData('login', e.target.value)}
+                                    autoComplete="email"
+                                    value={data.email}
+                                    onChange={(e) => setData('email', e.target.value)}
                                     placeholder="manager@konson.com"
                                     className="h-12 bg-neutral-50 border-neutral-200 text-neutral-900 placeholder:text-neutral-400 focus:ring-blue-600/20 focus:border-blue-600 transition-all rounded-xl"
                                 />
-                                <InputError message={errors.login} className="mt-1" />
+                                <InputError message={errors.email} className="mt-1" />
                             </div>
 
                             <div className="grid gap-2">

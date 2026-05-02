@@ -37,6 +37,7 @@ class CustomerController extends Controller
             'email' => 'nullable|email|max:255',
             'national_id' => 'nullable|string|max:50',
             'address' => 'nullable|string',
+            'plot_no' => 'nullable|string|max:255',
             'customer_type' => 'required|string|in:residential,commercial,government',
             'status' => 'required|string|in:active,inactive',
             'zone_id' => 'required|exists:zones,id',
@@ -59,6 +60,7 @@ class CustomerController extends Controller
             'email' => $validated['email'],
             'national_id' => $validated['national_id'],
             'address' => $validated['address'],
+            'plot_no' => $validated['plot_no'] ?? null,
             'customer_type' => $validated['customer_type'],
             'status' => $validated['status'],
             'zone_id' => $validated['zone_id'],
@@ -105,6 +107,7 @@ class CustomerController extends Controller
                     $q->where('name', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
                         ->orWhere('account_number', 'like', "%{$search}%")
+                        ->orWhere('plot_no', 'like', "%{$search}%")
                         ->orWhereHas('meters', function ($mq) use ($search) {
                             $mq->where('meter_number', 'like', "%{$search}%");
                         });
@@ -197,6 +200,7 @@ class CustomerController extends Controller
             'email' => 'nullable|email|max:255',
             'national_id' => 'nullable|string|max:50',
             'address' => 'nullable|string',
+            'plot_no' => 'nullable|string|max:255',
             'customer_type' => 'required|string|in:residential,commercial,government',
             'status' => 'required|string|in:active,inactive',
             'zone_id' => 'required|exists:zones,id',

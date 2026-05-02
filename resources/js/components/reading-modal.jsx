@@ -27,6 +27,7 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
 
     const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
         meter_id: '',
+        previous_reading: '',
         current_reading: '',
         reading_date: new Date().toISOString().split('T')[0],
         notes: '',
@@ -41,6 +42,10 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
             setData(prevData => ({
                 ...prevData,
                 meter_id: meter.id.toString(),
+                previous_reading:
+                    meter.last_reading != null && meter.last_reading !== ''
+                        ? String(meter.last_reading)
+                        : '0',
             }));
             clearErrors();
         }
@@ -96,16 +101,25 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
                             )}
                         </div>
 
-                        {/* Previous Reading Info */}
+                        {/* Previous reading (from meter snapshot; editable if needed) */}
                         {selectedMeter && (
-                            <div className="bg-muted/50 p-3 rounded-lg border flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <MapPin className="h-3 w-3" />
-                                    <span>Previous Reading </span>
-                                </div>
-                                <span className="font-mono font-bold text-sm">
-                                    {selectedMeter.last_reading || 0} m³
-                                </span>
+                            <div className="grid gap-2">
+                                <Label htmlFor="previous_reading" className="flex items-center gap-2">
+                                    <MapPin className="h-3 w-3 text-muted-foreground" />
+                                    Previous reading (m³)
+                                </Label>
+                                <Input
+                                    id="previous_reading"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={data.previous_reading}
+                                    onChange={(e) => setData('previous_reading', e.target.value)}
+                                    placeholder="Last recorded index"
+                                />
+                                {errors.previous_reading && (
+                                    <p className="text-xs text-red-500">{errors.previous_reading}</p>
+                                )}
                             </div>
                         )}
 
@@ -146,7 +160,9 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
                         </div>
 
                         {/* Warning if current < previous */}
-                        {selectedMeter && data.current_reading && parseFloat(data.current_reading) < (selectedMeter.last_reading || 0) && (
+                        {selectedMeter &&
+                            data.current_reading &&
+                            parseFloat(data.current_reading) < parseFloat(data.previous_reading || 0) && (
                             <Alert variant="destructive" className="py-2">
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertDescription className="text-[10px]">

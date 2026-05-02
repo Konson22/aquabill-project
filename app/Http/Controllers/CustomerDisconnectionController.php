@@ -12,12 +12,7 @@ class CustomerDisconnectionController extends Controller
 {
     public function index()
     {
-        $stats = [
-            'notified' => Disconnection::where('status', 'notified')->count(),
-            'grace_period' => Disconnection::where('status', 'grace_period')->count(),
-            'disconnected' => Disconnection::where('status', 'disconnected')->count(),
-            'reconnected' => Disconnection::where('status', 'reconnected')->where('updated_at', '>=', now()->startOfMonth())->count(),
-        ];
+        $stats = Disconnection::summaryStats();
 
         $disconnections = Disconnection::with(['customer.zone', 'disconnectedBy'])
             ->whereIn('status', ['notified', 'grace_period', 'disconnected'])

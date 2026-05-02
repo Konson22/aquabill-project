@@ -26,6 +26,7 @@ class MeterReading extends Model
         'image',
         'recorded_by',
         'notes',
+        'bill_no',
         'is_initial',
     ];
 
@@ -94,6 +95,12 @@ class MeterReading extends Model
             $reading->meter()->update([
                 'last_reading' => $reading->current_reading,
             ]);
+
+            if ($reading->customer_id) {
+                Customer::query()->whereKey($reading->customer_id)->update([
+                    'last_reading_date' => $reading->reading_date,
+                ]);
+            }
         });
     }
 

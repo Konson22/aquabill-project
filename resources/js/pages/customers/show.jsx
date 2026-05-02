@@ -261,6 +261,9 @@ export default function Show({ customer, unassignedMeters = [] }) {
                                             <CardContent className="space-y-1">
                                                 <p className="text-sm font-medium leading-relaxed">{customer?.address ?? '—'}</p>
                                                 <p className="text-xs text-muted-foreground">
+                                                    Plot: {customer?.plot_no ?? '—'}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
                                                     National ID: {customer?.national_id ?? '—'}
                                                 </p>
                                             </CardContent>

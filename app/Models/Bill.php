@@ -14,6 +14,7 @@ class Bill extends Model
     use HasFactory;
 
     protected $fillable = [
+        'bill_no',
         'customer_id',
         'meter_number',
         'meter_id',
@@ -27,6 +28,18 @@ class Bill extends Model
         'status',
         'due_date',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Bill $bill): void {
+            if (filled($bill->bill_no)) {
+                return;
+            }
+
+            $next = (int) (static::query()->max('id') ?? 0) + 1;
+            $bill->bill_no = 'BILL-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        });
+    }
 
     /**
      * The attributes that should be cast.

@@ -178,68 +178,54 @@ export default function MeterReadings({ readings, filters }) {
                 {/* Readings Table */}
                 <div className="flex-1 overflow-hidden rounded-xl border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full text-left text-xs  border-collapse">
                             <thead>
-                                <tr className="border-b bg-muted/50 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                <tr className="border-b bg-muted/50 uppercase tracking-wider text-muted-foreground">
                                     <th className="px-6 py-4">Date</th>
-                                    <th className="px-6 py-4">Meter / Customer</th>
+                                    <th className="px-6 py-4">Customer</th>
+                                    <th className="px-6 py-4">Meter</th>
                                     <th className="px-6 py-4">Prev / Current</th>
                                     <th className="px-6 py-4">Consumption</th>
-                                    <th className="px-6 py-4">Recorded By</th>
                                     <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
                                 {(readings?.data ?? []).map((reading) => (
-                                    <tr key={reading.id} className="hover:bg-muted/30 transition-colors group">
+                                    <tr key={reading.id} className="hover:bg-muted/30 transition-colors text-sm">
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-semibold">{formatReadingDate(reading.reading_date)}</span>
-                                                    <span className="text-[10px] text-muted-foreground">ID: #{reading.id}</span>
-                                                </div>
-                                            </div>
+                                            <span>{formatReadingDate(reading.reading_date)}</span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium">{reading.meter?.customer?.name}</span>
-                                                </div>
-                                                <span className="text-xs text-muted-foreground pl-1">{reading.meter?.meter_number}</span>
-                                            </div>
+                                            <span className="font-medium">{reading.meter?.customer?.name}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-muted-foreground">
+                                            {reading.meter?.meter_number ?? 'N/A'}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2 text-sm">
+                                            <div className="flex items-center gap-2">
                                                 <span className="text-muted-foreground">{reading.previous_reading}</span>
                                                 <span className="text-muted-foreground/30">→</span>
-                                                <span className="font-bold text-foreground">{reading.current_reading}</span>
+                                                <span className="text-foreground">{reading.current_reading}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-black text-primary">
-                                                        {reading.consumption} <span className="text-[10px] font-normal">m³</span>
+                                            <div className="flex items-center gap-1.5">
+                                                <span>
+                                                    {reading.consumption} m³
+                                                </span>
+                                                {reading.consumption > 50 && (
+                                                    <span
+                                                        className="text-red-500 inline-flex items-center"
+                                                        title="High usage"
+                                                        aria-label="High usage"
+                                                    >
+                                                        <ArrowUpRight className="h-3.5 w-3.5" />
                                                     </span>
-                                                    {reading.consumption > 50 && (
-                                                        <span className="text-[10px] text-red-500 font-bold flex items-center gap-0.5">
-                                                            <ArrowUpRight className="h-2 w-2" />
-                                                            High Usage
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center">
-                                                    <User className="h-3 w-3" />
-                                                </div>
-                                                <span className="text-xs">{reading.recorder?.name || 'System'}</span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center justify-end gap-1">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8" title="View Proof">
                                                     <ImageIcon className="h-4 w-4" />
                                                 </Button>
@@ -254,8 +240,8 @@ export default function MeterReadings({ readings, filters }) {
                                 ))}
                                 {(readings?.data ?? []).length === 0 && (
                                     <tr>
-                                        <td colSpan="6" className="px-6 py-20 text-center">
-                                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                        <td colSpan="7" className="px-6 py-20 text-center text-sm text-muted-foreground">
+                                            <div className="flex flex-col items-center gap-2">
                                                 <Activity className="h-10 w-10 opacity-20" />
                                                 <p>No meter readings match your filters.</p>
                                             </div>

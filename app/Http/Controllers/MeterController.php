@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Meter;
 use App\Models\MeterHistory;
 use Illuminate\Http\RedirectResponse;
@@ -45,12 +46,20 @@ class MeterController extends Controller
             'status' => ['required', 'in:active,inactive,maintenance,damage'],
         ]);
 
-        Meter::query()->create([
+        $lastReading = (float) ($validated['last_reading'] ?? 0);
+
+        $meter = Meter::query()->create([
             'customer_id' => $validated['customer_id'] ?? null,
             'meter_number' => $validated['meter_number'],
-            'last_reading' => $validated['last_reading'] ?? 0,
+            'last_reading' => $lastReading,
             'status' => $validated['status'],
         ]);
+
+        if ($lastReading > 0 && $meter->customer_id) {
+            Customer::query()->whereKey($meter->customer_id)->update([
+                'last_reading_date' => now()->toDateString(),
+            ]);
+        }
 
         return back()->with('success', 'Meter created successfully.');
     }

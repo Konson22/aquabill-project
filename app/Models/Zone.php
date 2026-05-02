@@ -32,6 +32,14 @@ class Zone extends Model
     }
 
     /**
+     * @return HasMany<Subzone, Zone>
+     */
+    public function subzones(): HasMany
+    {
+        return $this->hasMany(Subzone::class);
+    }
+
+    /**
      * Get the bills for the zone.
      */
     public function bills(): HasManyThrough
