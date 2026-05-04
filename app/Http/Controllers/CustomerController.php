@@ -88,7 +88,7 @@ class CustomerController extends Controller
                 'amount' => $request->service_charge_amount,
                 'issued_by' => auth()->id(),
                 'issued_date' => now(),
-                'status' => 'unpaid',
+                'status' => 'pending',
             ]);
         }
 
@@ -141,7 +141,6 @@ class CustomerController extends Controller
             'meters',
             'bills' => fn ($query) => $query->latest()->limit(50),
             'readings' => fn ($query) => $query->latest()->limit(50),
-            'payments' => fn ($query) => $query->latest()->limit(50),
             'serviceCharges' => fn ($query) => $query->latest()->limit(50),
             'meterHistories' => fn ($query) => $query->with(['meter', 'replacedBy'])->latest(),
             'disconnections' => fn ($query) => $query->with(['disconnectedBy', 'reconnectedBy'])->latest(),

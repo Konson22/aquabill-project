@@ -18,7 +18,7 @@ test('authenticated user can view overdue bills page', function () {
     $this->get(route('bills.overdue'))->assertOk();
 });
 
-test('overdue bills page only shows unpaid bills with due_date in the past', function () {
+test('overdue bills page only shows pending or partial bills with due_date in the past', function () {
     $user = User::factory()->create();
     $this->actingAs($user);
 
@@ -87,7 +87,7 @@ test('overdue bills page only shows unpaid bills with due_date in the past', fun
         'current_charge' => 10,
         'previous_balance' => 0,
         'total_amount' => 10,
-        'status' => 'unpaid',
+        'status' => 'pending',
         'due_date' => Carbon::today()->subDay(),
     ]);
 
@@ -101,7 +101,7 @@ test('overdue bills page only shows unpaid bills with due_date in the past', fun
         'current_charge' => 10,
         'previous_balance' => 0,
         'total_amount' => 10,
-        'status' => 'unpaid',
+        'status' => 'pending',
         'due_date' => Carbon::today()->addDay(),
     ]);
 

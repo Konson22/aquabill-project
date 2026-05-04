@@ -9,6 +9,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import { formatCurrency } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Calendar, DollarSign, History, Zap } from 'lucide-react';
 
@@ -58,7 +59,7 @@ export default function Show({ tariff }) {
                             <div className="flex items-center gap-2">
                                 <DollarSign className="h-4 w-4 text-primary" />
                                 <span className="font-mono text-2xl font-bold">
-                                    SSP {Number(tariff?.price_per_unit ?? 0).toLocaleString()}
+                                    {formatCurrency(tariff?.price_per_unit ?? 0)}
                                 </span>
                             </div>
                         </CardContent>
@@ -72,7 +73,7 @@ export default function Show({ tariff }) {
                         </CardHeader>
                         <CardContent className="pt-0">
                             <span className="font-mono text-2xl font-bold">
-                                SSP {Number(tariff?.fixed_charge ?? 0).toLocaleString()}
+                                {formatCurrency(tariff?.fixed_charge ?? 0)}
                             </span>
                         </CardContent>
                     </Card>
@@ -119,10 +120,10 @@ export default function Show({ tariff }) {
                                         <TableRow key={history.id}>
                                             <TableCell className="font-medium">{history.name}</TableCell>
                                             <TableCell className="text-right font-mono">
-                                                SSP {Number(history.price_per_unit ?? 0).toLocaleString()}
+                                                {formatCurrency(history.price_per_unit ?? 0)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono">
-                                                SSP {Number(history.fixed_charge ?? 0).toLocaleString()}
+                                                {formatCurrency(history.fixed_charge ?? 0)}
                                             </TableCell>
                                             <TableCell className="text-right text-sm text-muted-foreground">
                                                 {history.created_at

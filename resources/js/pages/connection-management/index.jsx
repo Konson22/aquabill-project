@@ -1,13 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, PowerOff, User } from 'lucide-react';
+import { ArrowLeft, PanelRight, PowerOff, User } from 'lucide-react';
 
 export default function ConnectionManagementIndex({ disconnections, stats }) {
     const items = disconnections?.data ?? [];
     const disconnectedItems = items.filter((item) => item?.status === 'disconnected');
-    const waitingItems = items.filter((item) => item?.status !== 'disconnected');
+    const notifiedItems = items.filter((item) => item?.status === 'notified' || item?.status === 'grace_period');
 
     const formatDate = (value) => {
         if (!value) {
@@ -73,8 +74,7 @@ export default function ConnectionManagementIndex({ disconnections, stats }) {
                     </Card>
                 </div>
 
-                
-                <WaitingCustomersTable rows={waitingItems} formatDate={formatDate} />
+                <NotifiedCustomersTable rows={notifiedItems} formatDate={formatDate} />
 
                 <DisconnectedCustomersTable rows={disconnectedItems} formatDate={formatDate} />
 
@@ -115,7 +115,7 @@ function DisconnectedCustomersTable({ rows, formatDate }) {
                                 <tr key={item.id} className="border-b">
                                     <td className="px-3 py-2 font-medium">
                                         <Link
-                                            href={`/customers/${item.customer?.id}`}
+                                            href={route('customers.show', item.customer?.id)}
                                             className="inline-flex items-center gap-1 text-primary hover:underline"
                                         >
                                             <User className="h-4 w-4" />
@@ -140,9 +140,11 @@ function DisconnectedCustomersTable({ rows, formatDate }) {
     );
 }
 
-function WaitingCustomersTable({ rows, formatDate }) {
+function NotifiedCustomersTable({ rows, formatDate }) {
+    const deadlineFor = (item) => item?.grace_period_ends_at ?? item?.notice_ends_at;
+
     const getDaysLeft = (item) => {
-        const endDate = item?.grace_period_ends_at ?? item?.notice_ends_at;
+        const endDate = deadlineFor(item);
 
         if (!endDate) {
             return '—';
@@ -163,7 +165,7 @@ function WaitingCustomersTable({ rows, formatDate }) {
     if (!rows.length) {
         return (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-                No waiting customers found.
+                No customers in the 30-day notice or 15-day grace period.
             </div>
         );
     }
@@ -171,7 +173,11 @@ function WaitingCustomersTable({ rows, formatDate }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Waiting</CardTitle>
+                <CardTitle className="text-lg">Notified customers</CardTitle>
+                <CardDescription>
+                    Accounts with an active disconnection notice (30-day phase or final 15-day grace). Days left count down to the grace-period
+                    end when set, otherwise to the notice end.
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">
@@ -179,10 +185,12 @@ function WaitingCustomersTable({ rows, formatDate }) {
                         <thead>
                             <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                                 <th className="px-3 py-2">Customer</th>
-                                <th className="px-3 py-2">Notified On</th>
-                                <th className="px-3 py-2">Notification End</th>
-                                <th className="px-3 py-2">Days Left</th>
-                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2">Notified on</th>
+                                <th className="px-3 py-2">Notice ends</th>
+                                <th className="px-3 py-2">Grace ends</th>
+                                <th className="px-3 py-2">Days left</th>
+                                <th className="px-3 py-2">Phase</th>
+                                <th className="px-3 py-2 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -190,7 +198,7 @@ function WaitingCustomersTable({ rows, formatDate }) {
                                 <tr key={item.id} className="border-b">
                                     <td className="px-3 py-2 font-medium">
                                         <Link
-                                            href={`/customers/${item.customer?.id}`}
+                                            href={route('customers.show', item.customer?.id)}
                                             className="inline-flex items-center gap-1 text-primary hover:underline"
                                         >
                                             <User className="h-4 w-4" />
@@ -199,11 +207,35 @@ function WaitingCustomersTable({ rows, formatDate }) {
                                     </td>
                                     <td className="px-3 py-2">{formatDate(item?.notified_at)}</td>
                                     <td className="px-3 py-2">{formatDate(item?.notice_ends_at)}</td>
+                                    <td className="px-3 py-2">{formatDate(item?.grace_period_ends_at)}</td>
                                     <td className="px-3 py-2">{getDaysLeft(item)}</td>
                                     <td className="px-3 py-2">
-                                        <Badge variant="secondary" className="uppercase">
-                                            {item.status}
+                                        <Badge
+                                            variant="outline"
+                                            className={
+                                                item.status === 'grace_period'
+                                                    ? 'border-red-300 uppercase text-red-800 bg-red-50'
+                                                    : 'border-amber-300 uppercase text-amber-900 bg-amber-50'
+                                            }
+                                        >
+                                            {item.status === 'grace_period' ? 'Grace period' : '30-day notice'}
                                         </Badge>
+                                    </td>
+                                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                                        {item.customer?.id ? (
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link
+                                                    href={route('customers.disconnection-status', item.customer.id)}
+                                                    className="gap-1.5"
+                                                    title="Open disconnection status page"
+                                                >
+                                                    <PanelRight className="h-4 w-4" />
+                                                    Open
+                                                </Link>
+                                            </Button>
+                                        ) : (
+                                            '—'
+                                        )}
                                     </td>
                                 </tr>
                             ))}

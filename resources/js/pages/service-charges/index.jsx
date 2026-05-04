@@ -39,6 +39,7 @@ import {
     DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/lib/utils';
 import ConfirmPaymentModal from './components/confirm-payment-modal';
 
 export default function ServiceChargesIndex({ charges }) {
@@ -64,8 +65,8 @@ export default function ServiceChargesIndex({ charges }) {
             totalAmount: data.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0),
             unpaid: data.filter(c => c.status === 'unpaid').length,
             unpaidAmount: data.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0),
-            invoiced: data.filter(c => c.bill_id).length,
-            invoicedAmount: data.filter(c => c.bill_id).reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0),
+            paid: data.filter(c => c.status === 'paid').length,
+            paidAmount: data.filter(c => c.status === 'paid').reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0),
         };
     }, [charges]);
 
@@ -136,7 +137,9 @@ export default function ServiceChargesIndex({ charges }) {
                             <div>
                                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1">Total Charges</p>
                                 <p className="text-2xl font-black tracking-tight">{stats.total}</p>
-                                <p className="text-xs text-muted-foreground mt-2">SSP {stats.totalAmount.toLocaleString()}</p>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    {formatCurrency(stats.totalAmount)}
+                                </p>
                             </div>
                             <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors">
                                 <CreditCard className="h-5 w-5 text-blue-600" />
@@ -150,7 +153,9 @@ export default function ServiceChargesIndex({ charges }) {
                             <div>
                                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1">Unpaid</p>
                                 <p className="text-2xl font-black tracking-tight text-amber-600">{stats.unpaid}</p>
-                                <p className="text-xs text-amber-600/70 mt-2">SSP {stats.unpaidAmount.toLocaleString()}</p>
+                                <p className="text-xs text-amber-600/70 mt-2">
+                                    {formatCurrency(stats.unpaidAmount)}
+                                </p>
                             </div>
                             <div className="p-2 bg-amber-500/10 rounded-lg group-hover:bg-amber-500/20 transition-colors">
                                 <Clock className="h-5 w-5 text-amber-600" />
@@ -158,13 +163,15 @@ export default function ServiceChargesIndex({ charges }) {
                         </div>
                     </div>
 
-                    {/* Invoiced Charges */}
+                    {/* Paid charges */}
                     <div className="bg-card rounded-xl border shadow-sm p-6 group hover:shadow-md transition-all">
                         <div className="flex items-start justify-between">
                             <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1">Invoiced</p>
-                                <p className="text-2xl font-black tracking-tight text-emerald-600">{stats.invoiced}</p>
-                                <p className="text-xs text-emerald-600/70 mt-2">SSP {stats.invoicedAmount.toLocaleString()}</p>
+                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1">Paid</p>
+                                <p className="text-2xl font-black tracking-tight text-emerald-600">{stats.paid}</p>
+                                <p className="text-xs text-emerald-600/70 mt-2">
+                                    {formatCurrency(stats.paidAmount)}
+                                </p>
                             </div>
                             <div className="p-2 bg-emerald-500/10 rounded-lg group-hover:bg-emerald-500/20 transition-colors">
                                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />
@@ -296,13 +303,9 @@ export default function ServiceChargesIndex({ charges }) {
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 <div className="flex flex-col">
-                                                    <span className="font-black text-base text-primary">SSP {charge.amount}</span>
-                                                    {charge.bill_id && (
-                                                        <div className="flex items-center gap-1 text-emerald-600 mt-1">
-                                                            <CheckCircle2 className="h-3 w-3" />
-                                                            <span className="text-xs font-bold">Invoiced</span>
-                                                        </div>
-                                                    )}
+                                                    <span className="font-black text-base text-primary">
+                                                        {formatCurrency(charge.amount)}
+                                                    </span>
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-4 text-muted-foreground text-sm">

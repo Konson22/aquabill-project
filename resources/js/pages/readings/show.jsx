@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { formatCurrency } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { 
-    ChevronLeft, 
+import {
+    ChevronLeft,
     Printer,
     MapPin,
     ArrowUpRight,
@@ -15,7 +16,8 @@ import {
     Droplets,
     User,
     Phone,
-    Calendar
+    Calendar,
+    Pencil,
 } from 'lucide-react';
 
 const formatDate = (dateString) => {
@@ -64,6 +66,12 @@ export default function Show({ reading }) {
                         </div>
                     </div>
                     <div className="flex gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={route('readings.edit', reading.id)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit reading
+                            </Link>
+                        </Button>
                         {reading.bill && (
                             <Button variant="outline" asChild size="sm">
                                 <Link href={`/bills/${reading.bill.id}/print`} target="_blank">
@@ -176,19 +184,27 @@ export default function Show({ reading }) {
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
                                         <div>
                                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Usage Charge</p>
-                                            <p className="font-mono text-sm font-bold">SSP {reading.bill.current_charge}</p>
+                                            <p className="font-mono text-sm font-bold">
+                                                {formatCurrency(reading.bill.current_charge)}
+                                            </p>
                                         </div>
                                         <div>
                                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Fixed Charge</p>
-                                            <p className="font-mono text-sm font-bold">SSP {reading.bill.fixed_charge}</p>
+                                            <p className="font-mono text-sm font-bold">
+                                                {formatCurrency(reading.bill.fixed_charge)}
+                                            </p>
                                         </div>
                                         <div>
                                             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Arrears</p>
-                                            <p className="font-mono text-sm font-bold text-red-500">SSP {reading.bill.previous_balance}</p>
+                                            <p className="font-mono text-sm font-bold text-red-500">
+                                                {formatCurrency(reading.bill.previous_balance)}
+                                            </p>
                                         </div>
                                         <div>
                                             <p className="text-[10px] text-primary uppercase tracking-wider font-bold mb-1">Total Due</p>
-                                            <p className="font-mono text-base font-black text-primary">SSP {reading.bill.total_amount}</p>
+                                            <p className="font-mono text-base font-black text-primary">
+                                                {formatCurrency(reading.bill.total_amount)}
+                                            </p>
                                         </div>
                                     </div>
 

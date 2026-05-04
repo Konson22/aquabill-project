@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Department;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 
@@ -42,5 +43,29 @@ test('users can logout', function () {
     $response = $this->actingAs($user)->post('/logout');
 
     $this->assertGuest();
+    $response->assertRedirect('/');
+});
+
+test('login accepts plain password seed pattern with hashed cast and verified email', function () {
+    $dept = Department::query()->create([
+        'name' => 'hr',
+        'description' => 'HR',
+    ]);
+
+    User::query()->create([
+        'name' => 'Seed Pattern',
+        'email' => 'seed-pattern@test.local',
+        'password' => '123',
+        'department_id' => $dept->id,
+        'status' => 'active',
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->post('/login', [
+        'email' => 'seed-pattern@test.local',
+        'password' => '123',
+    ]);
+
+    $this->assertAuthenticated();
     $response->assertRedirect('/');
 });

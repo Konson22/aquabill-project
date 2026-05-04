@@ -3,12 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ServiceCharge extends Model
 {
     protected $fillable = [
         'customer_id',
-        'bill_id',
         'service_charge_type_id',
         'amount',
         'issued_by',
@@ -27,23 +27,15 @@ class ServiceCharge extends Model
     /**
      * Get the customer associated with this service charge.
      */
-    public function customer(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
     }
 
     /**
-     * Get the bill associated with this service charge.
-     */
-    public function bill(): \Illuminate\Database\Eloquent\Relations\BelongsTo
-    {
-        return $this->belongsTo(Bill::class);
-    }
-
-    /**
      * Get the type of service charge.
      */
-    public function serviceChargeType(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function serviceChargeType(): BelongsTo
     {
         return $this->belongsTo(ServiceChargeType::class);
     }
@@ -51,7 +43,7 @@ class ServiceCharge extends Model
     /**
      * Get the user who issued this service charge.
      */
-    public function issuer(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function issuer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');
     }

@@ -33,6 +33,7 @@ import {
     ChevronLeft
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 
 export default function ServiceCharges({ types }) {
@@ -244,7 +245,7 @@ export default function ServiceCharges({ types }) {
                                         </TableCell>
                                         <TableCell>
                                             <span className="font-mono font-black text-lg text-rose-600">
-                                                SSP {type.amount}
+                                                {formatCurrency(type.amount)}
                                             </span>
                                         </TableCell>
                                         <TableCell className="max-w-[350px]">

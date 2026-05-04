@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateMeterReadingRequest;
 use App\Models\MeterReading;
 use App\Services\BillService;
+use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -78,13 +82,35 @@ class MeterReadingController extends Controller
 
     public function show(MeterReading $reading): Response
     {
-        $reading->load(['meter.customer.zone', 'meter.customer.tariff', 'recorder', 'bill.payments']);
+        $reading->load(['meter.customer.zone', 'meter.customer.tariff', 'recorder', 'bill']);
 
-        $reading->image_url = $reading->image ? \Illuminate\Support\Facades\Storage::disk('public')->url($reading->image) : null;
+        $reading->image_url = $reading->image ? Storage::disk('public')->url($reading->image) : null;
 
         return Inertia::render('readings/show', [
             'reading' => $reading,
         ]);
+    }
+
+    public function edit(MeterReading $reading): Response
+    {
+        $reading->load(['meter.customer.zone', 'bill']);
+
+        $reading->image_url = $reading->image ? Storage::disk('public')->url($reading->image) : null;
+
+        return Inertia::render('readings/edit', [
+            'reading' => $reading,
+        ]);
+    }
+
+    public function update(UpdateMeterReadingRequest $request, MeterReading $reading, BillService $billService): RedirectResponse
+    {
+        $reading->update($request->validated());
+
+        $billService->syncBillForReading($reading->fresh());
+
+        return redirect()
+            ->route('readings.show', $reading)
+            ->with('success', 'Reading updated successfully.');
     }
 
     public function export(Request $request)
@@ -107,39 +133,39 @@ class MeterReadingController extends Controller
             ->when($to, fn ($q) => $q->whereDate('reading_date', '<=', $to))
             ->orderBy('id', 'desc');
 
-        $filename = "meter_readings_" . date('Y-m-d_His') . ".csv";
+        $filename = 'meter_readings_'.date('Y-m-d_His').'.csv';
         $headers = [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=$filename",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
+            'Content-type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=$filename",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
         ];
 
         // Calculate summaries
         $totalConsumption = (clone $query)->sum('meter_readings.consumption');
         $customersCount = (clone $query)->join('meters', 'meter_readings.meter_id', '=', 'meters.id')
-                                      ->distinct('meters.customer_id')
-                                      ->count('meters.customer_id');
+            ->distinct('meters.customer_id')
+            ->count('meters.customer_id');
         $totalAmount = (clone $query)->join('bills', 'meter_readings.id', '=', 'bills.reading_id')
-                                   ->sum('bills.total_amount');
+            ->sum('bills.total_amount');
 
-        $callback = function() use($query, $totalConsumption, $customersCount, $totalAmount) {
+        $callback = function () use ($query, $totalConsumption, $customersCount, $totalAmount) {
             $file = fopen('php://output', 'w');
-            
+
             // Write Summary Header
             fputcsv($file, ['Export Summary']);
             fputcsv($file, ['Unique Customers', $customersCount]);
-            fputcsv($file, ['Total Consumption (m3)', number_format((float)$totalConsumption, 2, '.', '')]);
-            fputcsv($file, ['Total Bill Amount (SSP)', number_format((float)$totalAmount, 2, '.', '')]);
+            fputcsv($file, ['Total Consumption (m3)', number_format((float) $totalConsumption, 2, '.', '')]);
+            fputcsv($file, ['Total Bill Amount (SSP)', number_format((float) $totalAmount, 2, '.', '')]);
             fputcsv($file, []); // Empty line separator
 
             $columns = [
-                'ID', 'Meter Number', 'Customer Name', 'Previous Reading', 'Current Reading', 'Consumption', 'Reading Date', 'Recorded By', 'Bill Amount', 'Bill Status'
+                'ID', 'Meter Number', 'Customer Name', 'Previous Reading', 'Current Reading', 'Consumption', 'Reading Date', 'Recorded By', 'Bill Amount', 'Bill Status',
             ];
             fputcsv($file, $columns);
 
-            $query->chunk(500, function($readings) use($file) {
+            $query->chunk(500, function ($readings) use ($file) {
                 $readings->load('bill');
                 foreach ($readings as $reading) {
                     fputcsv($file, [
@@ -149,7 +175,7 @@ class MeterReadingController extends Controller
                         $reading->previous_reading,
                         $reading->current_reading,
                         $reading->consumption,
-                        $reading->reading_date ? \Carbon\Carbon::parse($reading->reading_date)->format('Y-m-d H:i') : 'N/A',
+                        $reading->reading_date ? Carbon::parse($reading->reading_date)->format('Y-m-d H:i') : 'N/A',
                         $reading->recorder->name ?? 'System',
                         $reading->bill ? $reading->bill->total_amount : '0.00',
                         $reading->bill ? ucfirst($reading->bill->status) : 'N/A',

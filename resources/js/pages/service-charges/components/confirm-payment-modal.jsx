@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { useForm } from '@inertiajs/react';
 import { CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 export default function ConfirmPaymentModal({ charge, isOpen, onClose }) {
     const { post, processing } = useForm();
@@ -49,7 +50,9 @@ export default function ConfirmPaymentModal({ charge, isOpen, onClose }) {
                             </div>
                             <div className="flex justify-between items-center pt-2 border-t border-muted-foreground/10">
                                 <span className="text-muted-foreground font-medium text-base">Amount Due:</span>
-                                <span className="text-xl font-black text-primary">SSP {Number(charge.amount).toLocaleString()}</span>
+                                <span className="text-xl font-black text-primary">
+                                    {formatCurrency(charge.amount)}
+                                </span>
                             </div>
                         </div>
 

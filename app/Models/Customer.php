@@ -110,16 +110,6 @@ class Customer extends Model
     }
 
     /**
-     * Get the payments for the customer.
-     *
-     * @return HasMany<Payment, Customer>
-     */
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
-
-    /**
      * Get the service charges for the customer.
      *
      * @return HasMany<ServiceCharge, Customer>

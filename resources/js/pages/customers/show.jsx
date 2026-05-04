@@ -28,6 +28,7 @@ import CustomerServiceCharges from './components/customer-service-charges';
 import DisconnectionManagement from './components/disconnection-management';
 import MeterStatusModal from './components/meter-status-modal';
 import ReplaceMeterModal from './components/replace-meter-modal';
+import { formatCurrency } from '@/lib/utils';
 import { useState } from 'react';
 
 export default function Show({ customer, unassignedMeters = [] }) {
@@ -62,15 +63,13 @@ export default function Show({ customer, unassignedMeters = [] }) {
     const bills = customer?.bills ?? [];
     const totalBills = bills.length;
     const paidBills = bills.filter((bill) => bill?.status === 'paid').length;
-    const unpaidBills = bills.filter((bill) => bill?.status === 'unpaid').length;
+    const unpaidBills = bills.filter((bill) => bill?.status === 'pending' || bill?.status === 'partial').length;
     const overdueBills = bills.filter((bill) => bill?.status === 'overdue').length;
     const meters = customer?.meters ?? [];
     const meterHistories = customer?.meterHistories ?? customer?.meter_histories ?? [];
     const unpaidAmount = bills
         .filter((bill) => bill?.status !== 'paid')
         .reduce((carry, bill) => carry + Number(bill?.total_amount ?? bill?.total ?? 0), 0);
-
-    const formatCurrency = (value) => `SSP ${Number(value ?? 0).toLocaleString()}`;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -88,14 +87,11 @@ export default function Show({ customer, unassignedMeters = [] }) {
                     </Link>
 
                     <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setActiveTab('disconnections')}
-                            className="text-orange-600 hover:text-orange-700"
-                        >
-                            <PowerOff className="mr-2 h-4 w-4" />
-                            Disconnection
+                        <Button variant="outline" size="sm" className="text-orange-600 hover:text-orange-700" asChild>
+                            <Link href={route('customers.disconnection-status', customer.id)}>
+                                <PowerOff className="mr-2 h-4 w-4" />
+                                Disconnection
+                            </Link>
                         </Button>
                         <Button variant="outline" size="sm" asChild>
                             <Link href={route('customers.edit', customer.id)}>
@@ -402,7 +398,7 @@ export default function Show({ customer, unassignedMeters = [] }) {
                                 </TabsContent>
 
                                 <TabsContent value="payments" className="m-0 border-none p-0 outline-none">
-                                    <CustomerPayments payments={customer?.payments} />
+                                    <CustomerPayments bills={customer?.bills} />
                                 </TabsContent>
 
                                 <TabsContent value="charges" className="m-0 border-none p-0 outline-none">

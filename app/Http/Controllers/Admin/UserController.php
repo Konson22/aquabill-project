@@ -95,7 +95,6 @@ class UserController extends Controller
 
         $user->loadCount([
             'recordedReadings',
-            'receivedPayments',
         ]);
 
         return Inertia::render('admin/users/show', [
@@ -116,7 +115,6 @@ class UserController extends Controller
                 ])->values(),
                 'performance' => [
                     'readings_count' => $user->recorded_readings_count,
-                    'payments_count' => $user->received_payments_count,
                 ],
             ],
         ]);

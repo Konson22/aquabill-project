@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CURRENCY_CODE } from '@/lib/utils';
 import { CreditCard, Calendar, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function ServiceChargeModal({ customer, serviceChargeTypes = [], isOpen, onClose }) {
@@ -111,7 +112,7 @@ export default function ServiceChargeModal({ customer, serviceChargeTypes = [], 
                                     autoFocus
                                 />
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase">
-                                    SSP
+                                    {CURRENCY_CODE}
                                 </div>
                             </div>
                             {errors.amount && <p className="text-xs text-red-500">{errors.amount}</p>}

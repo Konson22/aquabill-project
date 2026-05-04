@@ -1,133 +1,207 @@
-You are a senior Laravel backend engineer.
+Act as a senior Laravel + React/Inertia system architect.
 
-Design a **Service Charges module** for a Water Billing System.
+Add a Training Management Module to the existing HR Management system.
 
-This module is ONLY for operational/service-related fees (e.g. reconnection, installation, inspection), separate from fines or penalties.
+Tech stack:
+- Laravel backend
+- React + Inertia frontend
+- Tailwind CSS
+- MySQL
+- Role-based access control
 
-Generate:
+Module name: Training Management
 
-- Laravel migrations
-- Eloquent models
-- Relationships
-- Seeders (sample service charges)
-- Constraints and indexes
+Objective:
+Track all trainings provided by the institution to staff, including training programs, participants, attendance, completion, certificates, costs, and reports.
 
-Do NOT create frontend code.
+1. Database Tables
 
----
+Create migrations for:
 
-# 🔷 1. SERVICE CHARGE TYPES
-
-Create table: `service_charge_types`
-
+training_programs
 Fields:
-
 - id
-- name (e.g. Reconnection Fee, Installation Fee)
-- code (unique, e.g. RECON_FEE)
-- amount (decimal 10,2) → fixed charge amount
-- description (nullable)
+- title
+- description nullable
+- provider nullable
+- location nullable
+- start_date nullable
+- end_date nullable
+- cost decimal nullable
+- status enum: planned, ongoing, completed, cancelled
+- timestamps
+- soft deletes
+
+training_participants
+Fields:
+- id
+- training_program_id
+- staff_id
+- status enum: enrolled, attended, completed, absent
+- score decimal nullable
+- certificate_path nullable
+- remarks nullable
 - timestamps
 
 Rules:
+- training_program_id references training_programs
+- staff_id references staff
+- unique training_program_id + staff_id
 
-- Only fixed amounts (no percentage logic)
-- Name must be clear and unique
-- Code must be unique and used in logic
-
----
-
-# 🔷 2. SERVICE CHARGES (APPLIED)
-
-Create table: `service_charges`
-
+training_documents
 Fields:
-
 - id
-
-- customer_id (FK → customers.id)
-
-- bill_id (nullable FK → bills.id)
-
-- service_charge_type_id (FK → service_charge_types.id)
-
-- amount (decimal 10,2)
-
-- issued_by (FK → users.id, nullable)
-
-- issued_date (date)
-
-- due_date (nullable)
-
-- status (unpaid, paid) default unpaid
-
-- notes (nullable)
-
+- training_program_id
+- title nullable
+- file_path
 - timestamps
 
----
+2. Models & Relationships
 
-# 🔷 3. RELATIONSHIPS
+Create models:
+- TrainingProgram
+- TrainingParticipant
+- TrainingDocument
 
-ServiceCharge:
+Relationships:
+- TrainingProgram has many participants
+- TrainingProgram has many documents
+- TrainingParticipant belongs to training program
+- TrainingParticipant belongs to staff
+- TrainingDocument belongs to training program
+- Staff has many training participants
+- Staff belongs to many training programs through training_participants
 
-- belongsTo Customer
-- belongsTo Bill (nullable)
-- belongsTo ServiceChargeType
-- belongsTo User (issued_by)
+3. Features
 
-ServiceChargeType:
+Build full CRUD for training programs:
+- Create training
+- Edit training
+- View training details
+- Delete training
+- Filter by status, provider, date range
+- Search by title/provider/location
 
-- hasMany ServiceCharges
+Training detail page should show:
+- Training information
+- Participants list
+- Uploaded documents
+- Training cost
+- Completion summary
 
-Customer:
+Participant management:
+- Add staff to training
+- Remove staff from training
+- Update participant status:
+  - enrolled
+  - attended
+  - completed
+  - absent
+- Add score
+- Add remarks
+- Upload certificate per participant
 
-- hasMany ServiceCharges
+Training documents:
+- Upload training materials
+- View/download documents
+- Delete documents
 
-Bill:
+4. Staff Profile Integration
 
-- hasMany ServiceCharges
+Update staff profile page to include a “Training” tab showing:
+- Trainings enrolled
+- Trainings attended
+- Trainings completed
+- Certificates
+- Scores
+- Training dates
+- Provider
 
----
+5. Dashboard Cards
 
-# 🔷 4. BUSINESS RULES
+Add dashboard widgets:
+- Total trainings
+- Ongoing trainings
+- Completed trainings
+- Staff trained this year
+- Pending/planned trainings
+- Training cost this year
 
-- Service charges can exist WITH or WITHOUT a bill
-  (e.g. installation before first bill)
-- Charges can later be attached to a bill
-- Amount is copied from service_charge_types at time of creation (snapshot)
-- Status must be tracked (unpaid/paid)
-- Charges contribute to customer balance
+6. Reports
 
----
+Create reports for:
+- Training programs report
+- Staff training history
+- Training participation report
+- Training cost report
+- Completion rate report
 
-# 🔷 5. SEEDERS
+Reports should support:
+- Search
+- Filters
+- Export to Excel
+- Export to PDF
+- Print
 
-Create sample data:
+7. Permissions
 
-- Installation Fee (50)
-- Reconnection Fee (20)
-- Meter Replacement Fee (25)
-- Inspection Fee (15)
+Add permissions:
+- view_training
+- manage_training_programs
+- manage_training_participants
+- manage_training_documents
+- view_training_reports
 
----
+Role access:
+- Super Admin: full access
+- HR Manager: full training access
+- Department Manager: view department staff trainings
+- Staff: view own training history and certificates
 
-# 🔷 6. INDEXING
+8. UI Requirements
 
-- service_charges.customer_id
-- service_charges.bill_id
-- service_charges.service_charge_type_id
-- service_charge_types.code (unique)
+Use professional HR dashboard style:
+- Responsive pages
+- Tailwind CSS
+- Clean tables
+- Status badges
+- Modal forms where useful
+- Tabs on training detail page
+- Confirmation dialogs before deleting
+- File upload UI for documents/certificates
 
----
+9. Business Logic
 
-# 🔷 7. OUTPUT REQUIREMENTS
+Use service classes where needed:
+- TrainingService
+- TrainingReportService
 
-Generate:
+Important logic:
+- Prevent duplicate staff enrollment in same training
+- Calculate completion rate
+- Calculate total cost per training
+- Track training history per staff
+- Show expired or missing certificates if certificate expiry is added later
 
-- Migrations
-- Models with relationships
-- Seeders
-- Clean Laravel best practices
+10. Routes & Controllers
 
-Ensure design is scalable and integrates with billing and payment modules.
+Create:
+- TrainingProgramController
+- TrainingParticipantController
+- TrainingDocumentController
+- TrainingReportController
+
+Use Laravel validation Form Requests.
+
+11. Deliver Step by Step
+
+Implement in this order:
+1. Migrations
+2. Models and relationships
+3. Seed permissions
+4. Controllers and routes
+5. Services
+6. React/Inertia pages
+7. Staff profile training tab
+8. Dashboard widgets
+9. Reports and exports

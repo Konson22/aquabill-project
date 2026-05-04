@@ -2,27 +2,10 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { RevenueSummaryTable } from '@/pages/reports/components/revenue-summary-table';
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    Calendar,
-    ChevronLeft,
-    ChevronRight,
-    Download,
-    LineChart,
-    Receipt,
-    Search,
-    TrendingUp,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Receipt, TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
     Area,
     AreaChart,
@@ -32,6 +15,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
+import { OverdueBills } from './components/overdue-bills';
 
 const breadcrumbs = [
     {
@@ -40,14 +24,27 @@ const breadcrumbs = [
     },
 ];
 
-function formatMoney(value) {
-    const number = Number(value ?? 0);
+/**
+ * @param {Date} [d]
+ * @returns {{ from: string, to: string }}
+ */
+function calendarFullYearBounds(d = new Date()) {
+    const y = d.getFullYear();
 
-    if (!Number.isFinite(number)) {
-        return 'SSP 0';
+    return { from: `${y}-01-01`, to: `${y}-12-31` };
+}
+
+/**
+ * @param {{ from?: string, to?: string }} f
+ */
+function initialBillMonthRange(f) {
+    const from = f.from?.trim() ?? '';
+    const to = f.to?.trim() ?? '';
+    if (from && to) {
+        return { from, to };
     }
 
-    return `SSP ${number.toLocaleString()}`;
+    return calendarFullYearBounds();
 }
 
 export default function RevenueReport({
@@ -55,49 +52,44 @@ export default function RevenueReport({
     chartData = [],
     rows,
     filters,
+    overdueBills = [],
+    overdueBillsMeta,
 }) {
     const safeSummary = summary ?? {
         total_revenue: 0,
+        fixed_charge_revenue: 0,
+        total_billed_revenue: 0,
         total_paid: 0,
         total_outstanding: 0,
+        collection_rate_percent: 0,
         payments_count: 0,
     };
 
     const safeRows = rows.data ?? [];
     const safeFilters = filters ?? { search: '', from: '', to: '' };
 
-    const [search, setSearch] = useState(safeFilters.search ?? '');
-    const [from, setFrom] = useState(safeFilters.from ?? '');
-    const [to, setTo] = useState(safeFilters.to ?? '');
-
-    const isDirty = useMemo(() => {
-        return (
-            (safeFilters.search ?? '') !== search ||
-            (safeFilters.from ?? '') !== from ||
-            (safeFilters.to ?? '') !== to
-        );
-    }, [from, safeFilters.from, safeFilters.search, safeFilters.to, search, to]);
+    const [from, setFrom] = useState(() => initialBillMonthRange(filters ?? { from: '', to: '' }).from);
+    const [to, setTo] = useState(() => initialBillMonthRange(filters ?? { from: '', to: '' }).to);
 
     useEffect(() => {
         const timeout = setTimeout(() => {
             router.get(
                 breadcrumbs[0].href,
                 {
-                    search: search || undefined,
-                    from: from || undefined,
-                    to: to || undefined,
+                    from,
+                    to,
                 },
                 {
                     preserveScroll: true,
                     preserveState: true,
                     replace: true,
-                    only: ['summary', 'rows', 'filters'],
+                    only: ['summary', 'rows', 'filters', 'chartData', 'overdueBills', 'overdueBillsMeta'],
                 },
             );
         }, 350);
 
         return () => clearTimeout(timeout);
-    }, [from, search, to]);
+    }, [from, to]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -115,10 +107,6 @@ export default function RevenueReport({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" disabled>
-                            <Download className="mr-2 h-4 w-4" />
-                            Export
-                        </Button>
                         <Button size="sm" asChild>
                             <Link href={route('bills.index')}>
                                 <Receipt className="mr-2 h-4 w-4" />
@@ -128,218 +116,81 @@ export default function RevenueReport({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <Card className="shadow-sm">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-semibold text-muted-foreground">Total Revenue</CardTitle>
-                                <div className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700">
-                                    <TrendingUp className="h-4 w-4" />
+                <RevenueSummaryTable
+                    summary={safeSummary}
+                    filters={safeFilters}
+                    onBillDateRangeChange={(fromValue, toValue) => {
+                        setFrom(fromValue);
+                        setTo(toValue);
+                    }}
+                />
+
+                <Card className="shadow-sm">
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <CardTitle className="text-base">Collection rate by month</CardTitle>
+                                <div className="text-xs text-muted-foreground">
+                                    For each month: paid bill amounts (by bill date) plus paid service charges (by issue date),
+                                    divided by that month&apos;s billed water plus fixed charges — same basis as period collection rate.
                                 </div>
                             </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-black text-emerald-700">{formatMoney(safeSummary.total_revenue)}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Total billed water current charges for selected period</div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="shadow-sm">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-semibold text-muted-foreground">Collected</CardTitle>
-                                <div className="h-9 w-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-700">
-                                    <Receipt className="h-4 w-4" />
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-black">{formatMoney(safeSummary.total_paid)}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Total payments received</div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="shadow-sm">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-semibold text-muted-foreground">Outstanding</CardTitle>
-                                <div className="h-9 w-9 rounded-full bg-amber-50 flex items-center justify-center text-amber-800">
-                                    <LineChart className="h-4 w-4" />
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-black text-amber-700">{formatMoney(safeSummary.total_outstanding)}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Unpaid balances (arrears included)</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                    <Card className="lg:col-span-2 shadow-sm">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between gap-3">
-                                <div>
-                                    <CardTitle className="text-base">Revenue Trend</CardTitle>
-                                    <div className="text-xs text-muted-foreground">Daily water charges issued plus service fees (matches summary)</div>
-                                </div>
-                                <Badge variant="outline" className="text-[10px] uppercase tracking-widest text-emerald-600 border-emerald-200 bg-emerald-50">
-                                    Live Data
-                                </Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-64 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={chartData}>
-                                        <defs>
-                                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                        <XAxis 
-                                            dataKey="date" 
-                                            axisLine={false} 
-                                            tickLine={false} 
-                                            tick={{ fontSize: 10, fill: '#888' }}
-                                            dy={10}
-                                        />
-                                        <YAxis 
-                                            axisLine={false} 
-                                            tickLine={false} 
-                                            tick={{ fontSize: 10, fill: '#888' }}
-                                            tickFormatter={(value) => `SSP ${value >= 1000 ? (value/1000).toFixed(0) + 'k' : value}`}
-                                        />
-                                        <Tooltip 
-                                            contentStyle={{ 
-                                                borderRadius: '12px', 
-                                                border: '1px solid #e2e8f0',
-                                                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                                                fontSize: '12px',
-                                                fontWeight: 'bold'
-                                            }}
-                                            formatter={(value) => [`SSP ${value.toLocaleString()}`, 'Revenue']}
-                                        />
-                                        <Area 
-                                            type="monotone" 
-                                            dataKey="revenue" 
-                                            stroke="#10b981" 
-                                            strokeWidth={3}
-                                            fillOpacity={1} 
-                                            fill="url(#colorRevenue)" 
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="shadow-sm">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">Filters</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-10"
-                                    placeholder="Search customer / bill / receipt..."
-                                />
-                            </div>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                                <div className="space-y-1">
-                                    <div className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                                        <Calendar className="h-4 w-4" /> From
-                                    </div>
-                                    <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                                        <Calendar className="h-4 w-4" /> To
-                                    </div>
-                                    <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-                                </div>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                {isDirty ? 'Updating…' : 'Showing results for current filters'}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
-                    <Table>
-                        <TableHeader className="bg-muted/50">
-                            <TableRow className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                <TableHead className="px-4 py-3">Date</TableHead>
-                                <TableHead className="px-4 py-3">Reference</TableHead>
-                                <TableHead className="px-4 py-3">Customer</TableHead>
-                                <TableHead className="px-4 py-3 text-right">Paid</TableHead>
-                                <TableHead className="px-4 py-3 text-right">Outstanding</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {safeRows.length > 0 ? (
-                                safeRows.map((row) => (
-                                    <TableRow key={row.id}>
-                                        <TableCell className="px-4 py-4 text-sm text-muted-foreground">
-                                            {row.date ? new Date(row.date).toLocaleDateString() : '—'}
-                                        </TableCell>
-                                        <TableCell className="px-4 py-4 font-mono text-sm">
-                                            {row.reference ?? '—'}
-                                        </TableCell>
-                                        <TableCell className="px-4 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="font-semibold text-foreground">{row.customer_name ?? '—'}</span>
-                                                <span className="text-xs text-muted-foreground">{row.account_number ?? ''}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="px-4 py-4 text-right font-mono text-emerald-700">
-                                            {formatMoney(row.paid)}
-                                        </TableCell>
-                                        <TableCell className="px-4 py-4 text-right font-mono text-amber-700">
-                                            {formatMoney(row.outstanding)}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
-                                        No revenue rows found for the selected filters.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-
-                    <div className="flex items-center justify-between border-t px-4 py-4 bg-muted/20">
-                        <div className="text-xs text-muted-foreground">
-                            Tip: once the backend is wired, we can add pagination and export.
+                            <Badge variant="outline" className="text-[10px] uppercase tracking-widest text-emerald-600 border-emerald-200 bg-emerald-50">
+                                Live Data
+                            </Badge>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                disabled={!rows.prev_page_url}
-                                onClick={() => router.get(rows.prev_page_url, { search, from, to }, { preserveState: true })}
-                            >
-                                <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                disabled={!rows.next_page_url}
-                                onClick={() => router.get(rows.next_page_url, { search, from, to }, { preserveState: true })}
-                            >
-                                <ChevronRight className="h-4 w-4" />
-                            </Button>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-64 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData}>
+                                    <defs>
+                                        <linearGradient id="colorCollectionRate" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                    <XAxis
+                                        dataKey="date"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        interval={0}
+                                        tick={{ fontSize: 9, fill: '#888', angle: -32, textAnchor: 'end' }}
+                                        height={48}
+                                    />
+                                    <YAxis
+                                        domain={[0, 100]}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 10, fill: '#888' }}
+                                        tickFormatter={(value) => `${value}%`}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{
+                                            borderRadius: '12px',
+                                            border: '1px solid #e2e8f0',
+                                            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                                            fontSize: '12px',
+                                            fontWeight: '600',
+                                        }}
+                                        formatter={(value) => [`${Number(value).toFixed(1)}%`, 'Collection rate']}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="collection_rate_percent"
+                                        stroke="#10b981"
+                                        strokeWidth={3}
+                                        fillOpacity={1}
+                                        fill="url(#colorCollectionRate)"
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
                         </div>
-                    </div>
-                </div>
+                    </CardContent>
+                </Card>
+
+                <OverdueBills overdueBills={overdueBills} overdueBillsMeta={overdueBillsMeta} />
             </div>
         </AppLayout>
     );

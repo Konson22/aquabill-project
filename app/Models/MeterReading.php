@@ -91,6 +91,12 @@ class MeterReading extends Model
             }
         });
 
+        static::updating(function (MeterReading $reading): void {
+            if ($reading->isDirty(['previous_reading', 'current_reading'])) {
+                $reading->consumption = (float) $reading->current_reading - (float) $reading->previous_reading;
+            }
+        });
+
         static::created(function (MeterReading $reading) {
             $reading->meter()->update([
                 'last_reading' => $reading->current_reading,
@@ -99,6 +105,28 @@ class MeterReading extends Model
             if ($reading->customer_id) {
                 Customer::query()->whereKey($reading->customer_id)->update([
                     'last_reading_date' => $reading->reading_date,
+                ]);
+            }
+        });
+
+        static::updated(function (MeterReading $reading): void {
+            $latest = static::query()
+                ->where('meter_id', $reading->meter_id)
+                ->orderByDesc('reading_date')
+                ->orderByDesc('id')
+                ->first();
+
+            if (! $latest) {
+                return;
+            }
+
+            $latest->meter()->update([
+                'last_reading' => $latest->current_reading,
+            ]);
+
+            if ($latest->customer_id) {
+                Customer::query()->whereKey($latest->customer_id)->update([
+                    'last_reading_date' => $latest->reading_date,
                 ]);
             }
         });

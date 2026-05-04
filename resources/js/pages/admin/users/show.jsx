@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Calendar, Edit, KeySquare, LogIn, Shield, UserCog, Building, Activity, Droplet, CreditCard } from 'lucide-react';
+import { ArrowLeft, Calendar, Edit, KeySquare, LogIn, Shield, UserCog, Building, Activity, Droplet } from 'lucide-react';
 
 export default function UserShow({ user }) {
     const initials = user.name
@@ -148,7 +148,7 @@ export default function UserShow({ user }) {
                             </CardContent>
                         </Card>
 
-                        {(user.performance?.readings_count > 0 || user.performance?.payments_count > 0 || ['customer_care', 'ledger'].includes(user.department?.name) || user.roles?.some(r => r.name === 'Meter Reader')) && (
+                        {(user.performance?.readings_count > 0 || ['customer_care', 'ledger'].includes(user.department?.name) || user.roles?.some(r => r.name === 'Meter Reader')) && (
                             <Card className="border-border shadow-sm">
                                 <CardHeader>
                                     <CardTitle className="text-lg flex items-center gap-2">
@@ -168,16 +168,6 @@ export default function UserShow({ user }) {
                                                     <span className="text-sm font-medium">Readings Taken</span>
                                                 </div>
                                                 <span className="text-2xl font-bold">{user.performance?.readings_count || 0}</span>
-                                            </div>
-                                        )}
-                                        
-                                        {(user.performance?.payments_count > 0 || ['customer_care', 'ledger'].includes(user.department?.name)) && (
-                                            <div className="flex flex-col gap-1 p-4 bg-muted/30 rounded-lg border">
-                                                <div className="flex items-center gap-2 text-muted-foreground mb-2">
-                                                    <CreditCard className="h-4 w-4" />
-                                                    <span className="text-sm font-medium">Payments Processed</span>
-                                                </div>
-                                                <span className="text-2xl font-bold">{user.performance?.payments_count || 0}</span>
                                             </div>
                                         )}
                                     </div>

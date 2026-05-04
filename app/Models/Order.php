@@ -33,11 +33,6 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
-
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);

@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('service_charges', function (Blueprint $table) {
             $table->id();
             $table->foreignId('customer_id')->constrained()->onDelete('cascade');
-            $table->foreignId('bill_id')->nullable()->constrained()->onDelete('set null');
             $table->foreignId('service_charge_type_id')->constrained()->onDelete('cascade');
             $table->decimal('amount', 10, 2);
             $table->foreignId('issued_by')->nullable()->constrained('users')->onDelete('set null');
@@ -26,7 +25,6 @@ return new class extends Migration
 
             // Indexes
             $table->index('customer_id');
-            $table->index('bill_id');
             $table->index('service_charge_type_id');
         });
     }

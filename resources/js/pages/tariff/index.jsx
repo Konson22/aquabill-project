@@ -20,9 +20,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { Eye, Pencil, Plus, Trash2, Zap } from 'lucide-react';
 import { useState } from 'react';
+import { formatCurrency } from '@/lib/utils';
 
 const breadcrumbs = [
     {
@@ -32,6 +33,10 @@ const breadcrumbs = [
 ];
 
 export default function Tariffs({ tariffs }) {
+    const { auth } = usePage().props;
+    /** Align with sidebar: admin department (and legacy users with no department) may manage tariffs. */
+    const canManageTariffs = (auth.user?.department?.name || 'admin') === 'admin';
+
     const [open, setOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -122,12 +127,14 @@ export default function Tariffs({ tariffs }) {
                         </p>
                     </div>
                     <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create Tariff
-                            </Button>
-                        </DialogTrigger>
+                        {canManageTariffs && (
+                            <DialogTrigger asChild>
+                                <Button size="sm">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Create Tariff
+                                </Button>
+                            </DialogTrigger>
+                        )}
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Create Tariff</DialogTitle>
@@ -213,10 +220,10 @@ export default function Tariffs({ tariffs }) {
                                             </Link>
                                         </TableCell>
                                         <TableCell className="px-4 py-4 text-right font-mono">
-                                            SSP {Number(tariff.price_per_unit).toLocaleString()}
+                                            {formatCurrency(tariff.price_per_unit)}
                                         </TableCell>
                                         <TableCell className="px-4 py-4 text-right font-mono">
-                                            SSP {Number(tariff.fixed_charge).toLocaleString()}
+                                            {formatCurrency(tariff.fixed_charge)}
                                         </TableCell>
                                         <TableCell className="px-4 py-4 text-right text-sm text-muted-foreground">
                                             {new Date(tariff.created_at).toLocaleDateString()}
@@ -228,22 +235,26 @@ export default function Tariffs({ tariffs }) {
                                                         <Eye className="h-4 w-4" />
                                                     </Link>
                                                 </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-8 px-2"
-                                                    onClick={() => openEdit(tariff)}
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="destructive"
-                                                    size="sm"
-                                                    className="h-8 px-2"
-                                                    onClick={() => openDelete(tariff)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                {canManageTariffs && (
+                                                    <>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 px-2"
+                                                            onClick={() => openEdit(tariff)}
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="destructive"
+                                                            size="sm"
+                                                            className="h-8 px-2"
+                                                            onClick={() => openDelete(tariff)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </>
+                                                )}
                                             </div>
                                         </TableCell>
                                     </TableRow>

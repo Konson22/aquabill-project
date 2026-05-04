@@ -1,12 +1,31 @@
 import AppLayout from '@/layouts/app-layout';
+import { formatCurrency } from '@/lib/utils';
 import { Head } from '@inertiajs/react';
 import { CreditCard, DollarSign, TrendingUp, PieChart } from 'lucide-react';
 
 const stats = [
-    { name: 'Total Revenue', value: '$84,250', icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { name: 'Outstanding', value: '$12,400', icon: CreditCard, color: 'text-rose-600', bg: 'bg-rose-100' },
+    {
+        name: 'Total Revenue',
+        value: formatCurrency(84250),
+        icon: DollarSign,
+        color: 'text-emerald-600',
+        bg: 'bg-emerald-100',
+    },
+    {
+        name: 'Outstanding',
+        value: formatCurrency(12400),
+        icon: CreditCard,
+        color: 'text-rose-600',
+        bg: 'bg-rose-100',
+    },
     { name: 'Growth', value: '+12.5%', icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { name: 'Expenses', value: '$24,100', icon: PieChart, color: 'text-amber-600', bg: 'bg-amber-100' },
+    {
+        name: 'Expenses',
+        value: formatCurrency(24100),
+        icon: PieChart,
+        color: 'text-amber-600',
+        bg: 'bg-amber-100',
+    },
 ];
 
 export default function FinanceDashboard() {
@@ -54,14 +73,18 @@ export default function FinanceDashboard() {
                                     <td className="py-3 text-slate-500">Apr 24, 2026</td>
                                     <td className="py-3 font-medium">Customer Payment #9234</td>
                                     <td className="py-3">Water Bill</td>
-                                    <td className="py-3 text-emerald-600 font-bold">+$45.00</td>
+                                    <td className="py-3 text-emerald-600 font-bold">
+                                        +{formatCurrency(45)}
+                                    </td>
                                     <td className="py-3"><span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">Completed</span></td>
                                 </tr>
                                 <tr>
                                     <td className="py-3 text-slate-500">Apr 23, 2026</td>
                                     <td className="py-3 font-medium">Maintenance Fee</td>
                                     <td className="py-3">Equipment</td>
-                                    <td className="py-3 text-rose-600 font-bold">-$1,200.00</td>
+                                    <td className="py-3 text-rose-600 font-bold">
+                                        -{formatCurrency(1200)}
+                                    </td>
                                     <td className="py-3"><span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Pending</span></td>
                                 </tr>
                             </tbody>

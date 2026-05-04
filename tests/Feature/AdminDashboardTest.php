@@ -3,7 +3,6 @@
 use App\Models\Customer;
 use App\Models\Department;
 use App\Models\Disconnection;
-use App\Models\Payment;
 use App\Models\Tariff;
 use App\Models\User;
 use App\Models\Zone;
@@ -57,38 +56,23 @@ test('admin dashboard includes disconnection summary stats', function () {
         'reason' => 'Test',
     ]);
 
-    Payment::query()->create([
-        'customer_id' => $customer->id,
-        'amount' => 100,
-        'payment_date' => now()->startOfYear()->addDays(14)->toDateString(),
-        'payment_method' => 'cash',
-    ]);
-    Payment::query()->create([
-        'customer_id' => $customer->id,
-        'amount' => 250.5,
-        'payment_date' => now()->startOfYear()->addMonths(2)->toDateString(),
-        'payment_method' => 'cash',
-    ]);
-
-    $year = (int) now()->year;
-
     $response = $this->actingAs($user)->get(route('admin'));
 
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page
         ->component('admin/dashboard')
+        ->has('revenueBillCounts')
+        ->where('revenueBillCounts.paid', 0)
+        ->where('revenueBillCounts.unpaid', 0)
+        ->where('revenueBillCounts.total', 0)
+        ->where('revenueBillCounts.collection_rate_percent', 0)
         ->where('disconnectionStats.notified', 1)
         ->where('disconnectionStats.disconnected', 1)
         ->where('disconnectionStats.grace_period', 0)
         ->has('notifiedCustomers', 1)
         ->where('notifiedCustomers.0.customer_name', 'Test Customer')
         ->has('disconnectedCustomers', 1)
-        ->where('disconnectedCustomers.0.customer_name', 'Test Customer')
-        ->where('paymentChartYear', $year)
-        ->has('monthlyPayments', 12)
-        ->where('monthlyPayments.0.amount', 100)
-        ->where('monthlyPayments.2.amount', 250.5)
-        ->where('monthlyPayments.1.amount', 0));
+        ->where('disconnectedCustomers.0.customer_name', 'Test Customer'));
 });
 
 test('non-admin cannot access admin dashboard', function () {

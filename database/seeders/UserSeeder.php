@@ -6,10 +6,14 @@ use App\Models\Department;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class UserSeeder extends Seeder
 {
+    /**
+     * Seed demo login accounts. Passwords are plain strings here — the User model's
+     * `password` cast (`hashed`) hashes them once on save. Also set `email_verified_at`
+     * so `verified` middleware does not block dashboard access after login.
+     */
     public function run(): void
     {
         $adminDept = Department::where('name', 'admin')->first();
@@ -22,9 +26,10 @@ class UserSeeder extends Seeder
         $admin = User::create([
             'name' => 'Admin',
             'email' => 'admin@gmail.com',
-            'password' => Hash::make('123'),
+            'password' => '123',
             'department_id' => $adminDept->id,
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
         $admin->roles()->attach(Role::where('name', 'Super Admin')->first()->id);
 
@@ -32,9 +37,10 @@ class UserSeeder extends Seeder
         $finance = User::create([
             'name' => 'John Finance',
             'email' => 'finance@gmail.com',
-            'password' => Hash::make('123'),
+            'password' => '123',
             'department_id' => $financeDept->id,
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
         $finance->roles()->attach(Role::where('name', 'Accountant')->first()->id);
 
@@ -42,9 +48,10 @@ class UserSeeder extends Seeder
         $ledger = User::create([
             'name' => 'Larry Ledger',
             'email' => 'ledger@gmail.com',
-            'password' => Hash::make('123'),
+            'password' => '123',
             'department_id' => $ledgerDept->id,
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
         $ledger->roles()->attach(Role::where('name', 'Billing Officer')->first()->id);
 
@@ -52,9 +59,10 @@ class UserSeeder extends Seeder
         $hr = User::create([
             'name' => 'Hannah HR',
             'email' => 'hr@gmail.com',
-            'password' => Hash::make('123'),
+            'password' => '123',
             'department_id' => $hrDept->id,
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
         $hr->roles()->attach(Role::where('name', 'HR Manager')->first()->id);
 
@@ -62,9 +70,10 @@ class UserSeeder extends Seeder
         $cc = User::create([
             'name' => 'Cathy Care',
             'email' => 'care@gmail.com',
-            'password' => Hash::make('123'),
+            'password' => '123',
             'department_id' => $customerCareDept->id,
             'status' => 'active',
+            'email_verified_at' => now(),
         ]);
         $cc->roles()->attach(Role::where('name', 'Agent')->first()->id);
     }

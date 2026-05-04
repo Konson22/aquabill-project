@@ -9,7 +9,7 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request)
     {
-        $department = $request->user()->department->name ?? 'none';
+        $department = $request->user()->department?->name ?? 'none';
 
         return match ($department) {
             'admin' => redirect()->route('admin'),

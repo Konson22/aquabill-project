@@ -6,7 +6,6 @@ use Database\Factories\BillFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Bill extends Model
 {
@@ -22,9 +21,11 @@ class Bill extends Model
         'consumption',
         'unit_price',
         'fixed_charge',
-        'current_charge',
+        'current_charge', // This-cycle charge; revenue report sums this (not total_amount, which may include previous_balance)
         'previous_balance',
         'total_amount',
+        'amount_paid',
+        'current_balance',
         'status',
         'due_date',
     ];
@@ -38,6 +39,19 @@ class Bill extends Model
 
             $next = (int) (static::query()->max('id') ?? 0) + 1;
             $bill->bill_no = 'BILL-'.str_pad((string) $next, 6, '0', STR_PAD_LEFT);
+        });
+
+        static::creating(function (Bill $bill): void {
+            $paid = (float) ($bill->amount_paid ?? 0);
+            $total = (float) ($bill->total_amount ?? 0);
+            $bill->amount_paid = $paid;
+            $bill->current_balance = max(0.0, $total - $paid);
+        });
+
+        static::updating(function (Bill $bill): void {
+            $paid = (float) ($bill->amount_paid ?? 0);
+            $total = (float) ($bill->total_amount ?? 0);
+            $bill->current_balance = max(0.0, $total - $paid);
         });
     }
 
@@ -56,6 +70,8 @@ class Bill extends Model
             'current_charge' => 'decimal:2',
             'previous_balance' => 'decimal:2',
             'total_amount' => 'decimal:2',
+            'amount_paid' => 'decimal:2',
+            'current_balance' => 'decimal:2',
         ];
     }
 
@@ -87,25 +103,5 @@ class Bill extends Model
     public function reading(): BelongsTo
     {
         return $this->belongsTo(MeterReading::class, 'reading_id');
-    }
-
-    /**
-     * Payments applied to this bill.
-     *
-     * @return HasMany<Payment, Bill>
-     */
-    public function payments(): HasMany
-    {
-        return $this->hasMany(Payment::class);
-    }
-
-    /**
-     * Get the service charges associated with this bill.
-     *
-     * @return HasMany<ServiceCharge, Bill>
-     */
-    public function serviceCharges(): HasMany
-    {
-        return $this->hasMany(ServiceCharge::class);
     }
 }

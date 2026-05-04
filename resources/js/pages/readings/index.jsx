@@ -18,7 +18,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Image as ImageIcon,
-    Camera
+    Camera,
+    Pencil
 } from 'lucide-react';
 
 const breadcrumbs = [
@@ -228,6 +229,11 @@ export default function MeterReadings({ readings, filters }) {
                                             <div className="flex items-center justify-end gap-1">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8" title="View Proof">
                                                     <ImageIcon className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                    <Link href={route('readings.edit', reading.id)} title="Edit reading">
+                                                        <Pencil className="h-4 w-4 text-amber-600" />
+                                                    </Link>
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
                                                     <Link href={`/readings/${reading.id}`}>

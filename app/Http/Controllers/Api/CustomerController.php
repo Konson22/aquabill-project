@@ -26,7 +26,7 @@ class CustomerController extends Controller
                     'tariff',
                     'meters.latestReading',
                     'bills' => function ($q) {
-                        $q->withSum('payments', 'amount')->latest();
+                        $q->latest();
                     },
                 ]);
 
@@ -135,9 +135,6 @@ class CustomerController extends Controller
             return 0;
         }
 
-        $paid = (float) ($bill->payments_sum_amount ?? 0);
-        $total = (float) $bill->total_amount;
-
-        return round(max(0.0, $total - $paid), 2);
+        return round(max(0.0, (float) $bill->current_balance), 2);
     }
 }

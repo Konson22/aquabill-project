@@ -33,7 +33,7 @@ class BillController extends Controller
 
         $bills = Bill::query()
             ->with(['customer', 'meter'])
-            ->where('status', 'unpaid')
+            ->whereIn('status', ['pending', 'partial'])
             ->whereDate('due_date', '<', $today)
             ->latest('due_date')
             ->paginate(15);
@@ -49,17 +49,9 @@ class BillController extends Controller
     public function printingList(): Response
     {
         $bills = Bill::with(['customer.zone', 'meter'])
-            ->withSum('payments', 'amount')
-            ->whereIn('status', ['unpaid', 'partial'])
+            ->whereIn('status', ['pending', 'partial'])
             ->latest()
-            ->get()
-            ->map(function (Bill $bill) {
-                $paidAmount = (float) ($bill->payments_sum_amount ?? 0);
-                $totalAmount = (float) $bill->total_amount;
-                $bill->current_balance = max(0, $totalAmount - $paidAmount);
-
-                return $bill;
-            });
+            ->get();
 
         return Inertia::render('bills/bill-printing-list', [
             'bills' => $bills,

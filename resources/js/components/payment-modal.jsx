@@ -30,13 +30,25 @@ export default function PaymentModal({ open, onOpenChange, bill }) {
     const billId = bill?.id ?? null;
     const customerName = bill?.customer?.name ?? '—';
     const accountNumber = bill?.customer?.account_number ?? '—';
-    const amountDue = useMemo(
+    const totalAmount = useMemo(
         () => Number(bill?.total_amount ?? 0),
         [bill?.total_amount],
     );
 
+    const amountPaid = useMemo(() => {
+        if (bill?.amount_paid != null && bill.amount_paid !== '') {
+            return Number(bill.amount_paid);
+        }
+        return 0;
+    }, [bill?.amount_paid]);
+
+    const balanceDue = useMemo(
+        () => Math.max(0, totalAmount - amountPaid),
+        [totalAmount, amountPaid],
+    );
+
     const form = useForm({
-        amount: amountDue || '',
+        amount: balanceDue || '',
         payment_date: todayIsoDate(),
         payment_method: 'cash',
         reference_number: '',
@@ -48,12 +60,29 @@ export default function PaymentModal({ open, onOpenChange, bill }) {
 
         form.setData((data) => ({
             ...data,
-            amount: amountDue || '',
+            amount: balanceDue || '',
             payment_date: todayIsoDate(),
             notes: billId ? `Payment for bill #${billId}` : data.notes,
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, billId, amountDue]);
+    }, [open, billId, balanceDue]);
+
+    const paymentAmountEntered = useMemo(() => {
+        const raw = form.data.amount;
+        if (raw === '' || raw === null || raw === undefined) {
+            return 0;
+        }
+        const n = Number(raw);
+        if (!Number.isFinite(n)) {
+            return 0;
+        }
+        return Math.max(0, n);
+    }, [form.data.amount]);
+
+    const balanceAfterThisPayment = useMemo(
+        () => Math.max(0, balanceDue - paymentAmountEntered),
+        [balanceDue, paymentAmountEntered],
+    );
 
     const submit = (e) => {
         e.preventDefault();
@@ -74,9 +103,25 @@ export default function PaymentModal({ open, onOpenChange, bill }) {
                 <DialogHeader>
                     <DialogTitle>Record payment</DialogTitle>
                     <DialogDescription>
-                        {customerName} · {accountNumber} · Due{' '}
-                        <span className="font-mono font-semibold">
-                            {formatCurrency(amountDue)}
+                        {customerName} · {accountNumber}
+                        <span className="mt-2 block text-red-500 text-xl">
+                            Balance after this payment{' '}
+                            <span className="font-mono font-semibold">
+                                {formatCurrency(balanceAfterThisPayment)}
+                            </span>
+                        </span>
+                        <span className="mt-1 block text-muted-foreground text-xs font-normal">
+                            Outstanding before payment{' '}
+                            <span className="font-mono font-medium text-foreground">
+                                {formatCurrency(balanceDue)}
+                            </span>
+                            {amountPaid > 0 && (
+                                <>
+                                    {' '}
+                                    · Already paid {formatCurrency(amountPaid)}{' '}
+                                    of {formatCurrency(totalAmount)}
+                                </>
+                            )}
                         </span>
                     </DialogDescription>
                 </DialogHeader>

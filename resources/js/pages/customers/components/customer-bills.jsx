@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/utils';
 import { Receipt, Eye } from 'lucide-react';
 import { Link } from '@inertiajs/react';
 
@@ -45,11 +46,11 @@ export default function CustomerBills({ bills }) {
                     </div>
                     <div className="flex items-center gap-6">
                         <div className="text-right">
-                            <Badge variant={bill.status === 'paid' ? 'success' : (bill.status === 'unpaid' ? 'destructive' : 'outline')} className="capitalize text-[10px] mb-1">
+                            <Badge variant={bill.status === 'paid' ? 'success' : (bill.status === 'pending' ? 'destructive' : 'outline')} className="capitalize text-[10px] mb-1">
                                 {bill.status ?? '—'}
                             </Badge>
                             <p className="font-mono font-black text-sm block">
-                                SSP {Number(bill.total_amount ?? bill.total ?? 0).toLocaleString()}
+                                {formatCurrency(bill.total_amount ?? bill.total ?? 0)}
                             </p>
                         </div>
                         <Button asChild variant="ghost" size="icon">

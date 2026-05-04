@@ -74,12 +74,12 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the payments received by the user.
+     * Leave requests approved by this user (HR/admin login accounts).
      *
-     * @return HasMany<Payment, User>
+     * @return HasMany<StaffLeaveRequest, User>
      */
-    public function receivedPayments(): HasMany
+    public function approvedStaffLeaveRequests(): HasMany
     {
-        return $this->hasMany(Payment::class, 'received_by');
+        return $this->hasMany(StaffLeaveRequest::class, 'approved_by');
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bill;
-use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -23,31 +22,27 @@ class BillPaymentController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
+        if ($bill->status !== 'pending') {
+            abort(422, 'Payments can only be recorded while the bill status is pending.');
+        }
+
         DB::transaction(function () use ($validated, $bill) {
-            Payment::create([
-                'customer_id' => $bill->customer_id,
-                'bill_id' => $bill->id,
-                'amount' => $validated['amount'],
-                'payment_date' => $validated['payment_date'],
-                'payment_method' => $validated['payment_method'],
-                'reference_number' => $validated['reference_number'] ?? null,
-                'received_by' => auth()->id(),
-                'notes' => $validated['notes'] ?? "Payment for bill #{$bill->id}",
-            ]);
-
-            $paidTotal = (float) Payment::query()
-                ->where('bill_id', $bill->id)
-                ->sum('amount');
-
+            $increment = (float) $validated['amount'];
+            $paidTotal = round((float) $bill->amount_paid + $increment, 2);
             $billTotal = (float) $bill->total_amount;
+            $balance = max(0.0, $billTotal - $paidTotal);
 
             $status = match (true) {
-                $paidTotal <= 0.0 => 'unpaid',
+                $paidTotal <= 0.0 => 'pending',
                 $paidTotal + 0.00001 < $billTotal => 'partial',
                 default => 'paid',
             };
 
-            $bill->update(['status' => $status]);
+            $bill->update([
+                'amount_paid' => $paidTotal,
+                'current_balance' => $balance,
+                'status' => $status,
+            ]);
         });
 
         return back()->with('success', 'Payment recorded successfully.');

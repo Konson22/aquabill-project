@@ -3,7 +3,14 @@ import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import PaymentModal from '@/components/payment-modal';
+import { formatCurrency } from '@/lib/utils';
 import {
     FileText,
     Search,
@@ -11,6 +18,7 @@ import {
     Calendar,
     Download,
     Eye,
+    MoreHorizontal,
     Printer,
     ChevronLeft,
     ChevronRight,
@@ -26,6 +34,11 @@ const breadcrumbs = [
         href: '/bills',
     },
 ];
+
+/** Payment is only for fully pending bills (not partial, paid, or forwarded). */
+function canRecordPayment(status) {
+    return status === 'pending';
+}
 
 export default function Bills({ bills }) {
     const [paymentOpen, setPaymentOpen] = useState(false);
@@ -83,7 +96,7 @@ export default function Bills({ bills }) {
                         <div>
                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Unpaid</p>
                             <p className="text-xl font-black">
-                                {bills.data.filter(b => b.status === 'unpaid').length}
+                                {bills.data.filter((b) => canRecordPayment(b.status)).length}
                             </p>
                         </div>
                     </div>
@@ -94,7 +107,13 @@ export default function Bills({ bills }) {
                         <div>
                             <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Revenue</p>
                             <p className="text-xl font-black text-emerald-600">
-                                ${bills.data.reduce((acc, b) => acc + parseFloat(b.total_amount), 0).toLocaleString()}
+                                {formatCurrency(
+                                    bills.data.reduce(
+                                        (acc, b) =>
+                                            acc + parseFloat(b.total_amount),
+                                        0,
+                                    ),
+                                )}
                             </p>
                         </div>
                     </div>
@@ -132,7 +151,7 @@ export default function Bills({ bills }) {
                         <table className="w-full text-left border-collapse text-sm">
                             <thead>
                                 <tr className="border-b bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                    <th className="px-6 py-4 text-center w-20">Invoice</th>
+                                    {/* <th className="px-6 py-4 text-center w-20">Invoice</th> */}
                                     <th className="px-6 py-4">Customer Details</th>
                                     <th className="px-6 py-4">Consumption</th>
                                     <th className="px-6 py-4">Amount Breakdown</th>
@@ -144,13 +163,13 @@ export default function Bills({ bills }) {
                             <tbody className="divide-y">
                                 {bills.data.map((bill) => (
                                     <tr key={bill.bill_no} className="hover:bg-muted/30 transition-colors group">
-                                        <td className="px-6 py-4 text-center">
+                                        {/* <td className="px-6 py-4 text-center">
                                             <span className="font-mono text-xs font-bold text-muted-foreground">#{String(bill.bill_no).padStart(6, '0')}</span>
-                                        </td>
+                                        </td> */}
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-foreground leading-tight">{bill.customer?.name}</span>
-                                                <span className="text-xs text-muted-foreground">{bill.customer?.account_number}</span>
+                                               
                                                 <div className="flex items-center gap-1 mt-1">
                                                     <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-blue-200 text-blue-600 bg-blue-50/50">
                                                         {bill.meter?.meter_number}
@@ -163,25 +182,39 @@ export default function Bills({ bills }) {
                                                 <div className="flex items-center gap-1.5 font-black text-primary">
                                                     {bill.consumption} <span className="text-[10px] font-normal text-muted-foreground">m³</span>
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground">Rate: ${bill.unit_price}/unit</span>
+                                                <span className="text-[10px] text-muted-foreground">
+                                                    Rate:{' '}
+                                                    {formatCurrency(bill.unit_price)}
+                                                    /unit
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col text-[11px] gap-0.5">
                                                 <div className="flex justify-between w-32">
                                                     <span className="text-muted-foreground">Current:</span>
-                                                    <span className="font-bold font-mono">${bill.current_charge}</span>
+                                                    <span className="font-bold font-mono">
+                                                        {formatCurrency(
+                                                            bill.current_charge,
+                                                        )}
+                                                    </span>
                                                 </div>
                                                 <div className="flex justify-between w-32">
                                                     <span className="text-muted-foreground">Arrears:</span>
-                                                    <span className="font-bold font-mono text-red-500">${bill.previous_balance}</span>
+                                                    <span className="font-bold font-mono text-red-500">
+                                                        {formatCurrency(
+                                                            bill.previous_balance,
+                                                        )}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
                                                 <span className="text-base font-black text-foreground font-mono leading-none">
-                                                    ${bill.total_amount}
+                                                    {formatCurrency(
+                                                        bill.total_amount,
+                                                    )}
                                                 </span>
                                                 <span className="text-[10px] text-muted-foreground mt-1">
                                                     Due: {new Date(bill.due_date).toLocaleDateString()}
@@ -195,7 +228,9 @@ export default function Bills({ bills }) {
                                                         ? 'success'
                                                         : bill.status === 'forwarded'
                                                           ? 'outline'
-                                                          : 'destructive'
+                                                          : bill.status === 'partial'
+                                                            ? 'outline'
+                                                            : 'destructive'
                                                 }
                                                 className="uppercase text-[9px] font-black tracking-tighter"
                                             >
@@ -203,61 +238,54 @@ export default function Bills({ bills }) {
                                             </Badge>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    onClick={() => openPayment(bill)}
-                                                    title={
-                                                        bill.status === 'paid'
-                                                            ? 'Already paid'
-                                                            : bill.status ===
-                                                              'forwarded'
-                                                            ? 'Forwarded to next bill'
-                                                            : bill.status ===
-                                                              'partial'
-                                                            ? 'Partially paid'
-                                                            : 'Record payment'
-                                                    }
-                                                    disabled={
-                                                        bill.status ===
-                                                            'paid' ||
-                                                        bill.status ===
-                                                            'forwarded' ||
-                                                        bill.status ===
-                                                            'partial'
-                                                    }
-                                                >
-                                                    <DollarSign
-                                                        className={`h-4 w-4 ${
-                                                            bill.status ===
-                                                                'paid' ||
-                                                            bill.status ===
-                                                                'partial'
-                                                                ? 'text-muted-foreground'
-                                                                : 'text-emerald-600'
-                                                        }`}
-                                                    />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-8 w-8"
-                                                    asChild
-                                                >
-                                                    <Link
-                                                        href={route('bills.print', bill.id)}
-                                                        target="_blank"
-                                                    >
-                                                        <Printer className="h-4 w-4 text-muted-foreground" />
-                                                    </Link>
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                                    <Link href={route('bills.show', bill.id)}>
-                                                        <Eye className="h-4 w-4 text-blue-500" />
-                                                    </Link>
-                                                </Button>
+                                            <div className="flex justify-end opacity-80 transition-opacity group-hover:opacity-100">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 gap-1.5 px-2.5"
+                                                        >
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-48">
+                                                        <DropdownMenuItem
+                                                            disabled={!canRecordPayment(bill.status)}
+                                                            title={
+                                                                !canRecordPayment(bill.status)
+                                                                    ? 'Payments are only available while the bill is pending'
+                                                                    : 'Record payment'
+                                                            }
+                                                            onSelect={() => openPayment(bill)}
+                                                        >
+                                                            <DollarSign
+                                                                className={
+                                                                    canRecordPayment(bill.status)
+                                                                        ? 'text-emerald-600'
+                                                                        : 'text-muted-foreground'
+                                                                }
+                                                            />
+                                                            Record payment
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem asChild>
+                                                            <Link
+                                                                href={route('bills.print', bill.id)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                            >
+                                                                <Printer className="text-muted-foreground" />
+                                                                Print bill
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={route('bills.show', bill.id)}>
+                                                                <Eye className="text-blue-500" />
+                                                                View bill
+                                                            </Link>
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </div>
                                         </td>
                                     </tr>

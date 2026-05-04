@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { formatCurrency } from '@/lib/utils';
 import { Wrench, Calendar } from 'lucide-react';
 
 export default function CustomerServiceCharges({ serviceCharges }) {
@@ -33,7 +34,7 @@ export default function CustomerServiceCharges({ serviceCharges }) {
                         <th className="px-4 py-3">Date Applied</th>
                         <th className="px-4 py-3">Type</th>
                         <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3 text-right">Amount (SSP)</th>
+                        <th className="px-4 py-3 text-right">Amount</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -55,7 +56,7 @@ export default function CustomerServiceCharges({ serviceCharges }) {
                                 </Badge>
                             </td>
                             <td className="px-4 py-3 text-right font-mono font-black text-red-600">
-                                {Number(charge.amount ?? 0).toLocaleString()}
+                                {formatCurrency(charge.amount ?? 0)}
                             </td>
                         </tr>
                     ))}

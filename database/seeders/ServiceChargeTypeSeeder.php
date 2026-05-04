@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\ServiceChargeType;
 use Illuminate\Database\Seeder;
 
 class ServiceChargeTypeSeeder extends Seeder
@@ -40,7 +40,7 @@ class ServiceChargeTypeSeeder extends Seeder
         ];
 
         foreach ($types as $type) {
-            \App\Models\ServiceChargeType::updateOrCreate(['code' => $type['code']], $type);
+            ServiceChargeType::updateOrCreate(['code' => $type['code']], $type);
         }
     }
 }

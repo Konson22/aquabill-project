@@ -17,6 +17,7 @@ import {
     CheckCircle2,
     Clock
 } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 export default function Show({ bill }) {
     const breadcrumbs = [
@@ -25,13 +26,13 @@ export default function Show({ bill }) {
     ];
 
     const statusConfig = {
-        unpaid: { color: 'text-red-600 bg-red-50 border-red-200', icon: AlertCircle, label: 'Unpaid' },
+        pending: { color: 'text-red-600 bg-red-50 border-red-200', icon: AlertCircle, label: 'Pending' },
         paid: { color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: CheckCircle2, label: 'Paid' },
         partial: { color: 'text-amber-600 bg-amber-50 border-amber-200', icon: Clock, label: 'Partial' },
         forwarded: { color: 'text-indigo-700 bg-indigo-50 border-indigo-200', icon: Clock, label: 'Forwarded' },
     };
 
-    const currentStatus = statusConfig[bill.status] || statusConfig.unpaid;
+    const currentStatus = statusConfig[bill.status] || statusConfig.pending;
     const StatusIcon = currentStatus.icon;
 
     return (
@@ -56,7 +57,7 @@ export default function Show({ bill }) {
                             <Download className="mr-2 h-4 w-4" />
                             Download PDF
                         </Button>
-                        {bill.status !== 'paid' && (
+                        {bill.status === 'pending' && (
                             <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
                                 <CreditCard className="mr-2 h-4 w-4" />
                                 Record Payment
@@ -173,8 +174,15 @@ export default function Show({ bill }) {
                                             <p className="text-[10px] text-muted-foreground tracking-tight italic">Measured usage for the period</p>
                                         </td>
                                         <td className="py-5 text-center font-mono">{bill.consumption} m³</td>
-                                        <td className="py-5 text-right font-mono">${bill.unit_price}</td>
-                                        <td className="py-5 text-right font-bold font-mono">${(bill.consumption * bill.unit_price).toFixed(2)}</td>
+                                        <td className="py-5 text-right font-mono">
+                                            {formatCurrency(bill.unit_price)}
+                                        </td>
+                                        <td className="py-5 text-right font-bold font-mono">
+                                            {formatCurrency(
+                                                bill.consumption *
+                                                    bill.unit_price,
+                                            )}
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td className="py-5">
@@ -182,8 +190,12 @@ export default function Show({ bill }) {
                                             <p className="text-[10px] text-muted-foreground tracking-tight italic">Standard monthly infrastructure maintenance</p>
                                         </td>
                                         <td className="py-5 text-center font-mono">1 Units</td>
-                                        <td className="py-5 text-right font-mono">${bill.fixed_charge}</td>
-                                        <td className="py-5 text-right font-bold font-mono">${bill.fixed_charge}</td>
+                                        <td className="py-5 text-right font-mono">
+                                            {formatCurrency(bill.fixed_charge)}
+                                        </td>
+                                        <td className="py-5 text-right font-bold font-mono">
+                                            {formatCurrency(bill.fixed_charge)}
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -193,18 +205,28 @@ export default function Show({ bill }) {
                                 <div className="w-full md:w-80 space-y-3">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Current Charges</span>
-                                        <span className="font-bold font-mono">${bill.current_charge}</span>
+                                        <span className="font-bold font-mono">
+                                            {formatCurrency(bill.current_charge)}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Previous Balance (Arrears)</span>
-                                        <span className={`font-bold font-mono ${parseFloat(bill.previous_balance) > 0 ? 'text-red-500' : ''}`}>${bill.previous_balance}</span>
+                                        <span
+                                            className={`font-bold font-mono ${parseFloat(bill.previous_balance) > 0 ? 'text-red-500' : ''}`}
+                                        >
+                                            {formatCurrency(
+                                                bill.previous_balance,
+                                            )}
+                                        </span>
                                     </div>
                                     <div className="pt-4 border-t-2 border-foreground flex justify-between items-end">
                                         <div className="space-y-1">
                                             <span className="text-xs font-black uppercase tracking-tighter text-foreground">Total Amount Due</span>
                                             <p className="text-[8px] text-muted-foreground italic leading-none">Inclusive of all taxes and fees</p>
                                         </div>
-                                        <span className="text-3xl font-black text-foreground tracking-tighter font-mono">${bill.total_amount}</span>
+                                        <span className="text-3xl font-black text-foreground tracking-tighter font-mono">
+                                            {formatCurrency(bill.total_amount)}
+                                        </span>
                                     </div>
                                 </div>
                             </div>

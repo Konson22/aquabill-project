@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatCurrency } from '@/lib/utils';
 
 const breadcrumbs = [
     { title: 'Customers', href: '/customers' },
@@ -54,6 +55,8 @@ export default function CreateCustomer({ zones = [], tariffs = [], existingMeter
         service_charge_type_id: '',
         service_charge_amount: '',
     });
+
+    const availableMeters = existingMeters.filter((meter) => !meter.customer_id);
 
     const submit = (e) => {
         e.preventDefault();
@@ -290,23 +293,22 @@ export default function CreateCustomer({ zones = [], tariffs = [], existingMeter
                                             <SelectValue placeholder="Select available meter" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {existingMeters.length ? (
-                                                existingMeters.map((meter) => (
-                                                    <SelectItem key={meter.id} value={String(meter.id)} disabled={Boolean(meter.customer_id)}>
+                                            {availableMeters.length ? (
+                                                availableMeters.map((meter) => (
+                                                    <SelectItem key={meter.id} value={String(meter.id)}>
                                                         {meter.meter_number}
-                                                        {meter.customer_id ? ` (Assigned to ${meter.customer?.name ?? 'customer'})` : ' (Available)'}
                                                     </SelectItem>
                                                 ))
                                             ) : (
                                                 <SelectItem value="no-meters" disabled>
-                                                    No meters found in database
+                                                    No unassigned meters available
                                                 </SelectItem>
                                             )}
                                         </SelectContent>
                                     </Select>
                                     <InputError message={errors.existing_meter_id} />
                                     <p className="text-xs text-muted-foreground">
-                                        Meters are loaded from database. Assigned meters are shown but disabled.
+                                        Only meters not linked to a customer are listed.
                                     </p>
                                 </div>
                             ) : (
@@ -383,7 +385,7 @@ export default function CreateCustomer({ zones = [], tariffs = [], existingMeter
                                             <SelectContent>
                                                 {serviceChargeTypes.map((type) => (
                                                     <SelectItem key={type.id} value={String(type.id)}>
-                                                        {type.name} (SSP {type.amount})
+                                                        {`${type.name} (${formatCurrency(type.amount)})`}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>

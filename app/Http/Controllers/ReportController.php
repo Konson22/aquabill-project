@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Bill;
 use App\Models\Customer;
-use App\Models\Payment;
 use App\Models\ServiceCharge;
 use App\Models\Zone;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ReportController extends Controller
@@ -42,22 +42,15 @@ class ReportController extends Controller
                 });
             });
 
-        $paymentsInScope = Payment::query()
-            ->when($from, fn ($q) => $q->whereDate('payment_date', '>=', $from))
-            ->when($to, fn ($q) => $q->whereDate('payment_date', '<=', $to))
-            ->when(filled($search), function ($q) use ($search): void {
-                $q->whereHas('customer', function ($c) use ($search): void {
-                    $c->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('account_number', 'like', '%'.$search.'%');
-                });
-            });
-
         /*
-         * Revenue is defined as billed water charges only.
-         * Keep this tied to bill current_charge (excluding carried balances and service charges).
+         * Water revenue (summary.total_revenue): sum of bill current_charge (consumption × unit price; usage only).
+         * Fixed charge revenue: sum of fixed_charge snapshots (tariff fixed fees on bills).
+         * Total billed revenue: water + fixed on bills in scope (excludes previous_balance / arrears).
          */
         $totalRevenue = (float) (clone $billsInScope)->sum('current_charge');
-        $totalPaid = (float) (clone $paymentsInScope)->sum('amount');
+        $fixedChargeRevenue = (float) (clone $billsInScope)->sum('fixed_charge');
+        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue;
+        $totalPaid = (float) (clone $billsInScope)->sum('amount_paid');
 
         $paidChargesQuery = ServiceCharge::where('status', 'paid')
             ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
@@ -73,10 +66,7 @@ class ReportController extends Controller
 
         $actualTotalPaid = $totalPaid + $paidChargesSum;
 
-        $billOutstanding = (float) (clone $billsInScope)
-            ->withSum('payments', 'amount')
-            ->get()
-            ->sum(fn (Bill $bill) => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
+        $billOutstanding = (float) (clone $billsInScope)->sum('current_balance');
 
         $chargeOutstanding = (float) ServiceCharge::query()
             ->where('status', 'unpaid')
@@ -92,10 +82,10 @@ class ReportController extends Controller
 
         $totalOutstanding = $billOutstanding + $chargeOutstanding;
 
-        $paymentsCount = (clone $paymentsInScope)->count() + $paidChargesQuery->count();
+        $paymentsCount = (clone $billsInScope)->where('amount_paid', '>', 0)->count() + $paidChargesQuery->count();
 
         // Rows for the table (Recent Bills)
-        $rowsQuery = Bill::with(['customer', 'payments'])
+        $rowsQuery = Bill::with(['customer'])
             ->latest();
 
         if ($search) {
@@ -115,66 +105,126 @@ class ReportController extends Controller
 
         $bills = $rowsQuery->paginate(15)->withQueryString();
 
-        // Chart Data (Daily Revenue Trend)
-        $chartStart = $from ? Carbon::parse($from) : now()->subDays(30);
-        $chartEnd = $to ? Carbon::parse($to) : now();
+        /*
+         * Chart: 12 months for chart year (Jan–Dec), clipped to the bill-date filter.
+         * Each point is collection rate % for that month: (bill amount_paid in month + paid service charges issued in month)
+         * ÷ (bill current_charge + fixed_charge for bills created in month), matching summary.collection_rate_percent logic per window.
+         */
+        $chartRangeStart = $from ? Carbon::parse($from)->startOfDay() : now()->subMonths(11)->startOfMonth()->startOfDay();
+        $chartRangeEnd = $to ? Carbon::parse($to)->endOfDay() : now()->endOfDay();
 
-        $dailyRevenue = [];
-        $currentDate = $chartStart->copy();
+        $chartYear = (int) ($from
+            ? Carbon::parse($from)->year
+            : ($to ? Carbon::parse($to)->year : now()->year));
 
-        while ($currentDate <= $chartEnd) {
-            $dateStr = $currentDate->toDateString();
+        $chartData = [];
+        for ($month = 1; $month <= 12; $month++) {
+            $monthStart = Carbon::createFromDate($chartYear, $month, 1)->startOfDay();
+            $monthEnd = Carbon::createFromDate($chartYear, $month, 1)->endOfMonth()->endOfDay();
 
-            $billDaySum = Bill::query()
-                ->whereDate('created_at', $dateStr)
-                ->when(filled($search), function ($q) use ($search): void {
-                    $q->whereHas('customer', function ($c) use ($search): void {
-                        $c->where('name', 'like', '%'.$search.'%')
-                            ->orWhere('account_number', 'like', '%'.$search.'%');
+            $clipStart = $monthStart->gt($chartRangeStart) ? $monthStart : $chartRangeStart->copy();
+            $clipEnd = $monthEnd->lt($chartRangeEnd) ? $monthEnd : $chartRangeEnd->copy();
+
+            if ($clipStart->gt($clipEnd)) {
+                $monthCollectionRatePercent = 0.0;
+            } else {
+                $billsCreatedInClip = Bill::query()
+                    ->whereDate('created_at', '>=', $clipStart->toDateString())
+                    ->whereDate('created_at', '<=', $clipEnd->toDateString())
+                    ->when(filled($search), function ($q) use ($search): void {
+                        $q->whereHas('customer', function ($c) use ($search): void {
+                            $c->where('name', 'like', '%'.$search.'%')
+                                ->orWhere('account_number', 'like', '%'.$search.'%');
+                        });
                     });
-                })
-                ->sum('current_charge');
 
-            $chargeDaySum = ServiceCharge::query()
-                ->whereDate('issued_date', $dateStr)
-                ->when(filled($search), function ($q) use ($search): void {
-                    $q->whereHas('customer', function ($c) use ($search): void {
-                        $c->where('name', 'like', '%'.$search.'%')
-                            ->orWhere('account_number', 'like', '%'.$search.'%');
-                    });
-                })
-                ->sum('amount');
+                $monthBilled = (float) (clone $billsCreatedInClip)->sum(DB::raw('current_charge + COALESCE(fixed_charge, 0)'));
+                $billAmountPaid = (float) (clone $billsCreatedInClip)->sum('amount_paid');
 
-            $dailyRevenue[] = [
-                'date' => $currentDate->format('M d'),
-                'revenue' => (float) ($billDaySum + $chargeDaySum),
+                $paidChargesInMonth = (float) ServiceCharge::query()
+                    ->where('status', 'paid')
+                    ->whereDate('issued_date', '>=', $clipStart->toDateString())
+                    ->whereDate('issued_date', '<=', $clipEnd->toDateString())
+                    ->when(filled($search), function ($q) use ($search): void {
+                        $q->whereHas('customer', function ($c) use ($search): void {
+                            $c->where('name', 'like', '%'.$search.'%')
+                                ->orWhere('account_number', 'like', '%'.$search.'%');
+                        });
+                    })
+                    ->sum('amount');
+
+                $monthCollected = $billAmountPaid + $paidChargesInMonth;
+
+                $monthCollectionRatePercent = $monthBilled > 0.00001
+                    ? min(100.0, round(($monthCollected / $monthBilled) * 100, 1))
+                    : 0.0;
+            }
+
+            $chartData[] = [
+                'date' => $monthStart->format('M Y'),
+                'collection_rate_percent' => $monthCollectionRatePercent,
             ];
-
-            $currentDate->addDay();
         }
+
+        $collectionRatePercent = $totalBilledRevenue > 0.00001
+            ? round(($actualTotalPaid / $totalBilledRevenue) * 100, 1)
+            : 0.0;
+
+        $today = Carbon::today();
+        $overdueBaseQuery = Bill::query()
+            ->whereIn('status', ['pending', 'partial'])
+            ->whereDate('due_date', '<', $today);
+
+        $overdueBillsMeta = [
+            'total_count' => (int) (clone $overdueBaseQuery)->count(),
+            'total_outstanding' => (float) (clone $overdueBaseQuery)->sum('current_balance'),
+        ];
+
+        $overdueBills = (clone $overdueBaseQuery)
+            ->with(['customer:id,name,account_number'])
+            ->orderBy('due_date')
+            ->limit(15)
+            ->get()
+            ->map(fn (Bill $bill): array => [
+                'id' => $bill->id,
+                'due_date' => $bill->due_date?->toDateString(),
+                'reference' => 'BILL-'.str_pad((string) $bill->id, 6, '0', STR_PAD_LEFT),
+                'status' => $bill->status,
+                'current_balance' => (float) $bill->current_balance,
+                'total_amount' => (float) $bill->total_amount,
+                'customer_name' => $bill->customer?->name,
+                'account_number' => $bill->customer?->account_number,
+            ])
+            ->values()
+            ->all();
 
         return Inertia::render('reports/revenue', [
             'summary' => [
                 'total_revenue' => (float) $totalRevenue,
+                'fixed_charge_revenue' => (float) $fixedChargeRevenue,
+                'total_billed_revenue' => (float) $totalBilledRevenue,
                 'total_paid' => (float) $actualTotalPaid,
                 'total_outstanding' => (float) $totalOutstanding,
+                'collection_rate_percent' => (float) $collectionRatePercent,
                 'payments_count' => $paymentsCount,
             ],
-            'chartData' => $dailyRevenue,
+            'chartData' => $chartData,
             'rows' => $bills->through(fn ($bill) => [
                 'id' => $bill->id,
                 'date' => $bill->created_at->toDateString(),
                 'reference' => 'BILL-'.str_pad($bill->id, 6, '0', STR_PAD_LEFT),
                 'customer_name' => $bill->customer?->name,
                 'account_number' => $bill->customer?->account_number,
-                'paid' => (float) $bill->payments->sum('amount'),
-                'outstanding' => (float) ($bill->total_amount - $bill->payments->sum('amount')),
+                'paid' => (float) $bill->amount_paid,
+                'outstanding' => (float) $bill->current_balance,
             ]),
             'filters' => [
                 'search' => $search,
                 'from' => $from,
                 'to' => $to,
             ],
+            'overdueBills' => $overdueBills,
+            'overdueBillsMeta' => $overdueBillsMeta,
         ]);
     }
 
@@ -183,86 +233,185 @@ class ReportController extends Controller
      */
     public function waterUsage(Request $request)
     {
-        $from = $request->input('from');
-        $to = $request->input('to');
+        $fromInput = $request->string('from')->toString();
+        $toInput = $request->string('to')->toString();
 
-        $billsQuery = Bill::query();
+        $range = $this->resolveWaterUsageDateRange($fromInput, $toInput);
+        $fromStr = $range['from'];
+        $toStr = $range['to'];
+        $start = $range['start'];
+        $end = $range['end'];
 
-        if ($from) {
-            $billsQuery->whereDate('created_at', '>=', $from);
-        }
+        $billsInPeriod = Bill::query()
+            ->whereDate('created_at', '>=', $fromStr)
+            ->whereDate('created_at', '<=', $toStr);
 
-        if ($to) {
-            $billsQuery->whereDate('created_at', '<=', $to);
-        }
+        $totalConsumption = (float) (clone $billsInPeriod)->sum('consumption');
+        $billsCount = (clone $billsInPeriod)->count();
+        $avgConsumption = $billsCount > 0 ? $totalConsumption / $billsCount : 0.0;
 
-        $totalConsumption = $billsQuery->sum('consumption');
-        $avgConsumption = $billsQuery->avg('consumption') ?? 0;
-        $billsCount = $billsQuery->count();
+        /*
+         * Aggregate by zone via customers → bills (avoid withSum on hasManyThrough, which can break on SQLite / some drivers).
+         */
+        $usageByZone = Zone::query()
+            ->select('zones.id', 'zones.name')
+            ->selectRaw('COALESCE(SUM(bills.consumption), 0) as zone_consumption')
+            ->leftJoin('customers', 'customers.zone_id', '=', 'zones.id')
+            ->leftJoin('bills', function ($join) use ($fromStr, $toStr): void {
+                $join->on('bills.customer_id', '=', 'customers.id')
+                    ->whereDate('bills.created_at', '>=', $fromStr)
+                    ->whereDate('bills.created_at', '<=', $toStr);
+            })
+            ->groupBy('zones.id', 'zones.name')
+            ->orderByDesc('zone_consumption')
+            ->get()
+            ->map(fn (Zone $zone): array => [
+                'name' => $zone->name,
+                'consumption' => (float) ($zone->zone_consumption ?? 0),
+            ])
+            ->values()
+            ->all();
 
-        // Consumption by Zone
-        $usageByZone = Zone::withSum(['bills' => function ($q) use ($from, $to) {
-            if ($from) {
-                $q->whereDate('created_at', '>=', $from);
-            }
-            if ($to) {
-                $q->whereDate('created_at', '<=', $to);
-            }
-        }], 'consumption')->get()->map(fn ($zone) => [
-            'name' => $zone->name,
-            'consumption' => (float) ($zone->bills_sum_consumption ?? 0),
-        ]);
+        $daysInRange = $start->diffInDays($end) + 1;
+        $chartGranularity = $daysInRange > 45 ? 'month' : 'day';
+        $chartData = $chartGranularity === 'month'
+            ? $this->waterUsageChartByMonth($fromStr, $toStr, $start, $end)
+            : $this->waterUsageChartByDay($fromStr, $toStr, $start, $end);
 
-        // Daily Trend
-        $chartStart = $from ? Carbon::parse($from) : now()->subDays(30);
-        $chartEnd = $to ? Carbon::parse($to) : now();
-
-        $dailyUsage = [];
-        $currentDate = $chartStart->copy();
-
-        while ($currentDate <= $chartEnd) {
-            $dateStr = $currentDate->toDateString();
-            $daySum = Bill::whereDate('created_at', $dateStr)->sum('consumption');
-
-            $dailyUsage[] = [
-                'date' => $currentDate->format('M d'),
-                'consumption' => (float) $daySum,
-            ];
-
-            $currentDate->addDay();
-        }
-
-        // Top Consumers
-        $topConsumers = Customer::withSum(['bills' => function ($q) use ($from, $to) {
-            if ($from) {
-                $q->whereDate('created_at', '>=', $from);
-            }
-            if ($to) {
-                $q->whereDate('created_at', '<=', $to);
-            }
-        }], 'consumption')
-            ->orderByDesc('bills_sum_consumption')
+        $topConsumers = Customer::query()
+            ->select('customers.id', 'customers.name', 'customers.account_number')
+            ->join('bills', 'bills.customer_id', '=', 'customers.id')
+            ->whereDate('bills.created_at', '>=', $fromStr)
+            ->whereDate('bills.created_at', '<=', $toStr)
+            ->groupBy('customers.id', 'customers.name', 'customers.account_number')
+            ->selectRaw('SUM(bills.consumption) as period_consumption')
+            ->orderByDesc('period_consumption')
             ->limit(10)
             ->get()
-            ->map(fn ($customer) => [
+            ->map(fn (Customer $customer): array => [
+                'id' => $customer->id,
                 'name' => $customer->name,
                 'account' => $customer->account_number,
-                'consumption' => (float) ($customer->bills_sum_consumption ?? 0),
-            ]);
+                'consumption' => (float) ($customer->period_consumption ?? 0),
+            ])
+            ->values()
+            ->all();
 
         return Inertia::render('reports/water-usage', [
             'summary' => [
-                'total_consumption' => (float) $totalConsumption,
-                'avg_consumption' => (float) $avgConsumption,
+                'total_consumption' => $totalConsumption,
+                'avg_consumption' => round($avgConsumption, 2),
                 'bills_count' => $billsCount,
             ],
-            'chartData' => $dailyUsage,
+            'chartData' => $chartData,
+            'chartMeta' => [
+                'granularity' => $chartGranularity,
+            ],
             'zoneData' => $usageByZone,
             'topConsumers' => $topConsumers,
             'filters' => [
-                'from' => $from,
-                'to' => $to,
+                'from' => $fromStr,
+                'to' => $toStr,
             ],
         ]);
+    }
+
+    /**
+     * @return array{start: Carbon, end: Carbon, from: string, to: string}
+     */
+    private function resolveWaterUsageDateRange(string $from, string $to): array
+    {
+        if ($from === '' && $to === '') {
+            $start = now()->startOfYear()->startOfDay();
+            $end = now()->endOfYear()->endOfDay();
+        } elseif ($from !== '' && $to !== '') {
+            $start = Carbon::parse($from)->startOfDay();
+            $end = Carbon::parse($to)->endOfDay();
+        } elseif ($from !== '') {
+            $start = Carbon::parse($from)->startOfDay();
+            $end = $start->copy()->endOfYear()->endOfDay();
+        } else {
+            $end = Carbon::parse($to)->endOfDay();
+            $start = $end->copy()->startOfYear()->startOfDay();
+        }
+
+        if ($start->gt($end)) {
+            [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
+        }
+
+        return [
+            'start' => $start,
+            'end' => $end,
+            'from' => $start->toDateString(),
+            'to' => $end->toDateString(),
+        ];
+    }
+
+    /**
+     * @return list<array{date: string, consumption: float}>
+     */
+    private function waterUsageChartByDay(string $fromStr, string $toStr, Carbon $start, Carbon $end): array
+    {
+        $dayExpr = $this->billCreatedDayExpression();
+        $totals = Bill::query()
+            ->whereDate('created_at', '>=', $fromStr)
+            ->whereDate('created_at', '<=', $toStr)
+            ->selectRaw("{$dayExpr} as period, SUM(consumption) as total")
+            ->groupByRaw($dayExpr)
+            ->pluck('total', 'period');
+
+        $series = [];
+        for ($cursor = $start->copy()->startOfDay(); $cursor->lte($end); $cursor->addDay()) {
+            $key = $cursor->toDateString();
+            $series[] = [
+                'date' => $cursor->format('M j'),
+                'consumption' => (float) ($totals[$key] ?? 0),
+            ];
+        }
+
+        return $series;
+    }
+
+    /**
+     * @return list<array{date: string, consumption: float}>
+     */
+    private function waterUsageChartByMonth(string $fromStr, string $toStr, Carbon $start, Carbon $end): array
+    {
+        $monthExpr = $this->billCreatedMonthExpression();
+        $totals = Bill::query()
+            ->whereDate('created_at', '>=', $fromStr)
+            ->whereDate('created_at', '<=', $toStr)
+            ->selectRaw("{$monthExpr} as period, SUM(consumption) as total")
+            ->groupByRaw($monthExpr)
+            ->pluck('total', 'period');
+
+        $series = [];
+        for ($cursor = $start->copy()->startOfMonth(); $cursor->lte($end); $cursor->addMonth()) {
+            $key = $cursor->format('Y-m');
+            $series[] = [
+                'date' => $cursor->format('M Y'),
+                'consumption' => (float) ($totals[$key] ?? 0),
+            ];
+        }
+
+        return $series;
+    }
+
+    private function billCreatedDayExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => '(created_at::date)',
+            'sqlite' => 'date(created_at)',
+            default => 'DATE(created_at)',
+        };
+    }
+
+    private function billCreatedMonthExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "to_char(created_at, 'YYYY-MM')",
+            'sqlite' => "strftime('%Y-%m', created_at)",
+            default => "DATE_FORMAT(created_at, '%Y-%m')",
+        };
     }
 }

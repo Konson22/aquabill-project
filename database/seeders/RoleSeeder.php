@@ -19,6 +19,25 @@ class RoleSeeder extends Seeder
         $manageUsers = Permission::where('name', 'manage_users')->first();
         $handleComplaints = Permission::where('name', 'handle_complaints')->first();
 
+        $hrPermissionNames = [
+            'view_hr_dashboard',
+            'manage_departments',
+            'manage_staff',
+            'manage_attendance',
+            'manage_leave',
+            'approve_leave',
+            'manage_payroll',
+            'manage_staff_documents',
+            'view_hr_reports',
+            'view_training',
+            'manage_training_programs',
+            'manage_training_participants',
+            'manage_training_documents',
+            'view_training_reports',
+        ];
+
+        $hrPermissions = Permission::whereIn('name', $hrPermissionNames)->get();
+
         $roles = [
             'admin' => [
                 'Super Admin' => $allPermissions,
@@ -33,7 +52,7 @@ class RoleSeeder extends Seeder
                 'Meter Reader' => [$viewBill],
             ],
             'hr' => [
-                'HR Manager' => [$manageUsers, $viewReports],
+                'HR Manager' => $hrPermissions->merge(collect([$manageUsers, $viewReports]))->unique('id')->values()->all(),
             ],
             'customer_care' => [
                 'Agent' => [$viewBill, $handleComplaints],

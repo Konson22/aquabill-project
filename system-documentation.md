@@ -1,169 +1,194 @@
-# AquaBill Documentation
+Act as a senior software documentation engineer and Laravel/React system analyst.
 
-## 1. Document Purpose
-This document is written in a dual format so it can be used as:
-- **Client Documentation:** Explains what the platform delivers to the organization and each department.
-- **System Documentation:** Explains the core modules, data flow, and user responsibilities in operations.
+I want you to explore the entire codebase and generate a complete documentation package for the AquaBill Billing System for SSUWC.
 
-## 2. Product Overview (Client View)
-AquaBill is a water utility management platform that digitizes the full service cycle from customer registration to billing and payment reporting. It reduces manual paperwork, improves billing accuracy, and gives management real-time visibility into operations and revenue.
+First, inspect the system carefully:
+- Read routes
+- Read controllers
+- Read models
+- Read migrations
+- Read database seeders
+- Read React/Inertia pages
+- Read API routes
+- Read config files
+- Read services/helpers
+- Understand all modules and relationships before writing documentation
 
-### Business outcomes
-- Faster monthly billing cycles
-- Fewer calculation and posting errors
-- Better follow-up of overdue accounts
-- Improved service response from customer care
-- Clear reporting for financial and operational decisions
+Do not guess. Base the documentation on the actual codebase and database structure.
 
-## 3. Core Modules (System View)
+System context:
+- System name: AquaBill Billing System
+- Client: South Sudan Urban Water Corporation (SSUWC)
+- Purpose: Water billing, customer management, meter reading, payments, reporting, HR, attendance, leave, payroll, staff documents, and training management.
+- Tech stack: Laravel, React/Inertia, MySQL, Tailwind CSS, Sanctum API.
 
-### 3.1 Access Control and User Management
-**Goal:** Secure access by department and role.
+Generate the following documentation files inside a new folder:
 
-**Key functions:**
-- User account creation and deactivation
-- Role and permission assignment
-- Department-based module access
-- Activity accountability through user-level actions
+/docs
 
-### 3.2 Customer Management
-**Goal:** Maintain complete customer records in one location.
+1. SYSTEM_OVERVIEW.md
+Audience: SSUWC management, JICA, stakeholders.
+Include:
+- Introduction
+- Objectives
+- System modules
+- Key features
+- Benefits to SSUWC
+- High-level workflows
+- Future improvements
 
-**Key functions:**
-- New customer registration
-- Customer profile updates
-- Account status and balance tracking
-- Customer history and support reference
+2. USER_MANUAL.md
+Audience: end users.
+Include step-by-step guides for:
+- Login/logout
+- Dashboard
+- Customer management
+- Meter readings
+- Billing
+- Payments
+- Reports
+- HR module
+- Attendance
+- Leave
+- Payroll
+- Staff documents
+- Training management
+Use clear language and add placeholders for screenshots like:
+[SCREENSHOT: Login page]
 
-### 3.3 Meter and Zone Management
-**Goal:** Organize physical infrastructure and service geography.
+3. TRAINING_MANUAL.md
+Audience: trainers and workshop participants.
+Include:
+- Training objectives
+- Training agenda
+- Module-by-module explanation
+- Practical exercises
+- Example scenarios
+- Assessment/checklist
 
-**Key functions:**
-- Meter registry and customer-meter linking
-- Zone setup and grouping
-- Route support for reading operations
-- Area-level utility planning support
+4. TECHNICAL_DOCUMENTATION.md
+Audience: developers and IT team.
+Include:
+- System architecture
+- Folder structure
+- Backend structure
+- Frontend structure
+- Database overview
+- Authentication and authorization
+- Key business logic
+- Services/controllers/models explanation
+- Important configuration files
 
-### 3.4 Meter Reading Module
-**Goal:** Capture usage data accurately per billing cycle.
+5. DATABASE_DOCUMENTATION.md
+Audience: developers and database administrators.
+Explore migrations and models and document:
+- All database tables
+- Fields and data types
+- Relationships
+- Indexes
+- Foreign keys
+- Important constraints
+- Suggested ERD in Mermaid syntax
 
-**Key functions:**
-- Reading entry per customer/meter
-- Previous vs current reading comparison
-- Automatic consumption computation
-- Validation flags for unusual readings
+6. API_DOCUMENTATION.md
+Audience: developers/integrators.
+Explore api.php and controllers.
+Document:
+- Authentication
+- Endpoints
+- Methods
+- Request payloads
+- Response examples
+- Validation rules
+- Error responses
+- API usage flow
 
-### 3.5 Billing Module
-**Goal:** Produce accurate, auditable customer bills.
+7. DEPLOYMENT_GUIDE.md
+Audience: IT/admin team.
+Include:
+- Server requirements
+- Environment requirements
+- Installation steps
+- .env configuration
+- Database setup
+- Migration/seed commands
+- Storage link setup
+- Apache/Nginx setup
+- Queue/scheduler setup if used
+- Backup notes
+- Troubleshooting
 
-**Key functions:**
-- Tariff-based billing calculations
-- Inclusion of one-time and recurring charges
-- Bill generation (single or bulk)
-- Bill status lifecycle: issued, unpaid, overdue, paid
+8. OPERATIONS_MAINTENANCE_GUIDE.md
+Audience: SSUWC IT handover team.
+Include:
+- Daily operations
+- User management
+- Backup procedure
+- Restore procedure
+- Monitoring
+- Troubleshooting common issues
+- Updating the system
+- Managing uploaded files
+- Security practices
+- Handover checklist
 
-### 3.6 Payment and Ledger Module
-**Goal:** Record collections and keep financial records consistent.
+9. ADMIN_MANUAL.md
+Audience: system administrators.
+Include:
+- Managing users and roles
+- Managing system settings
+- Managing departments
+- Managing tariffs/zones if available
+- Managing HR settings
+- Managing reports
+- Exporting data
+- Audit/security checks
 
-**Key functions:**
-- Payment posting with method/date/reference
-- Immediate customer balance updates
-- Daily transaction visibility
-- Reconciliation support for accounting controls
+10. REPORTS_ANALYTICS_GUIDE.md
+Audience: management and reporting officers.
+Include:
+- List of all reports found in the system
+- Purpose of each report
+- Filters available
+- Export options
+- How reports support decision-making
 
-### 3.7 Reports and Analytics Module
-**Goal:** Convert transactions into actionable insights.
+11. SECURITY_DOCUMENTATION.md
+Audience: IT/admin/management.
+Include:
+- Authentication
+- Role-based access control
+- Permissions
+- Data protection
+- Document/file access
+- Backup security
+- Recommended improvements
 
-**Key functions:**
-- Revenue and collection trends
-- Overdue and receivable tracking
-- Consumption trends by period and zone
-- Management-level performance reporting
+12. CHANGELOG.md
+Audience: project team.
+Create a clean changelog template:
+- Version
+- Date
+- Added
+- Changed
+- Fixed
+- Notes
 
-## 4. Department Guide (Who Uses What)
+Important writing style:
+- Use professional but simple English
+- Use SSUWC context
+- Avoid unnecessary technical jargon in user-facing documents
+- Use tables where useful
+- Use Mermaid diagrams where useful
+- Use clear headings
+- Add screenshot placeholders where screenshots are needed
+- Clearly mark sections that need screenshots or confirmation
+- Do not invent features that are not in the codebase
+- If a feature is partially implemented, write “Partially implemented” and explain what exists
+- If something is missing but recommended, place it under “Recommended Improvements”
 
-### 4.1 Administration
-**Primary modules used:**
-- Access Control and User Management
-- Global system settings
-- Master data and policy setup
-
-**Department objective:** Maintain system governance, security, and configuration consistency.
-
-### 4.2 Finance
-**Primary modules used:**
-- Reports and Analytics
-- Billing summaries
-- Collection dashboards
-
-**Department objective:** Monitor financial performance, receivables, and revenue health.
-
-### 4.3 Ledger and Accounting
-**Primary modules used:**
-- Billing Module
-- Payment and Ledger Module
-- Customer account statements
-
-**Department objective:** Ensure all customer financial transactions are accurate, posted, and reconciled.
-
-### 4.4 Human Resources (HR)
-**Primary modules used:**
-- Staff records (where enabled)
-- Access coordination with Administration
-
-**Department objective:** Maintain employee records and support role assignment governance.
-
-### 4.5 Customer Care
-**Primary modules used:**
-- Customer Management
-- Customer account view
-- Billing and payment inquiry pages
-
-**Department objective:** Resolve customer issues quickly using complete and up-to-date account information.
-
-## 5. Key Pages and Their Purpose
-
-### Dashboard
-Provides quick KPIs, operational summaries, and pending items.
-
-### Customers
-Used to register, search, and manage customer records.
-
-### Customer Profile
-Shows account details, meter details, billing history, and payment history.
-
-### Meters
-Maintains meter inventory and assignment status.
-
-### Zones
-Groups customers and meters by service area.
-
-### Meter Readings
-Captures cycle readings and computes consumption values.
-
-### Billing
-Generates and tracks invoices per billing cycle.
-
-### Payments
-Records customer payments and updates balances.
-
-### Reports
-Displays financial and operational reports for decision-making.
-
-### Staff and Roles
-Controls user accounts, departments, and permissions.
-
-## 6. End-to-End Process Flow
-1. Register customer and assign meter
-2. Capture periodic meter reading
-3. Compute consumption and generate bill
-4. Deliver bill and track payment status
-5. Record payment and update ledger
-6. Review performance in reports and dashboards
-
-## 7. Implementation Benefits
-- **Operational efficiency:** Teams complete recurring tasks faster.
-- **Data accuracy:** Automated calculations reduce human error.
-- **Financial visibility:** Revenue and arrears are visible in real time.
-- **Service quality:** Customer-facing teams resolve requests with complete context.
-- **Control and auditability:** Role-based access and transaction records improve governance.
+After generating the documentation:
+- Create /docs/README.md as an index linking all documents
+- Summarize what documents were created
+- Summarize any missing or unclear areas found in the codebase
+- Suggest next improvements for documentation quality

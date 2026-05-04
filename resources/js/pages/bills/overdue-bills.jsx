@@ -11,6 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { formatCurrency } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -26,16 +27,6 @@ import {
 import { useMemo, useState } from 'react';
 
 const breadcrumbs = [{ title: 'Overdue Bills', href: '/bills/overdue-bills' }];
-
-function formatMoney(value) {
-    const number = Number(value ?? 0);
-
-    if (!Number.isFinite(number)) {
-        return 'SSP 0';
-    }
-
-    return `SSP ${number.toLocaleString()}`;
-}
 
 function daysOverdue(dueDate) {
     if (!dueDate) return null;
@@ -140,7 +131,7 @@ export default function OverdueBills({ bills }) {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-black text-rose-700">{formatMoney(totals.totalOverdue)}</div>
+                            <div className="text-2xl font-black text-rose-700">{formatCurrency(totals.totalOverdue)}</div>
                             <div className="mt-1 text-xs text-muted-foreground">Sum of totals for the list</div>
                         </CardContent>
                     </Card>
@@ -155,7 +146,7 @@ export default function OverdueBills({ bills }) {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-black">{formatMoney(totals.totalArrears)}</div>
+                            <div className="text-2xl font-black">{formatCurrency(totals.totalArrears)}</div>
                             <div className="mt-1 text-xs text-muted-foreground">Previous balances included</div>
                         </CardContent>
                     </Card>
@@ -239,10 +230,10 @@ export default function OverdueBills({ bills }) {
                                                 )}
                                             </TableCell>
                                             <TableCell className="px-4 py-4 text-right font-mono text-rose-700">
-                                                {formatMoney(bill.total_amount)}
+                                                {formatCurrency(bill.total_amount)}
                                             </TableCell>
                                             <TableCell className="px-4 py-4 text-right font-mono text-muted-foreground">
-                                                {formatMoney(bill.previous_balance)}
+                                                {formatCurrency(bill.previous_balance)}
                                             </TableCell>
                                         </TableRow>
                                     );

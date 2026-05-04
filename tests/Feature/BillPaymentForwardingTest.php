@@ -58,7 +58,7 @@ test('generating a new bill forwards the customer last open bill', function () {
         'current_charge' => 10,
         'previous_balance' => 0,
         'total_amount' => 100,
-        'status' => 'unpaid',
+        'status' => 'pending',
         'due_date' => now()->addDays(30)->toDateString(),
     ]);
 

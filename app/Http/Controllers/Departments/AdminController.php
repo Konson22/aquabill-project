@@ -3,38 +3,14 @@
 namespace App\Http\Controllers\Departments;
 
 use App\Http\Controllers\Controller;
+use App\Models\Bill;
 use App\Models\Disconnection;
-use App\Models\Payment;
-use Carbon\Carbon;
+use App\Models\ServiceCharge;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class AdminController extends Controller
 {
-    /**
-     * @return list<array{month: int, label: string, amount: float}>
-     */
-    private function monthlyPaymentChartData(int $year): array
-    {
-        $totals = array_fill(1, 12, 0.0);
-
-        foreach (Payment::query()->whereYear('payment_date', $year)->get(['amount', 'payment_date']) as $payment) {
-            $month = (int) $payment->payment_date->format('n');
-            $totals[$month] += (float) $payment->amount;
-        }
-
-        $rows = [];
-        for ($month = 1; $month <= 12; $month++) {
-            $rows[] = [
-                'month' => $month,
-                'label' => Carbon::createFromDate($year, $month, 1)->format('M'),
-                'amount' => round($totals[$month], 2),
-            ];
-        }
-
-        return $rows;
-    }
-
     public function index(): Response
     {
         $notifiedCustomers = Disconnection::query()
@@ -67,14 +43,30 @@ class AdminController extends Controller
                 'disconnection_type' => $row->disconnection_type,
             ]);
 
-        $paymentChartYear = (int) now()->year;
+        $paidBillsCount = Bill::query()->where('status', 'paid')->count();
+        $unpaidBillsCount = Bill::query()->whereIn('status', ['pending', 'partial', 'forwarded'])->count();
+
+        $billTotals = Bill::query()
+            ->selectRaw('COALESCE(SUM(current_charge + fixed_charge), 0) as total_billed, COALESCE(SUM(amount_paid), 0) as paid_on_bills')
+            ->first();
+        $totalBilledRevenue = (float) ($billTotals->total_billed ?? 0);
+        $totalPaidOnBills = (float) ($billTotals->paid_on_bills ?? 0);
+        $paidServiceCharges = (float) ServiceCharge::query()->where('status', 'paid')->sum('amount');
+        $actualTotalPaid = $totalPaidOnBills + $paidServiceCharges;
+        $collectionRatePercent = $totalBilledRevenue > 0.00001
+            ? round(($actualTotalPaid / $totalBilledRevenue) * 100, 1)
+            : 0.0;
 
         return Inertia::render('admin/dashboard', [
             'disconnectionStats' => Disconnection::summaryStats(),
             'notifiedCustomers' => $notifiedCustomers,
             'disconnectedCustomers' => $disconnectedCustomers,
-            'monthlyPayments' => $this->monthlyPaymentChartData($paymentChartYear),
-            'paymentChartYear' => $paymentChartYear,
+            'revenueBillCounts' => [
+                'paid' => $paidBillsCount,
+                'unpaid' => $unpaidBillsCount,
+                'total' => $paidBillsCount + $unpaidBillsCount,
+                'collection_rate_percent' => $collectionRatePercent,
+            ],
         ]);
     }
 }

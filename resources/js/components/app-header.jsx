@@ -37,8 +37,10 @@ const getNavItems = (department) => {
         );
     } else if (department === 'hr') {
         items.push(
-            { title: 'Staff List', url: '#', icon: Users },
-            { title: 'Attendance', url: '#', icon: Clock }
+            { title: 'HR Home', url: route('hr'), icon: LayoutGrid },
+            { title: 'Staff', url: route('hr.staff.index'), icon: Users },
+            { title: 'Attendance', url: route('hr.attendance.index'), icon: Clock },
+            { title: 'Leave', url: route('hr.leave.index'), icon: FileText }
         );
     } else if (department === 'customer_care') {
         items.push(

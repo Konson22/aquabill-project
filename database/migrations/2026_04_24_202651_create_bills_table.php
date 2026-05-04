@@ -27,7 +27,10 @@ return new class extends Migration
             $table->decimal('previous_balance', 10, 2)->default(0);
             $table->decimal('total_amount', 10, 2);
 
-            $table->enum('status', ['unpaid', 'partial', 'paid', 'forwarded'])->default('unpaid');
+            $table->decimal('amount_paid', 10, 2)->default(0);
+            $table->decimal('current_balance', 10, 2)->default(0);
+
+            $table->enum('status', ['pending', 'partial', 'paid', 'forwarded'])->default('pending');
             $table->date('due_date');
 
             $table->timestamps();
