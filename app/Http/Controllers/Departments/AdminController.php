@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Departments;
 use App\Http\Controllers\Controller;
 use App\Models\Bill;
 use App\Models\Disconnection;
+use App\Models\Payment;
 use App\Models\ServiceCharge;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -47,10 +48,10 @@ class AdminController extends Controller
         $unpaidBillsCount = Bill::query()->whereIn('status', ['pending', 'partial', 'forwarded'])->count();
 
         $billTotals = Bill::query()
-            ->selectRaw('COALESCE(SUM(current_charge + fixed_charge), 0) as total_billed, COALESCE(SUM(amount_paid), 0) as paid_on_bills')
+            ->selectRaw('COALESCE(SUM(current_charge + fixed_charge), 0) as total_billed')
             ->first();
         $totalBilledRevenue = (float) ($billTotals->total_billed ?? 0);
-        $totalPaidOnBills = (float) ($billTotals->paid_on_bills ?? 0);
+        $totalPaidOnBills = (float) Payment::query()->where('payable_type', Bill::class)->sum('amount');
         $paidServiceCharges = (float) ServiceCharge::query()->where('status', 'paid')->sum('amount');
         $actualTotalPaid = $totalPaidOnBills + $paidServiceCharges;
         $collectionRatePercent = $totalBilledRevenue > 0.00001

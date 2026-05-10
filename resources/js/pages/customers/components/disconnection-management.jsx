@@ -41,7 +41,7 @@ export default function DisconnectionManagement({ customer }) {
                             )}
                         </div>
                     </div>
-                    <Button type="button" variant="outline" className="shrink-0 border-orange-200 dark:text-orange-200" asChild>
+                    <Button type="button" variant="outline" className="shrink-0 border-orange-200" asChild>
                         <Link href={route('customers.disconnection-status', customer.id)}>
                             <Activity className="mr-2 h-4 w-4" />
                             Open disconnection page

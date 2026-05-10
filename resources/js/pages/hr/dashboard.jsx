@@ -108,7 +108,7 @@ export default function HRDashboard({ stats, currentPayroll, trainingMetrics = {
                 )}
 
                 {currentPayroll && (
-                    <Card className="border border-amber-200/80 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20">
+                    <Card className="border border-amber-200/80 bg-amber-50/50">
                         <CardContent className="flex flex-col gap-2 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
                                 <UserCheck className="h-8 w-8 text-amber-600" />

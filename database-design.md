@@ -1,207 +1,377 @@
-Act as a senior Laravel + React/Inertia system architect.
+Create a full GIS Infrastructure Module for AquaBill Water Billing System using Laravel, React, Tailwind CSS, React Leaflet, and OpenStreetMap.
 
-Add a Training Management Module to the existing HR Management system.
+This system is for a water utility organization and must support GIS visualization of water infrastructure and service points.
 
-Tech stack:
-- Laravel backend
-- React + Inertia frontend
-- Tailwind CSS
+IMPORTANT:
+- Use Leaflet as the GIS/map rendering engine.
+- Use OpenStreetMap as the map tile/data provider.
+- Do NOT use Google Maps.
+- Use React Leaflet components throughout the frontend.
+- Meters are normal/manual meters only.
+- Customer coordinates remain on customers table.
+- Do NOT add GPS coordinates to meters table because meters can be changed/replaced.
+- Explore the existing AquaBill codebase first and follow existing architecture, naming conventions, layouts, permissions, API style, and UI patterns.
+
+====================================
+TECH STACK
+====================================
+
+Backend:
+- Laravel
+- RESTful APIs
 - MySQL
-- Role-based access control
+- Existing AquaBill backend structure
 
-Module name: Training Management
-
-Objective:
-Track all trainings provided by the institution to staff, including training programs, participants, attendance, completion, certificates, costs, and reports.
-
-1. Database Tables
-
-Create migrations for:
-
-training_programs
-Fields:
-- id
-- title
-- description nullable
-- provider nullable
-- location nullable
-- start_date nullable
-- end_date nullable
-- cost decimal nullable
-- status enum: planned, ongoing, completed, cancelled
-- timestamps
-- soft deletes
-
-training_participants
-Fields:
-- id
-- training_program_id
-- staff_id
-- status enum: enrolled, attended, completed, absent
-- score decimal nullable
-- certificate_path nullable
-- remarks nullable
-- timestamps
-
-Rules:
-- training_program_id references training_programs
-- staff_id references staff
-- unique training_program_id + staff_id
-
-training_documents
-Fields:
-- id
-- training_program_id
-- title nullable
-- file_path
-- timestamps
-
-2. Models & Relationships
-
-Create models:
-- TrainingProgram
-- TrainingParticipant
-- TrainingDocument
-
-Relationships:
-- TrainingProgram has many participants
-- TrainingProgram has many documents
-- TrainingParticipant belongs to training program
-- TrainingParticipant belongs to staff
-- TrainingDocument belongs to training program
-- Staff has many training participants
-- Staff belongs to many training programs through training_participants
-
-3. Features
-
-Build full CRUD for training programs:
-- Create training
-- Edit training
-- View training details
-- Delete training
-- Filter by status, provider, date range
-- Search by title/provider/location
-
-Training detail page should show:
-- Training information
-- Participants list
-- Uploaded documents
-- Training cost
-- Completion summary
-
-Participant management:
-- Add staff to training
-- Remove staff from training
-- Update participant status:
-  - enrolled
-  - attended
-  - completed
-  - absent
-- Add score
-- Add remarks
-- Upload certificate per participant
-
-Training documents:
-- Upload training materials
-- View/download documents
-- Delete documents
-
-4. Staff Profile Integration
-
-Update staff profile page to include a “Training” tab showing:
-- Trainings enrolled
-- Trainings attended
-- Trainings completed
-- Certificates
-- Scores
-- Training dates
-- Provider
-
-5. Dashboard Cards
-
-Add dashboard widgets:
-- Total trainings
-- Ongoing trainings
-- Completed trainings
-- Staff trained this year
-- Pending/planned trainings
-- Training cost this year
-
-6. Reports
-
-Create reports for:
-- Training programs report
-- Staff training history
-- Training participation report
-- Training cost report
-- Completion rate report
-
-Reports should support:
-- Search
-- Filters
-- Export to Excel
-- Export to PDF
-- Print
-
-7. Permissions
-
-Add permissions:
-- view_training
-- manage_training_programs
-- manage_training_participants
-- manage_training_documents
-- view_training_reports
-
-Role access:
-- Super Admin: full access
-- HR Manager: full training access
-- Department Manager: view department staff trainings
-- Staff: view own training history and certificates
-
-8. UI Requirements
-
-Use professional HR dashboard style:
-- Responsive pages
+Frontend:
+- React
 - Tailwind CSS
-- Clean tables
-- Status badges
-- Modal forms where useful
-- Tabs on training detail page
-- Confirmation dialogs before deleting
-- File upload UI for documents/certificates
+- React Leaflet
+- OpenStreetMap
+- Existing AquaBill frontend layout/components
 
-9. Business Logic
+Install required packages if missing:
 
-Use service classes where needed:
-- TrainingService
-- TrainingReportService
+Frontend:
+npm install leaflet react-leaflet leaflet-defaulticon-compatibility
 
-Important logic:
-- Prevent duplicate staff enrollment in same training
-- Calculate completion rate
-- Calculate total cost per training
-- Track training history per staff
-- Show expired or missing certificates if certificate expiry is added later
+====================================
+DATABASE MODULES
+====================================
 
-10. Routes & Controllers
+1. water_point_types
+
+Fields:
+- id
+- name unique
+- slug unique
+- description nullable
+- timestamps
+
+Seed with:
+- Filling Station
+- Public Tap
+- Water Kiosk
+- Standpipe
+- Borehole
+- Tank
+
+====================================
+
+2. water_points
+
+Fields:
+- id
+- code unique
+- name
+- water_point_type_id foreign key
+- zone_id nullable foreign key
+- latitude decimal(10,7) nullable
+- longitude decimal(10,7) nullable
+- manager_name nullable
+- manager_phone nullable
+- status enum:
+  - active
+  - inactive
+  - maintenance
+  - damaged
+  default active
+- description nullable
+- timestamps
+
+====================================
+
+3. pipes
+
+Fields:
+- id
+- pipe_code unique
+- zone_id nullable foreign key
+- pipe_type enum:
+  - main
+  - distribution
+  - service
+  default distribution
+- material nullable
+- diameter decimal(8,2) nullable
+- length decimal(10,2) nullable
+- coordinates JSON
+- status enum:
+  - active
+  - inactive
+  - damaged
+  - maintenance
+  default active
+- installation_date nullable
+- description nullable
+- timestamps
+
+coordinates JSON example:
+[
+  [4.85941,31.57125],
+  [4.86010,31.57200],
+  [4.86120,31.57310]
+]
+
+====================================
+
+4. valves
+
+Fields:
+- id
+- valve_code unique
+- zone_id nullable foreign key
+- pipe_id nullable foreign key
+- valve_type enum:
+  - main
+  - control
+  - isolation
+  - washout
+  - air_release
+  default main
+- latitude decimal(10,7)
+- longitude decimal(10,7)
+- status enum:
+  - open
+  - closed
+  - damaged
+  - maintenance
+  default open
+- installation_date nullable
+- description nullable
+- timestamps
+
+====================================
+MODEL RELATIONSHIPS
+====================================
+
+WaterPointType:
+- hasMany WaterPoints
+
+WaterPoint:
+- belongsTo WaterPointType
+- belongsTo Zone
+
+Pipe:
+- belongsTo Zone
+- hasMany Valves
+
+Valve:
+- belongsTo Pipe
+- belongsTo Zone
+
+Zone:
+- hasMany WaterPoints
+- hasMany Pipes
+- hasMany Valves
+
+====================================
+BACKEND FEATURES
+====================================
 
 Create:
-- TrainingProgramController
-- TrainingParticipantController
-- TrainingDocumentController
-- TrainingReportController
+- migrations
+- models
+- factories if needed
+- seeders
+- controllers
+- form requests
+- API resources if project uses them
+- RESTful API routes
 
-Use Laravel validation Form Requests.
+Add:
+- pagination
+- validation
+- searching
+- filtering
+- sorting
 
-11. Deliver Step by Step
+====================================
+SEARCH/FILTERS
+====================================
 
-Implement in this order:
-1. Migrations
-2. Models and relationships
-3. Seed permissions
-4. Controllers and routes
-5. Services
-6. React/Inertia pages
-7. Staff profile training tab
-8. Dashboard widgets
-9. Reports and exports
+Water Points:
+- search by code/name/manager phone
+- filter by type
+- filter by zone
+- filter by status
+
+Pipes:
+- search by pipe_code/material
+- filter by pipe_type
+- filter by zone
+- filter by status
+
+Valves:
+- search by valve_code
+- filter by valve_type
+- filter by zone
+- filter by pipe
+- filter by status
+
+====================================
+FRONTEND PAGES
+====================================
+
+Create pages for:
+
+Water Point Types:
+- list
+- create
+- edit
+- view
+
+Water Points:
+- list
+- create
+- edit
+- view
+
+Pipes:
+- list
+- create
+- edit
+- view
+
+Valves:
+- list
+- create
+- edit
+- view
+
+GIS Dashboard:
+- full GIS infrastructure map page
+
+====================================
+LEAFLET + OPENSTREETMAP GIS FEATURES
+====================================
+
+Use:
+- MapContainer
+- TileLayer
+- Marker
+- Popup
+- Polyline
+- LayersControl
+
+Use OpenStreetMap tiles:
+
+https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
+
+Default map center:
+Juba, South Sudan
+
+====================================
+GIS DASHBOARD FEATURES
+====================================
+
+Display:
+- Water points as markers
+- Valves as markers
+- Pipes as polylines
+
+Add layer controls:
+- Toggle Water Points
+- Toggle Pipes
+- Toggle Valves
+
+Add filters:
+- Zone
+- Type
+- Status
+
+Add map popups.
+
+Water Point popup:
+- code
+- name
+- type
+- zone
+- manager phone
+- status
+
+Valve popup:
+- valve_code
+- valve_type
+- pipe
+- zone
+- status
+
+Pipe popup:
+- pipe_code
+- pipe_type
+- material
+- diameter
+- length
+- zone
+- status
+
+====================================
+GIS INTERACTION FEATURES
+====================================
+
+Water Point Form:
+- Allow picking location from Leaflet map
+- Clicking map sets latitude/longitude automatically
+
+Valve Form:
+- Allow picking valve location from map
+
+Pipe Form:
+- Allow user to click multiple points on map
+- Automatically build polyline coordinates JSON
+- Show live polyline preview while drawing
+
+====================================
+MAP STYLING
+====================================
+
+Use different colors/styles:
+
+Pipes:
+- Main pipes → thick blue
+- Distribution pipes → medium green
+- Service pipes → thin orange
+
+Markers:
+- Water points → blue markers
+- Valves → red markers
+
+====================================
+UI/UX REQUIREMENTS
+====================================
+
+- Use Tailwind CSS
+- Responsive design
+- Professional utility dashboard look
+- Reuse existing AquaBill components
+- Use status badges
+- Use modals or drawers if project already uses them
+- Add delete confirmation dialogs
+- Add loading states
+- Add empty state UI
+- Add validation messages
+
+====================================
+SEEDERS
+====================================
+
+Create realistic seed data:
+- water_point_types
+- water_points
+- pipes
+- valves
+
+Use realistic Juba coordinates for sample data.
+
+====================================
+FINAL GOAL
+====================================
+
+Build a professional GIS infrastructure management module for AquaBill capable of:
+- Water connection GIS registry
+- Filling station GIS
+- Public tap GIS
+- Pipe network visualization
+- Main valve point visualization
+- Zone-based GIS reporting
+- Infrastructure mapping using Leaflet and OpenStreetMap

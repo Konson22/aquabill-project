@@ -15,12 +15,37 @@ class BillController extends Controller
      */
     public function index(Request $request): Response
     {
-        $bills = Bill::with(['customer', 'meter'])
+        $search = trim((string) $request->input('search', ''));
+
+        $bills = Bill::query()
+            ->with(['customer.zone', 'meter'])
+            ->withSum('payments', 'amount')
+            ->when($search !== '', function ($query) use ($search): void {
+                $pattern = '%'.addcslashes($search, '%_\\').'%';
+                $query->where(function ($q) use ($pattern): void {
+                    $q->where('bills.bill_no', 'like', $pattern)
+                        ->orWhere('bills.meter_number', 'like', $pattern)
+                        ->orWhereHas('customer', function ($cq) use ($pattern): void {
+                            $cq->where('name', 'like', $pattern)
+                                ->orWhere('phone', 'like', $pattern);
+                        })
+                        ->orWhereHas('customer.zone', function ($zq) use ($pattern): void {
+                            $zq->where('name', 'like', $pattern);
+                        })
+                        ->orWhereHas('meter', function ($mq) use ($pattern): void {
+                            $mq->where('meter_number', 'like', $pattern);
+                        });
+                });
+            })
             ->latest()
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return Inertia::render('bills/index', [
             'bills' => $bills,
+            'filters' => [
+                'search' => $search,
+            ],
         ]);
     }
 
@@ -33,6 +58,7 @@ class BillController extends Controller
 
         $bills = Bill::query()
             ->with(['customer', 'meter'])
+            ->withSum('payments', 'amount')
             ->whereIn('status', ['pending', 'partial'])
             ->whereDate('due_date', '<', $today)
             ->latest('due_date')
@@ -49,6 +75,7 @@ class BillController extends Controller
     public function printingList(): Response
     {
         $bills = Bill::with(['customer.zone', 'meter'])
+            ->withSum('payments', 'amount')
             ->whereIn('status', ['pending', 'partial'])
             ->latest()
             ->get();
@@ -63,7 +90,10 @@ class BillController extends Controller
      */
     public function show(Bill $bill): Response
     {
-        $bill->load(['customer.zone', 'customer.tariff', 'meter', 'reading']);
+        $bill->load([
+            'customer.zone', 'customer.tariff', 'meter', 'reading',
+        ]);
+        $bill->loadSum('payments', 'amount');
 
         return Inertia::render('bills/show', [
             'bill' => $bill,
@@ -75,7 +105,10 @@ class BillController extends Controller
      */
     public function print(Bill $bill): Response
     {
-        $bill->load(['customer.zone', 'customer.tariff', 'meter', 'reading']);
+        $bill->load([
+            'customer.zone', 'customer.tariff', 'meter', 'reading',
+        ]);
+        $bill->loadSum('payments', 'amount');
 
         return Inertia::render('bills/print-single', [
             'bill' => $bill,
@@ -94,6 +127,7 @@ class BillController extends Controller
             ->values();
 
         $bills = Bill::with(['customer.zone', 'customer.tariff', 'meter', 'reading'])
+            ->withSum('payments', 'amount')
             ->whereIn('id', $ids)
             ->orderBy('id')
             ->get();

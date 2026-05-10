@@ -58,6 +58,9 @@ class RoleSeeder extends Seeder
                 'Agent' => [$viewBill, $handleComplaints],
                 'Supervisor' => [$viewBill, $handleComplaints, $viewReports],
             ],
+            'distribution' => [
+                'Distribution Officer' => [$viewBill, $viewReports],
+            ],
         ];
 
         foreach ($roles as $deptName => $deptRoles) {

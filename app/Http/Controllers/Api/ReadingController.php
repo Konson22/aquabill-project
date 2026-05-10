@@ -35,10 +35,20 @@ class ReadingController extends Controller
 
         foreach ($items as $index => $itemData) {
             try {
-                // Mobile app sends customer_id (same as customer_id per API contract)
-                $normalized = $itemData;
-                if (isset($normalized['customer_id']) && ! isset($normalized['customer_id'])) {
-                    $normalized['customer_id'] = $normalized['customer_id'];
+                $normalized = is_array($itemData) ? $itemData : [];
+
+                // Mobile may send bill_no, billNo, or bill_number — normalize to bill_no for validation + persistence.
+                $rawBillNo = $normalized['bill_no']
+                    ?? $normalized['billNo']
+                    ?? $normalized['bill_number']
+                    ?? null;
+                $rawBillNo = is_string($rawBillNo) || is_numeric($rawBillNo)
+                    ? trim((string) $rawBillNo)
+                    : '';
+                if ($rawBillNo !== '') {
+                    $normalized['bill_no'] = $rawBillNo;
+                } else {
+                    unset($normalized['bill_no']);
                 }
 
                 $validated = validator($normalized, [
@@ -187,7 +197,8 @@ class ReadingController extends Controller
                 $results[] = [
                     'customer_id' => $customer->id,
                     'reading_id' => $reading->id,
-                    'bill_number' => $createdBill ? 'BILL-'.$createdBill->id : null,
+                    'bill_no' => $createdBill?->bill_no,
+                    'bill_number' => $createdBill?->bill_no,
                     'total' => $createdBill?->total_amount ?? 0,
                     'index' => $index,
                 ];

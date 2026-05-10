@@ -1,7 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
     DropdownMenu,
@@ -22,7 +23,6 @@ import {
     Printer,
     ChevronLeft,
     ChevronRight,
-    ArrowUpRight,
     CreditCard,
     DollarSign,
     AlertCircle
@@ -40,9 +40,27 @@ function canRecordPayment(status) {
     return status === 'pending';
 }
 
-export default function Bills({ bills }) {
+export default function Bills({ bills, filters = {} }) {
     const [paymentOpen, setPaymentOpen] = useState(false);
     const [activeBill, setActiveBill] = useState(null);
+    const [search, setSearch] = useState(filters.search ?? '');
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            router.get(
+                route('bills.index'),
+                { search: search || undefined },
+                {
+                    preserveScroll: true,
+                    preserveState: true,
+                    replace: true,
+                    only: ['bills', 'filters'],
+                },
+            );
+        }, 300);
+
+        return () => clearTimeout(timeout);
+    }, [search]);
 
     const openPayment = (bill) => {
         setActiveBill(bill);
@@ -133,7 +151,9 @@ export default function Bills({ bills }) {
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
-                            placeholder="Search by Invoice #, Customer or Account..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Bill #, customer, phone, zone, or meter #"
                             className="pl-10"
                         />
                     </div>
@@ -151,7 +171,7 @@ export default function Bills({ bills }) {
                         <table className="w-full text-left border-collapse text-sm">
                             <thead>
                                 <tr className="border-b bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                    {/* <th className="px-6 py-4 text-center w-20">Invoice</th> */}
+                                    <th className="px-6 py-4 text-center w-20">Invoice</th>
                                     <th className="px-6 py-4">Customer Details</th>
                                     <th className="px-6 py-4">Consumption</th>
                                     <th className="px-6 py-4">Amount Breakdown</th>
@@ -163,9 +183,9 @@ export default function Bills({ bills }) {
                             <tbody className="divide-y">
                                 {bills.data.map((bill) => (
                                     <tr key={bill.bill_no} className="hover:bg-muted/30 transition-colors group">
-                                        {/* <td className="px-6 py-4 text-center">
+                                        <td className="px-6 py-4 text-center">
                                             <span className="font-mono text-xs font-bold text-muted-foreground">#{String(bill.bill_no).padStart(6, '0')}</span>
-                                        </td> */}
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
                                                 <span className="font-bold text-foreground leading-tight">{bill.customer?.name}</span>
@@ -340,14 +360,5 @@ export default function Bills({ bills }) {
                 bill={activeBill}
             />
         </AppLayout>
-    );
-}
-
-function Input({ className, ...props }) {
-    return (
-        <input
-            className={`flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
-            {...props}
-        />
     );
 }

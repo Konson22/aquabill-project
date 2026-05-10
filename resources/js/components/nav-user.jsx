@@ -18,7 +18,7 @@ export function NavUser() {
                     <DropdownMenuTrigger asChild>
                         <SidebarMenuButton
                             size="lg"
-                            className="group rounded-md border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 data-[state=open]:bg-neutral-100"
+                            className="group  text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 data-[state=open]:bg-neutral-100"
                         >
                             <UserInfo user={auth.user} />
                             <ChevronsUpDown className="ml-auto size-4 text-neutral-500" />

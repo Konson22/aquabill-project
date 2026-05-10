@@ -93,7 +93,7 @@ export default function PrintBillCard({ bill }) {
                         </p>
                         <div className="mt-0.5 text-center">
                             <p className="text-sm font-semibold text-red-600">
-                                #{bill?.bill_number}
+                                #{bill?.bill_no ?? bill?.id ?? '—'}
                             </p>
                         </div>
                     </div>

@@ -9,8 +9,15 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Departments\AdminController;
 use App\Http\Controllers\Departments\CustomerCareController;
 use App\Http\Controllers\Departments\FinanceController;
+use App\Http\Controllers\Departments\FinanceReportController;
 use App\Http\Controllers\Departments\HRController;
 use App\Http\Controllers\Departments\LedgerController;
+use App\Http\Controllers\Gis\GisDashboardController;
+use App\Http\Controllers\Gis\GisMapController;
+use App\Http\Controllers\Gis\PipeController as GisPipeController;
+use App\Http\Controllers\Gis\ValveController as GisValveController;
+use App\Http\Controllers\Gis\WaterPointController as GisWaterPointController;
+use App\Http\Controllers\Gis\WaterPointTypeController as GisWaterPointTypeController;
 use App\Http\Controllers\HR\TrainingDocumentController;
 use App\Http\Controllers\HR\TrainingParticipantController;
 use App\Http\Controllers\HR\TrainingProgramController;
@@ -33,6 +40,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/admin', [AdminController::class, 'index'])->middleware('department:admin')->name('admin');
     Route::get('/finance', [FinanceController::class, 'index'])->middleware('department:finance')->name('finance');
+    Route::prefix('finance')->middleware('department:finance')->name('finance.')->group(function () {
+        Route::get('/reports', [FinanceReportController::class, 'index'])->name('reports.index');
+        Route::get('/reports/export', [FinanceReportController::class, 'export'])->name('reports.export');
+        Route::get('/reports/monthly', [FinanceReportController::class, 'index'])->name('reports.monthly');
+    });
     Route::get('/ledger', [LedgerController::class, 'index'])->middleware('department:ledger')->name('ledger');
     Route::prefix('hr')->middleware('department:hr')->group(function () {
         Route::get('/', [HRController::class, 'index'])->name('hr');
@@ -74,6 +86,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('customers/{customer}/cancel-disconnection-notice', [CustomerDisconnectionController::class, 'cancelNotice'])->name('customers.cancel-disconnection-notice');
     Route::post('customers/{customer}/disconnect', [CustomerDisconnectionController::class, 'disconnect'])->name('customers.disconnect');
     Route::post('customers/{customer}/reconnect', [CustomerDisconnectionController::class, 'reconnect'])->name('customers.reconnect');
+    Route::get('customers/{customer}/service-charges/create', [ServiceChargeController::class, 'createForCustomer'])->name('customers.service-charges.create');
     Route::post('customers/{customer}/service-charges', [ServiceChargeController::class, 'store'])->name('customers.service-charges.store');
     Route::get('tariffs', [TariffController::class, 'index'])->name('tariffs.index');
     Route::get('tariffs/{tariff}', [TariffController::class, 'show'])->name('tariffs.show');
@@ -85,6 +98,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('readings/export', [MeterReadingController::class, 'export'])->name('readings.export');
     Route::resource('readings', MeterReadingController::class)->only(['index', 'store', 'show', 'edit', 'update']);
     Route::resource('zones', ZoneController::class)->only(['index', 'store']);
+
+    Route::prefix('gis')->name('gis.')->group(function () {
+        Route::get('/', [GisDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/map', GisMapController::class)->name('map');
+        Route::resource('water-point-types', GisWaterPointTypeController::class);
+        Route::resource('water-points', GisWaterPointController::class);
+        Route::resource('pipes', GisPipeController::class);
+        Route::resource('valves', GisValveController::class);
+    });
     Route::post('service-charges/{service_charge}/confirm-payment', [ServiceChargeController::class, 'confirmPayment'])->name('service-charges.confirm-payment');
     Route::resource('service-charges', ServiceChargeController::class);
     Route::get('bills/{bill}/print', [BillController::class, 'print'])->name('bills.print');

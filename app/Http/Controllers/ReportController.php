@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Bill;
 use App\Models\Customer;
+use App\Models\Payment;
 use App\Models\ServiceCharge;
 use App\Models\Zone;
 use Carbon\Carbon;
@@ -50,7 +51,10 @@ class ReportController extends Controller
         $totalRevenue = (float) (clone $billsInScope)->sum('current_charge');
         $fixedChargeRevenue = (float) (clone $billsInScope)->sum('fixed_charge');
         $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue;
-        $totalPaid = (float) (clone $billsInScope)->sum('amount_paid');
+        $totalPaid = (float) Payment::query()
+            ->where('payable_type', Bill::class)
+            ->whereIn('payable_id', $billsInScope->clone()->select('id'))
+            ->sum('amount');
 
         $paidChargesQuery = ServiceCharge::where('status', 'paid')
             ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
@@ -66,7 +70,10 @@ class ReportController extends Controller
 
         $actualTotalPaid = $totalPaid + $paidChargesSum;
 
-        $billOutstanding = (float) (clone $billsInScope)->sum('current_balance');
+        $billOutstanding = (float) (clone $billsInScope)
+            ->withSum('payments', 'amount')
+            ->get()
+            ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
 
         $chargeOutstanding = (float) ServiceCharge::query()
             ->where('status', 'unpaid')
@@ -82,10 +89,11 @@ class ReportController extends Controller
 
         $totalOutstanding = $billOutstanding + $chargeOutstanding;
 
-        $paymentsCount = (clone $billsInScope)->where('amount_paid', '>', 0)->count() + $paidChargesQuery->count();
+        $paymentsCount = (clone $billsInScope)->whereHas('payments')->count() + $paidChargesQuery->count();
 
         // Rows for the table (Recent Bills)
         $rowsQuery = Bill::with(['customer'])
+            ->withSum('payments', 'amount')
             ->latest();
 
         if ($search) {
@@ -139,7 +147,10 @@ class ReportController extends Controller
                     });
 
                 $monthBilled = (float) (clone $billsCreatedInClip)->sum(DB::raw('current_charge + COALESCE(fixed_charge, 0)'));
-                $billAmountPaid = (float) (clone $billsCreatedInClip)->sum('amount_paid');
+                $billAmountPaid = (float) Payment::query()
+                    ->where('payable_type', Bill::class)
+                    ->whereIn('payable_id', $billsCreatedInClip->clone()->select('id'))
+                    ->sum('amount');
 
                 $paidChargesInMonth = (float) ServiceCharge::query()
                     ->where('status', 'paid')
@@ -177,11 +188,15 @@ class ReportController extends Controller
 
         $overdueBillsMeta = [
             'total_count' => (int) (clone $overdueBaseQuery)->count(),
-            'total_outstanding' => (float) (clone $overdueBaseQuery)->sum('current_balance'),
+            'total_outstanding' => (float) (clone $overdueBaseQuery)
+                ->withSum('payments', 'amount')
+                ->get()
+                ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0))),
         ];
 
         $overdueBills = (clone $overdueBaseQuery)
             ->with(['customer:id,name,account_number'])
+            ->withSum('payments', 'amount')
             ->orderBy('due_date')
             ->limit(15)
             ->get()

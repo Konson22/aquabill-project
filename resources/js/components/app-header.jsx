@@ -60,7 +60,7 @@ const rightNavItems = [
     },
 ];
 
-const activeItemStyles = 'text-blue-600 bg-white/10 dark:bg-blue-600/10 dark:text-blue-500';
+const activeItemStyles = 'text-blue-600 bg-white/10';
 
 export function AppHeader({ breadcrumbs = [] }) {
     const page = usePage();
@@ -71,7 +71,7 @@ export function AppHeader({ breadcrumbs = [] }) {
 
     return (
         <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black backdrop-blur-lg">
-            <div className="mx-auto flex h-16 items-center px-4 md:max-w-7xl">
+            <div className="mx-auto flex h-14 items-center px-4 md:max-w-7xl">
                 {/* Mobile Menu */}
                 <div className="lg:hidden text-white">
                     <Sheet>

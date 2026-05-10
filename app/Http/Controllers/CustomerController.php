@@ -9,6 +9,7 @@ use App\Models\ServiceCharge;
 use App\Models\ServiceChargeType;
 use App\Models\Tariff;
 use App\Models\Zone;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
@@ -88,20 +89,28 @@ class CustomerController extends Controller
                 'amount' => $request->service_charge_amount,
                 'issued_by' => auth()->id(),
                 'issued_date' => now(),
-                'status' => 'pending',
+                'status' => 'unpaid',
             ]);
         }
 
         return redirect()->route('customers.index')->with('success', 'Customer created successfully.');
     }
 
+    /**
+     * Tab keys exposed on the customers index page. Order is preserved
+     * by the frontend when rendering the tab strip.
+     */
+    private const TAB_KEYS = ['all', 'active', 'inactive', 'notified', 'disconnected'];
+
     public function index(Request $request): Response
     {
         $search = $request->input('search');
         $zoneId = $request->input('zone_id');
+        $tab = in_array($request->input('tab'), self::TAB_KEYS, true)
+            ? $request->input('tab')
+            : 'all';
 
-        $customers = Customer::query()
-            ->with(['zone', 'tariff', 'meters'])
+        $baseQuery = fn () => Customer::query()
             ->when($search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -115,22 +124,47 @@ class CustomerController extends Controller
             })
             ->when($zoneId, function ($query, $zoneId) {
                 $query->where('zone_id', $zoneId);
-            })
+            });
+
+        $tabCounts = collect(self::TAB_KEYS)
+            ->mapWithKeys(fn (string $key) => [$key => $this->applyTabFilter($baseQuery(), $key)->count()])
+            ->all();
+
+        $customers = $this->applyTabFilter($baseQuery(), $tab)
+            ->with(['zone', 'tariff', 'meters'])
             ->latest()
             ->paginate(100)
             ->withQueryString();
 
         $this->attachScopedLastReadingsToCustomers($customers->getCollection());
 
-        $serviceChargeTypes = ServiceChargeType::all();
         $zones = Zone::query()->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('customers/index', [
             'customers' => $customers,
-            'serviceChargeTypes' => $serviceChargeTypes,
             'zones' => $zones,
-            'filters' => $request->only(['search', 'zone_id']),
+            'tabCounts' => $tabCounts,
+            'filters' => [
+                'search' => $search,
+                'zone_id' => $zoneId,
+                'tab' => $tab,
+            ],
         ]);
+    }
+
+    /**
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    private function applyTabFilter($query, string $tab)
+    {
+        return match ($tab) {
+            'active' => $query->where('status', 'active'),
+            'inactive' => $query->where('status', 'inactive'),
+            'notified' => $query->whereHas('disconnections', fn ($q) => $q->where('status', 'notified')),
+            'disconnected' => $query->whereHas('disconnections', fn ($q) => $q->where('status', 'disconnected')),
+            default => $query,
+        };
     }
 
     public function show(Customer $customer): Response
@@ -139,7 +173,7 @@ class CustomerController extends Controller
             'zone',
             'tariff',
             'meters',
-            'bills' => fn ($query) => $query->latest()->limit(50),
+            'bills' => fn ($query) => $query->withSum('payments', 'amount')->latest()->limit(50),
             'readings' => fn ($query) => $query->latest()->limit(50),
             'serviceCharges' => fn ($query) => $query->latest()->limit(50),
             'meterHistories' => fn ($query) => $query->with(['meter', 'replacedBy'])->latest(),

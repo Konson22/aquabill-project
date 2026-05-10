@@ -60,9 +60,15 @@ test('bills index includes summed payments for each bill', function () {
         'current_charge' => 10,
         'previous_balance' => 0,
         'total_amount' => 100,
-        'amount_paid' => 40,
         'status' => 'partial',
         'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $bill->payments()->create([
+        'amount' => 40,
+        'current_balance' => 60.0,
+        'payment_date' => now()->toDateString(),
+        'payment_method' => 'cash',
     ]);
 
     $response = $this->actingAs($user)->get(route('bills.index'));
@@ -72,7 +78,140 @@ test('bills index includes summed payments for each bill', function () {
         ->component('bills/index')
         ->has('bills.data', 1)
         ->where('bills.data.0.id', $bill->id)
-        ->where('bills.data.0.amount_paid', '40.00'));
+        ->where('bills.data.0.amount_paid', '40.00')
+        ->where('filters.search', ''));
+});
+
+test('bills index search filters by customer name, zone, meter number, phone, and bill number', function () {
+    $user = User::factory()->create();
+
+    $tariff = Tariff::query()->create([
+        'name' => 'DOMESTIC',
+        'price_per_unit' => 50,
+        'fixed_charge' => 0,
+    ]);
+
+    $zoneAlpha = Zone::query()->create([
+        'name' => 'SearchZoneAlpha',
+        'supply_day' => 'Monday',
+        'supply_time' => '08:00:00',
+    ]);
+
+    $zoneBeta = Zone::query()->create([
+        'name' => 'SearchZoneBeta',
+        'supply_day' => 'Tuesday',
+        'supply_time' => '09:00:00',
+    ]);
+
+    $customerAlpha = Customer::query()->create([
+        'customer_type' => 'residential',
+        'name' => 'SearchCustomerAlpha',
+        'phone' => '555-ALPHA-SEARCH',
+        'address' => '1 Alpha St',
+        'zone_id' => $zoneAlpha->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+
+    $customerBeta = Customer::query()->create([
+        'customer_type' => 'residential',
+        'name' => 'SearchCustomerBeta',
+        'phone' => '555-BETA-SEARCH',
+        'address' => '2 Beta St',
+        'zone_id' => $zoneBeta->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+
+    $meterAlpha = Meter::query()->create([
+        'customer_id' => $customerAlpha->id,
+        'meter_number' => 'MTR-SEARCH-ALPHA-001',
+        'status' => 'active',
+    ]);
+
+    $meterBeta = Meter::query()->create([
+        'customer_id' => $customerBeta->id,
+        'meter_number' => 'MTR-SEARCH-BETA-002',
+        'status' => 'active',
+    ]);
+
+    $readingAlpha = MeterReading::query()->create([
+        'meter_id' => $meterAlpha->id,
+        'reading_date' => now()->toDateString(),
+        'previous_reading' => 0,
+        'current_reading' => 10,
+        'notes' => 'Test',
+    ]);
+
+    $readingBeta = MeterReading::query()->create([
+        'meter_id' => $meterBeta->id,
+        'reading_date' => now()->toDateString(),
+        'previous_reading' => 0,
+        'current_reading' => 5,
+        'notes' => 'Test',
+    ]);
+
+    $billAlpha = Bill::query()->create([
+        'customer_id' => $customerAlpha->id,
+        'meter_id' => $meterAlpha->id,
+        'reading_id' => $readingAlpha->id,
+        'consumption' => 10,
+        'unit_price' => 1,
+        'fixed_charge' => 0,
+        'current_charge' => 10,
+        'previous_balance' => 0,
+        'total_amount' => 100,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $billBeta = Bill::query()->create([
+        'customer_id' => $customerBeta->id,
+        'meter_id' => $meterBeta->id,
+        'reading_id' => $readingBeta->id,
+        'consumption' => 5,
+        'unit_price' => 1,
+        'fixed_charge' => 0,
+        'current_charge' => 5,
+        'previous_balance' => 0,
+        'total_amount' => 50,
+        'status' => 'pending',
+        'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $billAlpha->refresh();
+
+    $acting = $this->actingAs($user);
+
+    $acting->get(route('bills.index', ['search' => 'SearchCustomerAlpha']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('bills.data', 1)
+            ->where('bills.data.0.id', $billAlpha->id));
+
+    $acting->get(route('bills.index', ['search' => 'SearchZoneAlpha']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('bills.data', 1)
+            ->where('bills.data.0.id', $billAlpha->id));
+
+    $acting->get(route('bills.index', ['search' => 'MTR-SEARCH-BETA-002']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('bills.data', 1)
+            ->where('bills.data.0.id', $billBeta->id));
+
+    $acting->get(route('bills.index', ['search' => '555-ALPHA-SEARCH']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('bills.data', 1)
+            ->where('bills.data.0.id', $billAlpha->id));
+
+    $acting->get(route('bills.index', ['search' => $billAlpha->bill_no]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('bills.data', 1)
+            ->where('bills.data.0.id', $billAlpha->id));
 });
 
 test('bill payment store rejects partial paid forwarded statuses', function () {
@@ -124,9 +263,15 @@ test('bill payment store rejects partial paid forwarded statuses', function () {
         'current_charge' => 10,
         'previous_balance' => 0,
         'total_amount' => 100,
-        'amount_paid' => 40,
         'status' => 'partial',
         'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $partialBill->payments()->create([
+        'amount' => 40,
+        'current_balance' => 60.0,
+        'payment_date' => now()->toDateString(),
+        'payment_method' => 'cash',
     ]);
 
     $this->actingAs($user)->post(route('bills.payments.store', $partialBill), [

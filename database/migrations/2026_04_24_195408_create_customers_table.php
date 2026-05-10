@@ -21,6 +21,8 @@ return new class extends Migration
             $table->string('national_id')->nullable();
             $table->string('plot_no')->nullable();
             $table->text('address');
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
             $table->foreignId('zone_id')->constrained('zones')->onDelete('cascade');
             $table->foreignId('tariff_id')->constrained('tariffs')->onDelete('cascade');
             $table->date('connection_date')->nullable();

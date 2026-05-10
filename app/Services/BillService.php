@@ -59,9 +59,12 @@ class BillService
         $previousBills = Bill::query()
             ->where('customer_id', $customer->id)
             ->whereIn('status', ['pending', 'partial'])
-            ->get(['id', 'total_amount', 'current_balance']);
+            ->withSum('payments', 'amount')
+            ->get(['id', 'total_amount']);
 
-        $previousBalance = $previousBills->sum(fn (Bill $bill) => (float) $bill->current_balance);
+        $previousBalance = $previousBills->sum(function (Bill $bill): float {
+            return max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0));
+        });
 
         $lastOpenBill = Bill::query()
             ->where('customer_id', $customer->id)
@@ -109,6 +112,8 @@ class BillService
             return;
         }
 
+        $bill->loadSum('payments', 'amount');
+
         $consumption = max(0.0, (float) $reading->consumption);
         $unitPrice = (float) $bill->unit_price;
         $fixedCharge = (float) $bill->fixed_charge;
@@ -116,7 +121,7 @@ class BillService
         $previousBalance = (float) $bill->previous_balance;
         $totalAmount = $currentCharge + $previousBalance;
 
-        $paid = (float) $bill->amount_paid;
+        $paid = $bill->paidTotalFloat();
 
         $status = match (true) {
             $paid <= 0.00001 => 'pending',
@@ -137,10 +142,11 @@ class BillService
         $bills = Bill::query()
             ->where('customer_id', $customerId)
             ->whereIn('status', ['pending', 'partial', 'paid'])
-            ->get(['id', 'total_amount', 'amount_paid', 'status']);
+            ->withSum('payments', 'amount')
+            ->get(['id', 'total_amount', 'status']);
 
         foreach ($bills as $bill) {
-            $paidTotal = (float) $bill->amount_paid;
+            $paidTotal = (float) ($bill->payments_sum_amount ?? 0);
 
             $billTotal = (float) $bill->total_amount;
 

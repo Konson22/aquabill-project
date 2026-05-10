@@ -28,9 +28,25 @@ class BillPaymentController extends Controller
 
         DB::transaction(function () use ($validated, $bill) {
             $increment = (float) $validated['amount'];
-            $paidTotal = round((float) $bill->amount_paid + $increment, 2);
             $billTotal = (float) $bill->total_amount;
-            $balance = max(0.0, $billTotal - $paidTotal);
+            $alreadyPaid = round((float) $bill->payments()->sum('amount'), 2);
+            $balanceAfter = max(0.0, round($billTotal - $alreadyPaid - $increment, 2));
+
+            $bill->payments()->create([
+                'amount' => $increment,
+                'current_balance' => $balanceAfter,
+                'payment_date' => $validated['payment_date'],
+                'payment_method' => $validated['payment_method'],
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'recorded_by' => auth()->id(),
+            ]);
+
+            $bill->unsetRelation('payments');
+            $bill->loadSum('payments', 'amount');
+
+            $paidTotal = round($bill->paidTotalFloat(), 2);
+            $billTotal = (float) $bill->total_amount;
 
             $status = match (true) {
                 $paidTotal <= 0.0 => 'pending',
@@ -39,8 +55,6 @@ class BillPaymentController extends Controller
             };
 
             $bill->update([
-                'amount_paid' => $paidTotal,
-                'current_balance' => $balance,
                 'status' => $status,
             ]);
         });

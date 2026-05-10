@@ -19,6 +19,8 @@ import {
     GraduationCap,
     PieChart,
     Droplets,
+    BarChart3,
+    Globe2,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -34,7 +36,6 @@ const getNavItems = (user) => {
     if (isAdmin) {
         return [
             ...items,
-            { title: 'User Management', url: route('users.index'), icon: Users },
             { title: 'Revenue', url: route('reports.revenue'), icon: CreditCard },
             { title: 'Water usage', url: route('reports.water-usage'), icon: Droplets },
             { title: 'Customers', url: route('customers.index'), icon: Users },
@@ -44,15 +45,16 @@ const getNavItems = (user) => {
             { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
             { title: 'Meters', url: route('meters.index'), icon: MapPin },
             { title: 'Zones', url: route('zones.index'), icon: MapPin },
+            { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 },
             { title: 'System Settings', url: route('admin.settings'), icon: Settings }
         ];
     }
 
     if (department === 'admin') {
         items.push(
-            { title: 'User Management', url: route('users.index'), icon: Users },
             { title: 'Customers', url: route('customers.index'), icon: Users },
             { title: 'Zones', url: route('zones.index'), icon: MapPin },
+            { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 },
             { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
             { title: 'Bills', url: route('bills.index'), icon: FileText },
             { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard },
@@ -62,6 +64,7 @@ const getNavItems = (user) => {
     } else if (department === 'finance') {
         items.push(
             { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
+            { title: 'Reports', url: route('finance.reports.index'), icon: BarChart3 },
             { title: 'Revenue', url: route('reports.revenue'), icon: CreditCard },
             { title: 'Water usage', url: route('reports.water-usage'), icon: Droplets },
             { title: 'Bills', url: route('bills.index'), icon: FileText },
@@ -70,6 +73,7 @@ const getNavItems = (user) => {
     } else if (department === 'ledger') {
         items.push(
             { title: 'Zones', url: route('zones.index'), icon: MapPin },
+            { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 },
             { title: 'Meters', url: route('meters.index'), icon: MapPin },
             { title: 'Meter Readings', url: route('readings.index'), icon: MapPin },
             { title: 'Billing Cycles', url: '#', icon: Calendar }
@@ -92,6 +96,11 @@ const getNavItems = (user) => {
             { title: 'Customers', url: route('customers.index'), icon: Users },
             { title: 'Complaints', url: '#', icon: FileText },
             { title: 'Tickets', url: '#', icon: Clock }
+        );
+    } else if (department === 'distribution') {
+        items.push(
+            { title: 'Zones', url: route('zones.index'), icon: MapPin },
+            { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 }
         );
     }
 

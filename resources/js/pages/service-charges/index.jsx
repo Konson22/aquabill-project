@@ -42,6 +42,29 @@ import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
 import ConfirmPaymentModal from './components/confirm-payment-modal';
 
+/**
+ * @param {string | null | undefined} value
+ */
+function formatIssuedDate(value) {
+    if (!value) {
+        return '—';
+    }
+    try {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) {
+            return String(value);
+        }
+
+        return d.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
+    } catch {
+        return String(value);
+    }
+}
+
 export default function ServiceChargesIndex({ charges }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -309,7 +332,7 @@ export default function ServiceChargesIndex({ charges }) {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="py-4 text-muted-foreground text-sm">
-                                                {charge.issued_date}
+                                                {formatIssuedDate(charge.issued_date)}
                                             </TableCell>
                                             <TableCell className="py-4">
                                                 {getStatusBadge(charge.status)}
@@ -323,9 +346,14 @@ export default function ServiceChargesIndex({ charges }) {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="w-48 rounded-lg p-1 shadow-lg border">
                                                         <DropdownMenuLabel className="px-3 py-2 text-xs font-bold text-muted-foreground">Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem className="rounded-md py-2 px-3 text-sm font-bold cursor-pointer">
-                                                            <ArrowUpRight className="mr-2 h-4 w-4" />
-                                                            View Details
+                                                        <DropdownMenuItem asChild>
+                                                            <Link
+                                                                href={route('service-charges.show', charge.id)}
+                                                                className="flex cursor-pointer items-center rounded-md py-2 px-3 text-sm font-bold"
+                                                            >
+                                                                <ArrowUpRight className="mr-2 h-4 w-4" />
+                                                                View Details
+                                                            </Link>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem className="rounded-md py-2 px-3 text-sm font-bold cursor-pointer">
                                                             <FileText className="mr-2 h-4 w-4" />

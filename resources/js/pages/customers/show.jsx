@@ -16,7 +16,6 @@ import {
     Receipt,
     User,
     Wrench,
-    BellOff,
     PowerOff,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,7 +27,6 @@ import CustomerServiceCharges from './components/customer-service-charges';
 import DisconnectionManagement from './components/disconnection-management';
 import MeterStatusModal from './components/meter-status-modal';
 import ReplaceMeterModal from './components/replace-meter-modal';
-import { formatCurrency } from '@/lib/utils';
 import { useState } from 'react';
 
 export default function Show({ customer, unassignedMeters = [] }) {
@@ -36,7 +34,7 @@ export default function Show({ customer, unassignedMeters = [] }) {
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false);
     const [isReadingModalOpen, setIsReadingModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('customer-info');
+    const [activeTab, setActiveTab] = useState('bills');
 
     const breadcrumbs = [
         { title: 'Customers', href: '/customers' },
@@ -60,16 +58,8 @@ export default function Show({ customer, unassignedMeters = [] }) {
     };
 
     const statusVariant = customer?.status === 'active' ? 'success' : 'secondary';
-    const bills = customer?.bills ?? [];
-    const totalBills = bills.length;
-    const paidBills = bills.filter((bill) => bill?.status === 'paid').length;
-    const unpaidBills = bills.filter((bill) => bill?.status === 'pending' || bill?.status === 'partial').length;
-    const overdueBills = bills.filter((bill) => bill?.status === 'overdue').length;
     const meters = customer?.meters ?? [];
     const meterHistories = customer?.meterHistories ?? customer?.meter_histories ?? [];
-    const unpaidAmount = bills
-        .filter((bill) => bill?.status !== 'paid')
-        .reduce((carry, bill) => carry + Number(bill?.total_amount ?? bill?.total ?? 0), 0);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -110,181 +100,125 @@ export default function Show({ customer, unassignedMeters = [] }) {
                     </div>
                 </div>
 
-                {/* Header */}
-                <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                    <div className="space-y-1">
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                            <User className="h-6 w-6 text-primary" />
-                            {customer?.name ?? 'Customer'}
-                        </h1>
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <span className="font-mono font-bold text-primary">
-                                {customer?.account_number ?? '—'}
-                            </span>
-                            <span className="text-muted-foreground/60">•</span>
-                            <span className="capitalize">{customer?.customer_type ?? '—'}</span>
-                            <span className="text-muted-foreground/60">•</span>
-                            <Badge variant={statusVariant} className="capitalize text-[10px]">
-                                <BadgeCheck className="mr-1.5 h-3 w-3" />
-                                {customer?.status ?? 'unknown'}
-                            </Badge>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="text-[10px] uppercase tracking-widest font-black">
-                            Zone: {customer?.zone?.name ?? '—'}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] uppercase tracking-widest font-black">
-                            Tariff: {customer?.tariff?.name ?? '—'}
-                        </Badge>
-                    </div>
-                </div>
-
-                {/* Billing summary cards */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <Card className="rounded-xl shadow-sm">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Receipt className="h-4 w-4 text-muted-foreground" />
-                                Total Bills
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-black">{totalBills}</p>
-                            <p className="text-xs text-muted-foreground">All issued invoices</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="rounded-xl shadow-sm">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <CreditCard className="h-4 w-4 text-muted-foreground" />
-                                Unpaid Bills
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-black">{unpaidBills}</p>
-                            <p className="text-xs text-muted-foreground">Current outstanding invoices</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="rounded-xl shadow-sm">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Activity className="h-4 w-4 text-muted-foreground" />
-                                Overdue Bills
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-black">{overdueBills}</p>
-                            <p className="text-xs text-muted-foreground">Past due invoices</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="rounded-xl shadow-sm">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <BadgeCheck className="h-4 w-4 text-muted-foreground" />
-                                Amount Due
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-xl font-black font-mono">{formatCurrency(unpaidAmount)}</p>
-                            <p className="text-xs text-muted-foreground">{paidBills} paid bill(s)</p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Customer Data Tabs */}
-                <Card className="rounded-xl border shadow-sm">
-                    <CardContent className="p-4 md:p-6">
-                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg bg-muted/40 p-1 md:grid-cols-7">
-                                <TabsTrigger value="customer-info" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                    <User className="mr-2 h-4 w-4" />
-                                    Info
-                                </TabsTrigger>
-                                <TabsTrigger value="disconnections" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                    <PowerOff className="mr-2 h-4 w-4" />
-                                    Status
-                                </TabsTrigger>
-                                <TabsTrigger value="bills" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                    <Receipt className="mr-2 h-4 w-4" />
-                                    Bills
-                                </TabsTrigger>
-                                <TabsTrigger value="readings" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                    <Droplet className="mr-2 h-4 w-4" />
-                                    Readings
-                                </TabsTrigger>
-                                <TabsTrigger value="meters" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                    <Gauge className="mr-2 h-4 w-4" />
-                                    Meters
-                                </TabsTrigger>
-                                <TabsTrigger value="payments" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                    <CreditCard className="mr-2 h-4 w-4" />
-                                    Payments
-                                </TabsTrigger>
-                                <TabsTrigger value="charges" className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                    <Wrench className="mr-2 h-4 w-4" />
-                                    Charges
-                                </TabsTrigger>
-                            </TabsList>
-
-                            <div className="mt-5">
-                                <TabsContent value="customer-info" className="m-0 border-none p-0 outline-none">
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                        <Card className="rounded-xl shadow-sm">
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base flex items-center gap-2">
-                                                    <Phone className="h-4 w-4 text-muted-foreground" />
-                                                    Contact
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="space-y-1">
-                                                <p className="text-sm font-medium">{customer?.phone ?? '—'}</p>
-                                                <p className="text-xs text-muted-foreground">{customer?.email ?? 'No email'}</p>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card className="rounded-xl shadow-sm">
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base flex items-center gap-2">
-                                                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                                                    Address
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="space-y-1">
-                                                <p className="text-sm font-medium leading-relaxed">{customer?.address ?? '—'}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Plot: {customer?.plot_no ?? '—'}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    National ID: {customer?.national_id ?? '—'}
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card className="rounded-xl shadow-sm">
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base flex items-center gap-2">
-                                                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    Connection
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="space-y-1">
-                                                <p className="text-sm font-medium">{formatDate(customer?.connection_date)}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Created: {formatDate(customer?.created_at)}
-                                                </p>
-                                            </CardContent>
-                                        </Card>
+                <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
+                    <div className="lg:col-span-4">
+                        <Card className="rounded-xl border shadow-sm">
+                            <CardHeader className="pb-4">
+                                <div className="flex items-start gap-3">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                        <User className="h-5 w-5" />
                                     </div>
-                                </TabsContent>
+                                    <div className="min-w-0 space-y-2">
+                                        <CardTitle className="text-xl font-bold leading-tight">
+                                            {customer?.name ?? 'Customer'}
+                                        </CardTitle>
+                                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                            <span className="font-mono font-bold text-primary">
+                                                {customer?.account_number ?? '—'}
+                                            </span>
+                                            <span className="text-muted-foreground/60">•</span>
+                                            <span className="capitalize">{customer?.customer_type ?? '—'}</span>
+                                            <span className="text-muted-foreground/60">•</span>
+                                            <Badge variant={statusVariant} className="capitalize text-[10px]">
+                                                <BadgeCheck className="mr-1.5 h-3 w-3" />
+                                                {customer?.status ?? 'unknown'}
+                                            </Badge>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 pt-1">
+                                            <Badge variant="outline" className="text-[10px] uppercase tracking-widest font-black">
+                                                Zone: {customer?.zone?.name ?? '—'}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-[10px] uppercase tracking-widest font-black">
+                                                Tariff: {customer?.tariff?.name ?? '—'}
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-6 border-t pt-6">
+                                <section className="space-y-2">
+                                    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        <Phone className="h-3.5 w-3.5" />
+                                        Contact
+                                    </h3>
+                                    <p className="text-sm font-medium text-foreground">{customer?.phone ?? '—'}</p>
+                                    <p className="text-xs text-muted-foreground">{customer?.email ?? 'No email'}</p>
+                                </section>
+                                <section className="space-y-2 border-t pt-6">
+                                    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        <MapPin className="h-3.5 w-3.5" />
+                                        Address
+                                    </h3>
+                                    <p className="text-sm font-medium leading-relaxed text-foreground">{customer?.address ?? '—'}</p>
+                                    <p className="text-xs text-muted-foreground">Plot: {customer?.plot_no ?? '—'}</p>
+                                    <p className="text-xs text-muted-foreground">National ID: {customer?.national_id ?? '—'}</p>
+                                </section>
+                                <section className="space-y-2 border-t pt-6">
+                                    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        <Calendar className="h-3.5 w-3.5" />
+                                        Connection
+                                    </h3>
+                                    <p className="text-sm font-medium text-foreground">{formatDate(customer?.connection_date)}</p>
+                                    <p className="text-xs text-muted-foreground">Created: {formatDate(customer?.created_at)}</p>
+                                </section>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                                <TabsContent value="disconnections" className="m-0 border-none p-0 outline-none">
-                                    <DisconnectionManagement customer={customer} />
-                                </TabsContent>
+                    {/* Right: tabbed data */}
+                    <div className="lg:col-span-8">
+                        <Card className="rounded-xl border shadow-sm">
+                            <CardContent className="p-4 md:p-6">
+                                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                                    <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-lg bg-muted/40 p-1 sm:grid-cols-3 lg:grid-cols-6">
+                                        <TabsTrigger
+                                            value="overview"
+                                            className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                                        >
+                                            <PowerOff className="mr-2 h-4 w-4" />
+                                            Overview
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="bills"
+                                            className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                                        >
+                                            <Receipt className="mr-2 h-4 w-4" />
+                                            Bills
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="readings"
+                                            className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                                        >
+                                            <Droplet className="mr-2 h-4 w-4" />
+                                            Readings
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="meters"
+                                            className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                                        >
+                                            <Gauge className="mr-2 h-4 w-4" />
+                                            Meters
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="payments"
+                                            className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                                        >
+                                            <CreditCard className="mr-2 h-4 w-4" />
+                                            Payments
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="charges"
+                                            className="py-2.5 text-xs font-bold uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                                        >
+                                            <Wrench className="mr-2 h-4 w-4" />
+                                            Charges
+                                        </TabsTrigger>
+                                    </TabsList>
+
+                                    <div className="mt-5">
+                                        <TabsContent value="overview" className="m-0 border-none p-0 outline-none">
+                                            <DisconnectionManagement customer={customer} />
+                                        </TabsContent>
 
                                 <TabsContent value="bills" className="m-0 border-none p-0 outline-none">
                                     <CustomerBills bills={customer?.bills} />
@@ -408,6 +342,8 @@ export default function Show({ customer, unassignedMeters = [] }) {
                         </Tabs>
                     </CardContent>
                 </Card>
+                    </div>
+                </div>
             </div>
 
             <MeterStatusModal

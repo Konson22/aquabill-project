@@ -153,12 +153,42 @@ function csvCell(value) {
 }
 
 /**
- * @param {RevenueSummary} summary
  * @param {RevenueSummaryFilters | undefined} filters
  */
-function exportSummaryCsv(summary, filters) {
+function exportYearFromFilters(filters) {
+    const from = filters?.from?.trim() ?? '';
+    if (from.length >= 4) {
+        const y = Number.parseInt(from.slice(0, 4), 10);
+        if (!Number.isNaN(y)) {
+            return y;
+        }
+    }
+    const to = filters?.to?.trim() ?? '';
+    if (to.length >= 4) {
+        const y = Number.parseInt(to.slice(0, 4), 10);
+        if (!Number.isNaN(y)) {
+            return y;
+        }
+    }
+
+    return new Date().getFullYear();
+}
+
+/**
+ * @param {RevenueSummary} summary
+ * @param {RevenueSummaryFilters | undefined} filters
+ * @param {number} [reportYear] Calendar year shown in the bill-period control (matches UI when set).
+ */
+function exportSummaryCsv(summary, filters, reportYear) {
+    const year =
+        typeof reportYear === 'number' && !Number.isNaN(reportYear)
+            ? reportYear
+            : exportYearFromFilters(filters);
+    const periodLabel = summaryPeriodLabel(filters);
     const lines = [
-        ['Period', summaryPeriodLabel(filters)],
+        ['Revenue report', ''],
+        ['Year', String(year)],
+        ['Period', periodLabel],
         ['Metric', 'Amount (SSP)'],
         ['Water revenue', summary.total_revenue],
         ['Fixed charges', summary.fixed_charge_revenue],
@@ -309,7 +339,7 @@ export function RevenueSummaryTable({ summary, filters, onBillDateRangeChange, b
                         variant="outline"
                         size="sm"
                         className="h-9 shrink-0"
-                        onClick={() => exportSummaryCsv(s, filters)}
+                        onClick={() => exportSummaryCsv(s, filters, year)}
                     >
                         <Download className="mr-2 h-4 w-4" aria-hidden />
                         Export CSV

@@ -61,7 +61,7 @@ export default function EditReading({ reading }) {
                             ) : null}
                         </p>
                         {hasBill && (
-                            <p className="mt-2 text-sm text-amber-700 dark:text-amber-500">
+                            <p className="mt-2 text-sm text-amber-700">
                                 This reading has a linked invoice; consumption and charges will be recalculated from the
                                 updated values.
                             </p>

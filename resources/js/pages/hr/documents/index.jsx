@@ -30,7 +30,7 @@ export default function HRDocumentsIndex({ expiringDocuments }) {
                     <p className="text-sm text-muted-foreground">Credentials and files expiring within the next 30 days.</p>
                 </div>
 
-                <Card className="border-amber-200/80 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/20">
+                <Card className="border-amber-200/80 bg-amber-50/40">
                     <CardContent className="flex items-start gap-3 py-4 text-sm">
                         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
                         <p>

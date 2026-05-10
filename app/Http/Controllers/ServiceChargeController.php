@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\ServiceCharge;
+use App\Models\ServiceChargeType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ServiceChargeController extends Controller
 {
@@ -32,6 +35,17 @@ class ServiceChargeController extends Controller
     }
 
     /**
+     * Show the form for issuing a service charge for a customer (full page).
+     */
+    public function createForCustomer(Customer $customer): Response
+    {
+        return Inertia::render('customers/service-charges/create', [
+            'customer' => $customer->only(['id', 'name', 'account_number', 'status']),
+            'serviceChargeTypes' => ServiceChargeType::query()->orderBy('name')->get(['id', 'name', 'amount']),
+        ]);
+    }
+
+    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request, Customer $customer)
@@ -53,6 +67,12 @@ class ServiceChargeController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
+        if ($request->header('X-Inertia')) {
+            return redirect()
+                ->route('service-charges.index')
+                ->with('success', 'Service charge created successfully.');
+        }
+
         return response()->json([
             'message' => 'Service charge created successfully',
             'charge' => $serviceCharge->load(['customer', 'serviceChargeType']),
@@ -62,9 +82,17 @@ class ServiceChargeController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(ServiceCharge $serviceCharge): Response
     {
-        //
+        $serviceCharge->load([
+            'customer.zone',
+            'serviceChargeType',
+            'issuer:id,name,email',
+        ]);
+
+        return Inertia::render('service-charges/show', [
+            'charge' => $serviceCharge,
+        ]);
     }
 
     /**
@@ -93,9 +121,25 @@ class ServiceChargeController extends Controller
     {
         $charge = ServiceCharge::findOrFail($id);
 
-        $charge->update([
-            'status' => 'paid',
-        ]);
+        if ($charge->status === 'paid') {
+            return back()->with('warning', 'This service charge is already marked as paid.');
+        }
+
+        DB::transaction(function () use ($charge, $request): void {
+            $charge->update([
+                'status' => 'paid',
+            ]);
+
+            $charge->payments()->create([
+                'amount' => (float) $charge->amount,
+                'current_balance' => 0.0,
+                'payment_date' => now()->toDateString(),
+                'payment_method' => $request->input('payment_method', 'cash'),
+                'reference_number' => $request->input('reference_number'),
+                'notes' => $request->input('notes'),
+                'recorded_by' => auth()->id(),
+            ]);
+        });
 
         return back()->with('success', 'Service charge payment confirmed.');
     }

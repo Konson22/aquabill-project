@@ -339,9 +339,9 @@ export default function DisconnectionStatusContent({ customer }) {
                 )}
 
                 {customer.status === 'disconnected' && (
-                    <Card className="rounded-xl border border-green-200 bg-green-50/40 shadow-sm dark:border-green-900 dark:bg-green-950/20">
+                    <Card className="rounded-xl border border-green-200 bg-green-50/40 shadow-sm">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base text-green-700 dark:text-green-400">
+                            <CardTitle className="flex items-center gap-2 text-base text-green-700">
                                 <RotateCcw className="h-4 w-4" />
                                 Reconnect water service
                             </CardTitle>
@@ -369,12 +369,12 @@ export default function DisconnectionStatusContent({ customer }) {
                 )}
 
                 {activeNotice && (
-                    <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950/30">
+                    <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
                         <div className="flex items-start gap-4">
                             <AlertCircle className="mt-0.5 h-5 w-5 text-orange-600" />
                             <div className="flex-1 space-y-4">
                                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                    <h4 className="text-sm font-bold uppercase tracking-tight text-orange-900 dark:text-orange-100">
+                                    <h4 className="text-sm font-bold uppercase tracking-tight text-orange-900">
                                         Two-Phase Notice Timeline
                                     </h4>
                                     <Button variant="outline" size="sm" className="shrink-0 border-orange-300 bg-white/80 text-orange-900 hover:bg-white" asChild>
@@ -389,30 +389,30 @@ export default function DisconnectionStatusContent({ customer }) {
                                     </Button>
                                 </div>
 
-                                <div className="relative h-2 w-full overflow-hidden rounded-full bg-orange-200 dark:bg-orange-900/50">
+                                <div className="relative h-2 w-full overflow-hidden rounded-full bg-orange-200">
                                     <div className="absolute bottom-0 left-0 top-0 w-2/3 bg-orange-500" />
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-3">
                                     <div>
-                                        <p className="mb-1 font-medium uppercase text-orange-800/60 dark:text-orange-200/70">
+                                        <p className="mb-1 font-medium uppercase text-orange-800/60">
                                             Phase 1: 30 Days Notice
                                         </p>
-                                        <p className="font-bold text-orange-900 dark:text-orange-100">
+                                        <p className="font-bold text-orange-900">
                                             Ends: {formatDate(activeNotice.notice_ends_at)}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="mb-1 font-medium uppercase text-orange-800/60 dark:text-orange-200/70">
+                                        <p className="mb-1 font-medium uppercase text-orange-800/60">
                                             Phase 2: 15 Days Grace
                                         </p>
-                                        <p className="font-bold text-orange-900 dark:text-orange-100">
+                                        <p className="font-bold text-orange-900">
                                             Ends: {formatDate(activeNotice.grace_period_ends_at)}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="mb-1 font-medium uppercase text-orange-800/60 dark:text-orange-200/70">Eligibility</p>
-                                        <p className="font-black text-red-700 dark:text-red-400">
+                                        <p className="mb-1 font-medium uppercase text-orange-800/60">Eligibility</p>
+                                        <p className="font-black text-red-700">
                                             Disconnection Eligible After {formatDate(activeNotice.grace_period_ends_at)}
                                         </p>
                                     </div>

@@ -46,4 +46,28 @@ class Zone extends Model
     {
         return $this->hasManyThrough(Bill::class, Customer::class);
     }
+
+    /**
+     * @return HasMany<WaterPoint, Zone>
+     */
+    public function waterPoints(): HasMany
+    {
+        return $this->hasMany(WaterPoint::class);
+    }
+
+    /**
+     * @return HasMany<Pipe, Zone>
+     */
+    public function pipes(): HasMany
+    {
+        return $this->hasMany(Pipe::class);
+    }
+
+    /**
+     * @return HasMany<Valve, Zone>
+     */
+    public function valves(): HasMany
+    {
+        return $this->hasMany(Valve::class);
+    }
 }

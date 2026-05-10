@@ -403,7 +403,6 @@ test('revenue report chart monthly collection rate uses billed vs collected in t
         'current_charge' => 50,
         'previous_balance' => 0,
         'total_amount' => 50,
-        'amount_paid' => 50,
         'status' => 'paid',
         'due_date' => Carbon::create($year, 2, 28)->toDateString(),
     ]);
@@ -411,6 +410,13 @@ test('revenue report chart monthly collection rate uses billed vs collected in t
         'created_at' => Carbon::create($year, 2, 12, 12, 0, 0),
         'updated_at' => Carbon::create($year, 2, 12, 12, 0, 0),
     ])->saveQuietly();
+
+    $bill->payments()->create([
+        'amount' => 50,
+        'current_balance' => 0.0,
+        'payment_date' => Carbon::create($year, 2, 15)->toDateString(),
+        'payment_method' => 'cash',
+    ]);
 
     $from = sprintf('%d-01-01', $year);
     $to = sprintf('%d-12-31', $year);

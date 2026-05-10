@@ -14,7 +14,7 @@ export default function PrintSingle({ bill }) {
     return (
         <div className="min-h-screen bg-white px-4 py-6 print:p-0">
             <Head
-                title={`Print Bill #${bill?.bill_number ?? bill?.id ?? ''}`}
+                title={`Print Bill #${bill?.bill_no ?? bill?.id ?? ''}`}
             />
 
             <div className="mx-auto w-full max-w-[21cm]">

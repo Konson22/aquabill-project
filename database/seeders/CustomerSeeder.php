@@ -15,6 +15,19 @@ use Illuminate\Support\Facades\File;
 class CustomerSeeder extends Seeder
 {
     /**
+     * Center coordinates for Juba Jebel market (Bongroki / HAI GWONGOROKI).
+     */
+    private const JEBEL_MARKET_LATITUDE = 4.8594;
+
+    private const JEBEL_MARKET_LONGITUDE = 31.5713;
+
+    /**
+     * Approximate spread around the market center, in decimal degrees.
+     * 0.005 deg ≈ 550 m, so customers will fall within ~550 m of the market.
+     */
+    private const COORDINATE_SPREAD = 0.005;
+
+    /**
      * Run the database seeds.
      */
     public function run(): void
@@ -74,6 +87,8 @@ class CustomerSeeder extends Seeder
                     $connectionDate = $this->parseConnectionDate(Arr::get($row, 'contractDate'));
                     $initialReading = $this->parseInitialReading(Arr::get($row, 'initialReading'));
 
+                    [$latitude, $longitude] = $this->randomCoordinatesNearJebelMarket();
+
                     $customerAttributes = [
                         'customer_type' => $customerType,
                         'name' => $name,
@@ -82,6 +97,8 @@ class CustomerSeeder extends Seeder
                         'national_id' => null,
                         'address' => $address !== '' ? $address : $area,
                         'plot_no' => $housePlotNo !== '' ? $housePlotNo : null,
+                        'latitude' => $latitude,
+                        'longitude' => $longitude,
                         'zone_id' => $zone->id,
                         'tariff_id' => $tariff->id,
                         'connection_date' => $connectionDate,
@@ -126,6 +143,23 @@ class CustomerSeeder extends Seeder
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Generate a random {latitude, longitude} pair within COORDINATE_SPREAD
+     * decimal degrees of the Juba Jebel market (Bongroki) center.
+     *
+     * @return array{0: float, 1: float}
+     */
+    private function randomCoordinatesNearJebelMarket(): array
+    {
+        $offsetLat = (mt_rand(-100000, 100000) / 100000) * self::COORDINATE_SPREAD;
+        $offsetLng = (mt_rand(-100000, 100000) / 100000) * self::COORDINATE_SPREAD;
+
+        return [
+            round(self::JEBEL_MARKET_LATITUDE + $offsetLat, 7),
+            round(self::JEBEL_MARKET_LONGITUDE + $offsetLng, 7),
+        ];
     }
 
     private function parseInitialReading(mixed $value): ?float

@@ -91,3 +91,43 @@ test('api reading store without bill_no lets server generate bill number', funct
     expect($bill)->not->toBeNull();
     expect($bill->bill_no)->toStartWith('BILL-');
 });
+
+test('api reading store accepts mobile billNo camelCase as bill_no', function () {
+    $user = User::factory()->create();
+    $tariff = Tariff::query()->create([
+        'name' => 'DOMESTIC',
+        'price_per_unit' => 50,
+        'fixed_charge' => 10,
+    ]);
+    $zone = Zone::query()->create([
+        'name' => 'API Zone Reading 3',
+        'status' => 'active',
+    ]);
+    $customer = Customer::query()->create([
+        'customer_type' => 'residential',
+        'name' => 'Reading API Customer 3',
+        'phone' => '777888999',
+        'address' => '3 Test St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+    Meter::query()->create([
+        'customer_id' => $customer->id,
+        'meter_number' => 'MTR-API-READ-3',
+        'status' => 'active',
+    ]);
+
+    $response = $this->actingAs($user, 'sanctum')->postJson('/api/readings', [
+        'customer_id' => $customer->id,
+        'reading_date' => '2026-05-03',
+        'current_reading' => 300,
+        'billNo' => 'MOBILE-CAMEL-777',
+    ]);
+
+    $response->assertCreated();
+    $reading = MeterReading::query()->where('customer_id', $customer->id)->latest('id')->first();
+    expect($reading->bill_no)->toBe('MOBILE-CAMEL-777');
+    $bill = Bill::query()->where('reading_id', $reading->id)->first();
+    expect($bill->bill_no)->toBe('MOBILE-CAMEL-777');
+});

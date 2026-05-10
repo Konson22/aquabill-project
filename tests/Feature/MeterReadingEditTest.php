@@ -60,7 +60,6 @@ function seedReadingEditScenario(): array
         'current_charge' => 200,
         'previous_balance' => 0,
         'total_amount' => 200,
-        'amount_paid' => 0,
         'status' => 'pending',
         'due_date' => now()->addDays(30)->toDateString(),
     ]);

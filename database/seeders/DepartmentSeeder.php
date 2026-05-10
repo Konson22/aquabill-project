@@ -15,6 +15,7 @@ class DepartmentSeeder extends Seeder
             ['name' => 'ledger', 'description' => 'Billing and meter reading management'],
             ['name' => 'hr', 'description' => 'Human resources and staff management'],
             ['name' => 'customer_care', 'description' => 'Customer support and complaints handling'],
+            ['name' => 'distribution', 'description' => 'Water network distribution and GIS infrastructure'],
         ];
 
         foreach ($departments as $dept) {

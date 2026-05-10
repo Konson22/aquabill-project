@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateCustomerCoordinatesBatchRequest;
 use App\Models\Customer;
 use Carbon\Carbon;
 use DateTimeInterface;
@@ -53,6 +54,51 @@ class CustomerController extends Controller
     }
 
     /**
+     * Batch-update customer map coordinates. Request body: JSON array of
+     * { record_id, customer_id, latitude, longitude }. Returns record_ids that were saved.
+     */
+    public function updateCoordinates(UpdateCustomerCoordinatesBatchRequest $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $zoneId = data_get($user, 'zone_id');
+            $rows = $request->validated();
+
+            $updatedRecordIds = [];
+
+            foreach ($rows as $row) {
+                $customer = Customer::query()->find($row['customer_id']);
+                if ($customer === null) {
+                    continue;
+                }
+
+                if ($zoneId !== null && $zoneId !== '' && (int) $customer->zone_id !== (int) $zoneId) {
+                    continue;
+                }
+
+                $customer->update([
+                    'latitude' => $row['latitude'],
+                    'longitude' => $row['longitude'],
+                ]);
+
+                $updatedRecordIds[] = $row['record_id'];
+            }
+
+            return response()->json([
+                'updated_record_ids' => $updatedRecordIds,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to batch update customer coordinates (API)', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to update coordinates.',
+            ], 500);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function formatCustomerForHomesApi(Customer $customer): array
@@ -61,6 +107,7 @@ class CustomerController extends Controller
         $lastReading = $meter?->latestReading;
 
         return [
+            'home_id' => $customer->id,
             'customer_id' => $customer->id,
             'account_number' => $customer->account_number,
             'address' => $customer->address,
@@ -68,6 +115,8 @@ class CustomerController extends Controller
             'customer_name' => $customer->name,
             'address' => $customer->address,
             'phone' => $customer->phone,
+            'latitude' => $customer->latitude,
+            'longitude' => $customer->longitude,
             'meter' => $meter ? [
                 'id' => $meter->id,
                 'meter_number' => $meter->meter_number,

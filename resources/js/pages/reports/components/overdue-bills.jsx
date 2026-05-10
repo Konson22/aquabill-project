@@ -62,12 +62,12 @@ export function OverdueBills({ overdueBills = [], overdueBillsMeta }) {
     );
 
     return (
-        <Card className="overflow-hidden border-amber-200/60 shadow-sm dark:border-amber-900/40">
-            <CardHeader className="border-b bg-gradient-to-r from-amber-50/80 to-card pb-4 dark:from-amber-950/30">
+        <Card className="overflow-hidden border-amber-200/60 shadow-sm">
+            <CardHeader className="border-b bg-gradient-to-r from-amber-50/80 to-card pb-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-800">
                                 <TriangleAlert className="h-4 w-4" />
                             </div>
                             <CardTitle className="text-lg">Overdue bills</CardTitle>
@@ -77,7 +77,7 @@ export function OverdueBills({ overdueBills = [], overdueBillsMeta }) {
                             Showing the oldest due dates first so the worst aging appears at the top.
                         </p>
                     </div>
-                    <Button variant="outline" size="sm" className="shrink-0 border-amber-200 bg-card hover:bg-amber-50/50 dark:border-amber-800" asChild>
+                    <Button variant="outline" size="sm" className="shrink-0 border-amber-200 bg-card hover:bg-amber-50/50" asChild>
                         <Link href={route('bills.overdue')}>
                             View all
                             <ArrowRight className="ml-2 h-4 w-4" />
@@ -87,7 +87,7 @@ export function OverdueBills({ overdueBills = [], overdueBillsMeta }) {
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="flex items-center gap-3 rounded-lg border bg-card/80 px-3 py-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-50 text-amber-700">
                             <AlertCircle className="h-4 w-4" />
                         </div>
                         <div>
@@ -96,16 +96,16 @@ export function OverdueBills({ overdueBills = [], overdueBillsMeta }) {
                         </div>
                     </div>
                     <div className="flex items-center gap-3 rounded-lg border bg-card/80 px-3 py-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-50 text-rose-700">
                             <CreditCard className="h-4 w-4" />
                         </div>
                         <div>
                             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Outstanding</div>
-                            <div className="text-xl font-bold tabular-nums text-rose-700 dark:text-rose-400">{formatCurrency(totalOutstanding)}</div>
+                            <div className="text-xl font-bold tabular-nums text-rose-700">{formatCurrency(totalOutstanding)}</div>
                         </div>
                     </div>
                     <div className="flex items-center gap-3 rounded-lg border bg-card/80 px-3 py-2.5">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700">
                             <Calendar className="h-4 w-4" />
                         </div>
                         <div>
@@ -119,7 +119,7 @@ export function OverdueBills({ overdueBills = [], overdueBillsMeta }) {
             <CardContent className="p-0">
                 {listed === 0 && totalCount === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
                             <CheckCircle2 className="h-6 w-6" />
                         </div>
                         <p className="font-medium text-foreground">No overdue bills right now</p>
@@ -174,7 +174,7 @@ export function OverdueBills({ overdueBills = [], overdueBillsMeta }) {
                                                     {late ? (
                                                         <Badge
                                                             variant="outline"
-                                                            className="font-mono text-[10px] border-amber-200 bg-amber-50/60 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                                                            className="font-mono text-[10px] border-amber-200 bg-amber-50/60 text-amber-900"
                                                         >
                                                             {late}d
                                                         </Badge>
@@ -182,7 +182,7 @@ export function OverdueBills({ overdueBills = [], overdueBillsMeta }) {
                                                         <span className="text-xs text-muted-foreground">—</span>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="px-4 py-3 text-right font-mono text-sm font-semibold text-rose-700 dark:text-rose-400">
+                                                <TableCell className="px-4 py-3 text-right font-mono text-sm font-semibold text-rose-700">
                                                     {formatCurrency(row.current_balance ?? 0)}
                                                 </TableCell>
                                                 <TableCell className="px-4 py-3 text-right">

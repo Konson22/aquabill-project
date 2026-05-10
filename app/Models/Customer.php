@@ -23,6 +23,8 @@ class Customer extends Model
         'national_id',
         'address',
         'plot_no',
+        'latitude',
+        'longitude',
         'zone_id',
         'tariff_id',
         'connection_date',
@@ -40,6 +42,8 @@ class Customer extends Model
         return [
             'connection_date' => 'date',
             'last_reading_date' => 'date',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
         ];
     }
 

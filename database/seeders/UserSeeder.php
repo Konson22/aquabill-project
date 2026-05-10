@@ -21,6 +21,7 @@ class UserSeeder extends Seeder
         $ledgerDept = Department::where('name', 'ledger')->first();
         $hrDept = Department::where('name', 'hr')->first();
         $customerCareDept = Department::where('name', 'customer_care')->first();
+        $distributionDept = Department::where('name', 'distribution')->first();
 
         // 1. Admin User
         $admin = User::create([
@@ -76,5 +77,18 @@ class UserSeeder extends Seeder
             'email_verified_at' => now(),
         ]);
         $cc->roles()->attach(Role::where('name', 'Agent')->first()->id);
+
+        // 6. Distribution User
+        $distribution = User::create([
+            'name' => 'Dana Distribution',
+            'email' => 'distribution@gmail.com',
+            'password' => '123',
+            'department_id' => $distributionDept->id,
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+        $distribution->roles()->attach(
+            Role::where('name', 'Distribution Officer')->where('department_id', $distributionDept->id)->first()->id
+        );
     }
 }

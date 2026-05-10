@@ -17,6 +17,7 @@ class DashboardController extends Controller
             'ledger' => redirect()->route('ledger'),
             'hr' => redirect()->route('hr'),
             'customer_care' => redirect()->route('customer-care'),
+            'distribution' => Inertia::render('distribution/dashboard'),
             default => Inertia::render('dashboard'),
         };
     }
