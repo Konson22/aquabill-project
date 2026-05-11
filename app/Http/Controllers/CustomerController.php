@@ -100,7 +100,7 @@ class CustomerController extends Controller
      * Tab keys exposed on the customers index page. Order is preserved
      * by the frontend when rendering the tab strip.
      */
-    private const TAB_KEYS = ['all', 'active', 'inactive', 'notified', 'disconnected'];
+    private const TAB_KEYS = ['all', 'active', 'inactive', 'attention'];
 
     public function index(Request $request): Response
     {
@@ -161,8 +161,7 @@ class CustomerController extends Controller
         return match ($tab) {
             'active' => $query->where('status', 'active'),
             'inactive' => $query->where('status', 'inactive'),
-            'notified' => $query->whereHas('disconnections', fn ($q) => $q->where('status', 'notified')),
-            'disconnected' => $query->whereHas('disconnections', fn ($q) => $q->where('status', 'disconnected')),
+            'attention' => $query->whereHas('disconnections', fn ($q) => $q->whereIn('status', ['notified', 'disconnected'])),
             default => $query,
         };
     }

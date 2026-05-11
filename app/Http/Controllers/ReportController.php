@@ -11,6 +11,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\RevenueSummaryExport;
 
 class ReportController extends Controller
 {
@@ -241,6 +243,106 @@ class ReportController extends Controller
             'overdueBills' => $overdueBills,
             'overdueBillsMeta' => $overdueBillsMeta,
         ]);
+    }
+
+    /**
+     * Export revenue report to Excel.
+     */
+    public function exportRevenue(Request $request)
+    {
+        $search = $request->input('search');
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        // This is a simplified version of the logic in revenue()
+        // In a real app, you'd extract this to a service class
+        $billsInScope = Bill::query()
+            ->when($from, fn ($q) => $q->whereDate('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('created_at', '<=', $to))
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            });
+
+        $totalRevenue = (float) (clone $billsInScope)->sum('current_charge');
+        $fixedChargeRevenue = (float) (clone $billsInScope)->sum('fixed_charge');
+        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue;
+        $totalPaid = (float) Payment::query()
+            ->where('payable_type', Bill::class)
+            ->whereIn('payable_id', $billsInScope->clone()->select('id'))
+            ->sum('amount');
+
+        $paidChargesSum = (float) ServiceCharge::where('status', 'paid')
+            ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            })
+            ->sum('amount');
+
+        $actualTotalPaid = $totalPaid + $paidChargesSum;
+
+        $billOutstanding = (float) (clone $billsInScope)
+            ->withSum('payments', 'amount')
+            ->get()
+            ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
+
+        $chargeOutstanding = (float) ServiceCharge::query()
+            ->where('status', 'unpaid')
+            ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            })
+            ->sum('amount');
+
+        $totalOutstanding = $billOutstanding + $chargeOutstanding;
+
+        $collectionRatePercent = $totalBilledRevenue > 0.00001
+            ? round(($actualTotalPaid / $totalBilledRevenue) * 100, 1)
+            : 0.0;
+
+        $summary = [
+            'total_revenue' => $totalRevenue,
+            'fixed_charge_revenue' => $fixedChargeRevenue,
+            'total_billed_revenue' => $totalBilledRevenue,
+            'total_paid' => $actualTotalPaid,
+            'total_outstanding' => $totalOutstanding,
+            'collection_rate_percent' => $collectionRatePercent,
+        ];
+
+        $bills = (clone $billsInScope)
+            ->with(['customer'])
+            ->withSum('payments', 'amount')
+            ->latest()
+            ->get()
+            ->map(fn ($bill) => [
+                $bill->created_at->toDateString(),
+                'BILL-'.str_pad($bill->id, 6, '0', STR_PAD_LEFT),
+                $bill->customer?->name,
+                $bill->customer?->account_number,
+                (float) $bill->amount_paid,
+                (float) $bill->current_balance,
+            ])
+            ->toArray();
+
+        $filters = [
+            'search' => $search,
+            'from' => $from,
+            'to' => $to,
+        ];
+
+        $filename = 'revenue_report_' . now()->format('Y-m-d_His') . '.xlsx';
+
+        return Excel::download(new RevenueSummaryExport($summary, $filters, $bills), $filename);
     }
 
     /**

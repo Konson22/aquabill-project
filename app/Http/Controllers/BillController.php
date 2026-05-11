@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\BillsExport;
 
 class BillController extends Controller
 {
@@ -16,10 +18,28 @@ class BillController extends Controller
     public function index(Request $request): Response
     {
         $search = trim((string) $request->input('search', ''));
+        $status = trim((string) $request->input('status', 'all'));
 
         $bills = Bill::query()
             ->with(['customer.zone', 'meter'])
             ->withSum('payments', 'amount')
+            ->when($status === 'pending', function ($query) {
+                $query->where('status', 'pending')
+                      ->whereDate('due_date', '>=', Carbon::today());
+            })
+            ->when($status === 'partial', function ($query) {
+                $query->where('status', 'partial');
+            })
+            ->when($status === 'forwarded', function ($query) {
+                $query->where('status', 'forwarded');
+            })
+            ->when($status === 'paid', function ($query) {
+                $query->where('status', 'paid');
+            })
+            ->when($status === 'overdue', function ($query) {
+                $query->whereIn('status', ['pending', 'partial'])
+                      ->whereDate('due_date', '<', Carbon::today());
+            })
             ->when($search !== '', function ($query) use ($search): void {
                 $pattern = '%'.addcslashes($search, '%_\\').'%';
                 $query->where(function ($q) use ($pattern): void {
@@ -45,8 +65,21 @@ class BillController extends Controller
             'bills' => $bills,
             'filters' => [
                 'search' => $search,
+                'status' => $status,
             ],
         ]);
+    }
+
+    /**
+     * Export bills to Excel.
+     */
+    public function export(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $status = trim((string) $request->input('status', 'all'));
+        $filename = 'bills_' . now()->format('Y-m-d_His') . '.xlsx';
+
+        return Excel::download(new BillsExport($search, $status), $filename);
     }
 
     /**

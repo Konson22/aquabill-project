@@ -30,11 +30,11 @@ export function formatCurrency(amount) {
     const n = Number(amount ?? 0);
 
     if (!Number.isFinite(n)) {
-        return `0.00 ${CURRENCY_CODE}`;
+        return `0 ${CURRENCY_CODE}`;
     }
 
     return `${n.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
+        minimumFractionDigits: 0,
         maximumFractionDigits: 2,
     })} ${CURRENCY_CODE}`;
 }

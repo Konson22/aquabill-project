@@ -11,12 +11,11 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import PaymentModal from '@/components/payment-modal';
-import { formatCurrency } from '@/lib/utils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { formatCurrency, cn } from '@/lib/utils';
 import {
-    FileText,
     Search,
-    Filter,
-    Calendar,
     Download,
     Eye,
     MoreHorizontal,
@@ -25,7 +24,6 @@ import {
     ChevronRight,
     CreditCard,
     DollarSign,
-    AlertCircle
 } from 'lucide-react';
 
 const breadcrumbs = [
@@ -44,12 +42,16 @@ export default function Bills({ bills, filters = {} }) {
     const [paymentOpen, setPaymentOpen] = useState(false);
     const [activeBill, setActiveBill] = useState(null);
     const [search, setSearch] = useState(filters.search ?? '');
+    const [status, setStatus] = useState(filters.status ?? 'all');
 
     useEffect(() => {
         const timeout = setTimeout(() => {
             router.get(
                 route('bills.index'),
-                { search: search || undefined },
+                {
+                    search: search || undefined,
+                    status: status !== 'all' ? status : undefined
+                },
                 {
                     preserveScroll: true,
                     preserveState: true,
@@ -60,7 +62,7 @@ export default function Bills({ bills, filters = {} }) {
         }, 300);
 
         return () => clearTimeout(timeout);
-    }, [search]);
+    }, [search, status]);
 
     const openPayment = (bill) => {
         setActiveBill(bill);
@@ -71,254 +73,203 @@ export default function Bills({ bills, filters = {} }) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Billing & Invoices" />
 
-            <div className="flex h-full flex-col gap-6 p-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                            <FileText className="h-6 w-6 text-blue-500" />
-                            Billing & Invoices
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage customer invoices, track payments, and monitor outstanding balances.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm">
-                            <Download className="mr-2 h-4 w-4" />
-                            Export
-                        </Button>
-                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700" asChild>
-                            <Link href={route('bills.printing-list')}>
-                                <CreditCard className="mr-2 h-4 w-4" />
-                                Process Payments
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
+            <div className="flex h-full w-full flex-col gap-6 p- md:p-3 animate-in fade-in duration-500">
 
-                {/* Stats Overview */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-card p-4 rounded-xl border shadow-sm flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                            <FileText className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Total Generated</p>
-                            <p className="text-xl font-black">{bills.total}</p>
-                        </div>
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border shadow-sm flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
-                            <AlertCircle className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Unpaid</p>
-                            <p className="text-xl font-black">
-                                {bills.data.filter((b) => canRecordPayment(b.status)).length}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border shadow-sm flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                            <DollarSign className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Revenue</p>
-                            <p className="text-xl font-black text-emerald-600">
-                                {formatCurrency(
-                                    bills.data.reduce(
-                                        (acc, b) =>
-                                            acc + parseFloat(b.total_amount),
-                                        0,
-                                    ),
-                                )}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="bg-card p-4 rounded-xl border shadow-sm flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                            <Calendar className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Billing Cycle</p>
-                            <p className="text-xl font-black">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
-                        </div>
-                    </div>
-                </div>
 
-                {/* Filters */}
-                <div className="flex flex-col gap-4 md:flex-row md:items-center bg-card p-4 rounded-xl border shadow-sm">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Bill #, customer, phone, zone, or meter #"
-                            className="pl-10"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
-                            <Filter className="mr-2 h-4 w-4" />
-                            Status
-                        </Button>
-                    </div>
-                </div>
+                <div className="flex flex-col flex-1 bg-card rounded-2xl border shadow-sm overflow-hidden">
+                    {/* Header with Tabs and Actions */}
+                    <div className="bg-sky-800 pt-4 px-4 sm:px-6 flex flex-col md:flex-row gap-4 md:items-end justify-between">
+                        <Tabs value={status} onValueChange={setStatus} className="w-full md:w-auto -mb-px overflow-hidden">
+                            <TabsList className="flex w-full md:w-auto bg-transparent p-0 h-auto gap-1 overflow-x-auto hide-scrollbar">
+                                <TabsTrigger
+                                    value="all"
+                                    className="whitespace-nowrap rounded-t-lg rounded-b-none border-0 px-6 py-2.5 text-[13px] font-bold transition-colors data-[state=active]:bg-card data-[state=active]:text-[#6366f1] text-white/70 hover:bg-white/20 hover:text-white data-[state=inactive]:bg-white/10 data-[state=active]:shadow-none"
+                                >
+                                    All
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="pending"
+                                    className="whitespace-nowrap rounded-t-lg rounded-b-none border-0 px-6 py-2.5 text-[13px] font-bold transition-colors data-[state=active]:bg-card data-[state=active]:text-[#6366f1] text-white/70 hover:bg-white/20 hover:text-white data-[state=inactive]:bg-white/10 data-[state=active]:shadow-none"
+                                >
+                                    Unpaid
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="partial"
+                                    className="whitespace-nowrap rounded-t-lg rounded-b-none border-0 px-6 py-2.5 text-[13px] font-bold transition-colors data-[state=active]:bg-card data-[state=active]:text-[#6366f1] text-white/70 hover:bg-white/20 hover:text-white data-[state=inactive]:bg-white/10 data-[state=active]:shadow-none"
+                                >
+                                    Partial
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="paid"
+                                    className="whitespace-nowrap rounded-t-lg rounded-b-none border-0 px-6 py-2.5 text-[13px] font-bold transition-colors data-[state=active]:bg-card data-[state=active]:text-[#6366f1] text-white/70 hover:bg-white/20 hover:text-white data-[state=inactive]:bg-white/10 data-[state=active]:shadow-none"
+                                >
+                                    Fully Paid
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="forwarded"
+                                    className="whitespace-nowrap rounded-t-lg rounded-b-none border-0 px-6 py-2.5 text-[13px] font-bold transition-colors data-[state=active]:bg-card data-[state=active]:text-[#6366f1] text-white/70 hover:bg-white/20 hover:text-white data-[state=inactive]:bg-white/10 data-[state=active]:shadow-none"
+                                >
+                                    Forwarded
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="overdue"
+                                    className="whitespace-nowrap rounded-t-lg rounded-b-none border-0 px-6 py-2.5 text-[13px] font-bold transition-colors data-[state=active]:bg-card data-[state=active]:text-red-500 text-white/70 hover:bg-white/20 hover:text-white data-[state=inactive]:bg-white/10 data-[state=active]:shadow-none"
+                                >
+                                    Overdue
+                                </TabsTrigger>
+                            </TabsList>
+                        </Tabs>
 
-                {/* Invoices Table */}
-                <div className="flex-1 overflow-hidden rounded-xl border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr className="border-b bg-muted/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                    <th className="px-6 py-4 text-center w-20">Invoice</th>
-                                    <th className="px-6 py-4">Customer Details</th>
-                                    <th className="px-6 py-4">Consumption</th>
-                                    <th className="px-6 py-4">Amount Breakdown</th>
-                                    <th className="px-6 py-4">Total Due</th>
-                                    <th className="px-6 py-4 text-center">Status</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y">
-                                {bills.data.map((bill) => (
-                                    <tr key={bill.bill_no} className="hover:bg-muted/30 transition-colors group">
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="font-mono text-xs font-bold text-muted-foreground">#{String(bill.bill_no).padStart(6, '0')}</span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-foreground leading-tight">{bill.customer?.name}</span>
-                                               
-                                                <div className="flex items-center gap-1 mt-1">
-                                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-blue-200 text-blue-600 bg-blue-50/50">
-                                                        {bill.meter?.meter_number}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-1.5 font-black text-primary">
-                                                    {bill.consumption} <span className="text-[10px] font-normal text-muted-foreground">m³</span>
-                                                </div>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    Rate:{' '}
-                                                    {formatCurrency(bill.unit_price)}
-                                                    /unit
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col text-[11px] gap-0.5">
-                                                <div className="flex justify-between w-32">
-                                                    <span className="text-muted-foreground">Current:</span>
-                                                    <span className="font-bold font-mono">
-                                                        {formatCurrency(
-                                                            bill.current_charge,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between w-32">
-                                                    <span className="text-muted-foreground">Arrears:</span>
-                                                    <span className="font-bold font-mono text-red-500">
-                                                        {formatCurrency(
-                                                            bill.previous_balance,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-base font-black text-foreground font-mono leading-none">
-                                                    {formatCurrency(
-                                                        bill.total_amount,
+                        <div className="flex items-center gap-3 pb-3">
+                            <Button variant="outline" size="sm" className="h-9 gap-2 shadow-sm rounded-lg bg-white/10 text-white border-white/20 hover:bg-white/20 hover:text-white" asChild>
+                                <a href={route('bills.export', { search: search || undefined, status: status !== 'all' ? status : undefined })}>
+                                    <Download className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Export</span>
+                                </a>
+                            </Button>
+                            <Button size="sm" className="h-9 gap-2 bg-white text-[#6366f1] hover:bg-white/90 shadow-sm rounded-lg font-semibold" asChild>
+                                <Link href={route('bills.printing-list')}>
+                                    <CreditCard className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Print bills</span>
+                                </Link>
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Toolbar: Search */}
+                    <div className="flex items-center p-4 border-b ">
+                        <div className="relative flex-1 md:max-w-md">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search by Bill #, Customer name, Phone, or Meter..."
+                                className="pl-9 bg-background border-gray-300/70 focus-visible:bg-background focus-visible:border-primary/30 h-10 rounded-xl transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Invoices Table */}
+                    <div className="flex-1">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted border-y text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-muted/30">
+                                    <TableHead className="px-6 py-4 text-center ">Bill Number</TableHead>
+                                    <TableHead className="px-6 py-4">Customer Details</TableHead>
+                                    <TableHead className="px-6 py-4 ">Usage m³</TableHead>
+                                    <TableHead className="px-6 py-4 ">Arrears</TableHead>
+                                    <TableHead className="px-6 py-4 ">Current Charge</TableHead>
+                                    <TableHead className="px-6 py-4 ">Total Due</TableHead>
+                                    <TableHead className="px-6 py-4 text-center ">Status</TableHead>
+                                    <TableHead className="px-6 py-4 text-right ">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {bills.data.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={9} className="px-6 py-8 text-center text-muted-foreground">
+                                            No bills found.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    bills.data.map((bill) => (
+                                        <TableRow key={bill.bill_no} className="group hover:bg-blue-50/40 transition-colors duration-200 text-sm font-normal">
+                                            <TableCell className="px-6 py-4 ">
+                                                <span className="font-mono text-muted-foreground">#{String(bill.bill_no).padStart(6, '0')}</span>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4">
+                                                {bill.customer?.name}
+                                            </TableCell>
+
+                                            <TableCell className="px-6 py-4 ">
+                                                {bill.consumption} <span className="text-muted-foreground">m³</span>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4 ">
+                                                {formatCurrency(bill.previous_balance)}
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4 ">
+                                                {formatCurrency(bill.current_charge)}
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4  text-foreground">
+                                                {formatCurrency(bill.total_amount)}
+                                            </TableCell>
+
+                                            <TableCell className="px-6 py-4 text-center ">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={cn(
+                                                        "uppercase text-[9px] font-black tracking-widest shadow-sm px-2 py-0.5",
+                                                        bill.status === 'paid'
+                                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50'
+                                                            : bill.status === 'forwarded' || bill.status === 'partial'
+                                                                ? 'bg-muted text-muted-foreground border-transparent hover:bg-muted'
+                                                                : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-50'
                                                     )}
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground mt-1">
-                                                    Due: {new Date(bill.due_date).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <Badge
-                                                variant={
-                                                    bill.status === 'paid'
-                                                        ? 'success'
-                                                        : bill.status === 'forwarded'
-                                                          ? 'outline'
-                                                          : bill.status === 'partial'
-                                                            ? 'outline'
-                                                            : 'destructive'
-                                                }
-                                                className="uppercase text-[9px] font-black tracking-tighter"
-                                            >
-                                                {bill.status}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex justify-end opacity-80 transition-opacity group-hover:opacity-100">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="h-8 gap-1.5 px-2.5"
-                                                        >
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48">
-                                                        <DropdownMenuItem
-                                                            disabled={!canRecordPayment(bill.status)}
-                                                            title={
-                                                                !canRecordPayment(bill.status)
-                                                                    ? 'Payments are only available while the bill is pending'
-                                                                    : 'Record payment'
-                                                            }
-                                                            onSelect={() => openPayment(bill)}
-                                                        >
-                                                            <DollarSign
-                                                                className={
-                                                                    canRecordPayment(bill.status)
-                                                                        ? 'text-emerald-600'
-                                                                        : 'text-muted-foreground'
-                                                                }
-                                                            />
-                                                            Record payment
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem asChild>
-                                                            <Link
-                                                                href={route('bills.print', bill.id)}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
+                                                >
+                                                    {bill.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4 text-right ">
+                                                <div className="flex justify-end opacity-80 transition-opacity group-hover:opacity-100">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0 rounded-lg shadow-sm"
                                                             >
-                                                                <Printer className="text-muted-foreground" />
-                                                                Print bill
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem asChild>
-                                                            <Link href={route('bills.show', bill.id)}>
-                                                                <Eye className="text-blue-500" />
-                                                                View bill
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-md">
+                                                            <DropdownMenuItem
+                                                                disabled={!canRecordPayment(bill.status)}
+                                                                title={
+                                                                    !canRecordPayment(bill.status)
+                                                                        ? 'Payments are only available while the bill is pending'
+                                                                        : 'Record payment'
+                                                                }
+                                                                onSelect={() => openPayment(bill)}
+                                                                className="cursor-pointer gap-2 py-2"
+                                                            >
+                                                                <DollarSign
+                                                                    className={`h-4 w-4 ${canRecordPayment(bill.status) ? 'text-emerald-600' : 'text-muted-foreground'}`}
+                                                                />
+                                                                <span>Record payment</span>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild className="cursor-pointer">
+                                                                <Link
+                                                                    href={route('bills.print', bill.id)}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="gap-2 py-2 w-full flex"
+                                                                >
+                                                                    <Printer className="h-4 w-4 text-muted-foreground" />
+                                                                    <span>Print bill</span>
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild className="cursor-pointer">
+                                                                <Link href={route('bills.show', bill.id)} className="gap-2 py-2 w-full flex">
+                                                                    <Eye className="h-4 w-4 text-blue-500" />
+                                                                    <span>View bill</span>
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
                     </div>
 
                     {/* Pagination */}
                     {bills.links.length > 3 && (
-                        <div className="flex items-center justify-between border-t px-6 py-4 bg-muted/20">
-                            <span className="text-xs text-muted-foreground">
-                                Showing {bills.from} to {bills.to} of {bills.total} invoices
+                        <div className="flex items-center justify-between border-t px-6 py-4 bg-muted/10">
+                            <span className="text-xs font-medium text-muted-foreground">
+                                Showing <span className="font-bold text-foreground">{bills.from}</span> to <span className="font-bold text-foreground">{bills.to}</span> of <span className="font-bold text-foreground">{bills.total}</span> invoices
                             </span>
                             <div className="flex items-center gap-1">
                                 {bills.links.map((link, i) => (
@@ -327,20 +278,20 @@ export default function Bills({ bills, filters = {} }) {
                                         variant={link.active ? 'default' : 'outline'}
                                         size="sm"
                                         disabled={!link.url}
-                                        className="h-8 px-2 min-w-8"
+                                        className="h-8 min-w-8 px-2 rounded-lg shadow-sm"
                                         asChild={!!link.url}
                                     >
                                         {link.url ? (
                                             <Link href={link.url}>
-                                                {link.label === '&laquo; Previous' ? <ChevronLeft className="h-4 w-4" /> : 
-                                                 link.label === 'Next &raquo;' ? <ChevronRight className="h-4 w-4" /> : 
-                                                 link.label}
+                                                {link.label === '&laquo; Previous' ? <ChevronLeft className="h-4 w-4" /> :
+                                                    link.label === 'Next &raquo;' ? <ChevronRight className="h-4 w-4" /> :
+                                                        link.label}
                                             </Link>
                                         ) : (
                                             <span>
-                                                {link.label === '&laquo; Previous' ? <ChevronLeft className="h-4 w-4" /> : 
-                                                 link.label === 'Next &raquo;' ? <ChevronRight className="h-4 w-4" /> : 
-                                                 link.label}
+                                                {link.label === '&laquo; Previous' ? <ChevronLeft className="h-4 w-4" /> :
+                                                    link.label === 'Next &raquo;' ? <ChevronRight className="h-4 w-4" /> :
+                                                        link.label}
                                             </span>
                                         )}
                                     </Button>

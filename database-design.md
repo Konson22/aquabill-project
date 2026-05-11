@@ -1,377 +1,189 @@
-Create a full GIS Infrastructure Module for AquaBill Water Billing System using Laravel, React, Tailwind CSS, React Leaflet, and OpenStreetMap.
+```text
+Update the existing Laravel + React/Inertia SSUWC/AquaBill billing system by adding a complete Budget and Expense Management module under the Finance Department.
 
-This system is for a water utility organization and must support GIS visualization of water infrastructure and service points.
+Budget structure must support:
 
-IMPORTANT:
-- Use Leaflet as the GIS/map rendering engine.
-- Use OpenStreetMap as the map tile/data provider.
-- Do NOT use Google Maps.
-- Use React Leaflet components throughout the frontend.
-- Meters are normal/manual meters only.
-- Customer coordinates remain on customers table.
-- Do NOT add GPS coordinates to meters table because meters can be changed/replaced.
-- Explore the existing AquaBill codebase first and follow existing architecture, naming conventions, layouts, permissions, API style, and UI patterns.
+Overall Budget
+  → Department Budgets
+      → Budget Items
+          → Expenses
 
-====================================
-TECH STACK
-====================================
+Create these tables:
 
-Backend:
-- Laravel
-- RESTful APIs
-- MySQL
-- Existing AquaBill backend structure
-
-Frontend:
-- React
-- Tailwind CSS
-- React Leaflet
-- OpenStreetMap
-- Existing AquaBill frontend layout/components
-
-Install required packages if missing:
-
-Frontend:
-npm install leaflet react-leaflet leaflet-defaulticon-compatibility
-
-====================================
-DATABASE MODULES
-====================================
-
-1. water_point_types
-
-Fields:
+1. budgets
 - id
-- name unique
-- slug unique
-- description nullable
+- budget_year
+- budget_month nullable
+- title
+- total_amount
+- currency
+- status // draft, approved, active, closed
+- approved_by nullable
+- approved_at nullable
+- remarks
 - timestamps
 
-Seed with:
-- Filling Station
-- Public Tap
-- Water Kiosk
-- Standpipe
-- Borehole
-- Tank
-
-====================================
-
-2. water_points
-
-Fields:
+2. department_budgets
 - id
-- code unique
+- budget_id
+- department_id
+- allocated_amount
+- remarks
+- timestamps
+
+3. expense_categories
+- id
 - name
-- water_point_type_id foreign key
-- zone_id nullable foreign key
-- latitude decimal(10,7) nullable
-- longitude decimal(10,7) nullable
-- manager_name nullable
-- manager_phone nullable
-- status enum:
-  - active
-  - inactive
-  - maintenance
-  - damaged
-  default active
-- description nullable
+- description
+- status // active, inactive
 - timestamps
 
-====================================
-
-3. pipes
-
-Fields:
+4. budget_items
 - id
-- pipe_code unique
-- zone_id nullable foreign key
-- pipe_type enum:
-  - main
-  - distribution
-  - service
-  default distribution
-- material nullable
-- diameter decimal(8,2) nullable
-- length decimal(10,2) nullable
-- coordinates JSON
-- status enum:
-  - active
-  - inactive
-  - damaged
-  - maintenance
-  default active
-- installation_date nullable
-- description nullable
+- department_budget_id
+- category_id
+- item_name
+- description
+- planned_amount
 - timestamps
 
-coordinates JSON example:
-[
-  [4.85941,31.57125],
-  [4.86010,31.57200],
-  [4.86120,31.57310]
-]
-
-====================================
-
-4. valves
-
-Fields:
+5. expenses
 - id
-- valve_code unique
-- zone_id nullable foreign key
-- pipe_id nullable foreign key
-- valve_type enum:
-  - main
-  - control
-  - isolation
-  - washout
-  - air_release
-  default main
-- latitude decimal(10,7)
-- longitude decimal(10,7)
-- status enum:
-  - open
-  - closed
-  - damaged
-  - maintenance
-  default open
-- installation_date nullable
-- description nullable
+- department_budget_id nullable
+- budget_item_id nullable
+- category_id
+- expense_date
+- description
+- amount
+- payment_method
+- reference_no nullable
+- vendor_name nullable
+- requested_by
+- approved_by nullable
+- approved_at nullable
+- status // pending, approved, rejected, over_budget_pending_approval, over_budget_approved, paid
+- is_over_budget boolean default false
+- over_budget_amount nullable
+- over_budget_reason nullable
+- over_budget_approved_by nullable
+- over_budget_approved_at nullable
+- attachment nullable
+- remarks
 - timestamps
 
-====================================
-MODEL RELATIONSHIPS
-====================================
+Rules:
+- Overall budget controls the institution’s full budget.
+- Department budgets are allocations from the overall budget.
+- Total department allocations must not exceed the overall budget.
+- Budget items belong to department budgets.
+- Expenses belong to department budgets and may optionally belong to budget items.
+- Expenses must reduce available budget only when status is approved or paid.
+- Remaining budget must be calculated from expenses, not manually entered.
+- If expense exceeds remaining budget, mark it as over-budget.
+- Over-budget expenses require special approval before payment.
+- Only users with finance.approve_over_budget can approve over-budget expenses.
+- Do not allow over-budget expenses to be marked as paid until over-budget approval is completed.
 
-WaterPointType:
-- hasMany WaterPoints
+Create services:
+1. BudgetCalculatorService
+- calculate overall budget spent
+- calculate overall budget remaining
+- calculate department budget spent
+- calculate department budget remaining
+- calculate budget item spent
+- calculate budget item remaining
+- calculate budget utilization percentage
+- detect over-budget items
+- detect over-budget departments
 
-WaterPoint:
-- belongsTo WaterPointType
-- belongsTo Zone
+2. ExpenseApprovalService
+- submit expense
+- approve expense
+- reject expense
+- mark expense as paid
+- check if expense exceeds budget
+- handle over-budget approval workflow
 
-Pipe:
-- belongsTo Zone
-- hasMany Valves
+Create CRUD pages using React/Inertia:
+- Overall Budgets
+- Department Budgets
+- Budget Items
+- Expense Categories
+- Expenses
+- Expense Approvals
+- Over-Budget Approvals
 
-Valve:
-- belongsTo Pipe
-- belongsTo Zone
-
-Zone:
-- hasMany WaterPoints
-- hasMany Pipes
-- hasMany Valves
-
-====================================
-BACKEND FEATURES
-====================================
-
-Create:
-- migrations
-- models
-- factories if needed
-- seeders
-- controllers
-- form requests
-- API resources if project uses them
-- RESTful API routes
-
-Add:
-- pagination
-- validation
-- searching
-- filtering
-- sorting
-
-====================================
-SEARCH/FILTERS
-====================================
-
-Water Points:
-- search by code/name/manager phone
-- filter by type
-- filter by zone
-- filter by status
-
-Pipes:
-- search by pipe_code/material
-- filter by pipe_type
-- filter by zone
-- filter by status
-
-Valves:
-- search by valve_code
-- filter by valve_type
-- filter by zone
-- filter by pipe
-- filter by status
-
-====================================
-FRONTEND PAGES
-====================================
-
-Create pages for:
-
-Water Point Types:
-- list
-- create
-- edit
-- view
-
-Water Points:
-- list
-- create
-- edit
-- view
-
-Pipes:
-- list
-- create
-- edit
-- view
-
-Valves:
-- list
-- create
-- edit
-- view
-
-GIS Dashboard:
-- full GIS infrastructure map page
-
-====================================
-LEAFLET + OPENSTREETMAP GIS FEATURES
-====================================
-
-Use:
-- MapContainer
-- TileLayer
-- Marker
-- Popup
-- Polyline
-- LayersControl
-
-Use OpenStreetMap tiles:
-
-https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
-
-Default map center:
-Juba, South Sudan
-
-====================================
-GIS DASHBOARD FEATURES
-====================================
-
-Display:
-- Water points as markers
-- Valves as markers
-- Pipes as polylines
-
-Add layer controls:
-- Toggle Water Points
-- Toggle Pipes
-- Toggle Valves
+Create Finance Budget Dashboard showing:
+- Total overall budget
+- Total department allocations
+- Total expenses
+- Remaining overall budget
+- Budget utilization percentage
+- Pending expenses
+- Approved expenses
+- Paid expenses
+- Rejected expenses
+- Over-budget expenses
+- Over-budget amount
+- Departments close to budget limit
+- Budget items exceeded
 
 Add filters:
-- Zone
-- Type
-- Status
+- year
+- month
+- department
+- category
+- budget status
+- expense status
+- vendor
+- payment method
+- over-budget only
 
-Add map popups.
+Add exports:
+- Excel
+- PDF
+- Print
 
-Water Point popup:
-- code
-- name
-- type
-- zone
-- manager phone
-- status
+Add permissions:
+- finance.view_budget
+- finance.manage_budget
+- finance.create_expense
+- finance.approve_expense
+- finance.pay_expense
+- finance.approve_over_budget
+- finance.export_budget_reports
 
-Valve popup:
-- valve_code
-- valve_type
-- pipe
-- zone
-- status
+Add sidebar menu under Finance Department:
+- Budget Dashboard
+- Overall Budgets
+- Department Budgets
+- Budget Items
+- Expenses
+- Expense Approvals
+- Over-Budget Approvals
+- Expense Categories
+- Budget Reports
 
-Pipe popup:
-- pipe_code
-- pipe_type
-- material
-- diameter
-- length
-- zone
-- status
+Use Laravel best practices:
+- migrations
+- models
+- relationships
+- controllers
+- form requests
+- policies
+- permissions
+- services
+- seeders
+- validation
+- clean React/Inertia UI
+- responsive design
 
-====================================
-GIS INTERACTION FEATURES
-====================================
+Add seeders for:
+- common expense categories
+- sample annual budget
+- sample department budgets
+- sample budget items
+- sample expenses
 
-Water Point Form:
-- Allow picking location from Leaflet map
-- Clicking map sets latitude/longitude automatically
-
-Valve Form:
-- Allow picking valve location from map
-
-Pipe Form:
-- Allow user to click multiple points on map
-- Automatically build polyline coordinates JSON
-- Show live polyline preview while drawing
-
-====================================
-MAP STYLING
-====================================
-
-Use different colors/styles:
-
-Pipes:
-- Main pipes → thick blue
-- Distribution pipes → medium green
-- Service pipes → thin orange
-
-Markers:
-- Water points → blue markers
-- Valves → red markers
-
-====================================
-UI/UX REQUIREMENTS
-====================================
-
-- Use Tailwind CSS
-- Responsive design
-- Professional utility dashboard look
-- Reuse existing AquaBill components
-- Use status badges
-- Use modals or drawers if project already uses them
-- Add delete confirmation dialogs
-- Add loading states
-- Add empty state UI
-- Add validation messages
-
-====================================
-SEEDERS
-====================================
-
-Create realistic seed data:
-- water_point_types
-- water_points
-- pipes
-- valves
-
-Use realistic Juba coordinates for sample data.
-
-====================================
-FINAL GOAL
-====================================
-
-Build a professional GIS infrastructure management module for AquaBill capable of:
-- Water connection GIS registry
-- Filling station GIS
-- Public tap GIS
-- Pipe network visualization
-- Main valve point visualization
-- Zone-based GIS reporting
-- Infrastructure mapping using Leaflet and OpenStreetMap
+Make the interface professional, clean, and suitable for SSUWC Finance Department.
+```

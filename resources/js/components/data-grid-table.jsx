@@ -54,8 +54,8 @@ export default function DataGridTable({
     inertiaOptions,
     pageSizeOptions,
     emptyLabel = 'No records found.',
-    height = 'calc(100vh - 320px)',
-    minHeight = 480,
+    height = 'calc(70vh - 250px)',
+    minHeight = 400,
     containerClassName,
     sx,
     ...dataGridProps

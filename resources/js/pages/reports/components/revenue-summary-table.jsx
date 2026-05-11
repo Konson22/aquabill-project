@@ -174,49 +174,7 @@ function exportYearFromFilters(filters) {
     return new Date().getFullYear();
 }
 
-/**
- * @param {RevenueSummary} summary
- * @param {RevenueSummaryFilters | undefined} filters
- * @param {number} [reportYear] Calendar year shown in the bill-period control (matches UI when set).
- */
-function exportSummaryCsv(summary, filters, reportYear) {
-    const year =
-        typeof reportYear === 'number' && !Number.isNaN(reportYear)
-            ? reportYear
-            : exportYearFromFilters(filters);
-    const periodLabel = summaryPeriodLabel(filters);
-    const lines = [
-        ['Revenue report', ''],
-        ['Year', String(year)],
-        ['Period', periodLabel],
-        ['Metric', 'Amount (SSP)'],
-        ['Water revenue', summary.total_revenue],
-        ['Fixed charges', summary.fixed_charge_revenue],
-        ['Total revenue', summary.total_billed_revenue],
-        ['Collected', summary.total_paid],
-        ['Collection rate (%)', summary.collection_rate_percent],
-        ['Outstanding', summary.total_outstanding],
-    ];
-    const csv = lines.map((row) => row.map(csvCell).join(',')).join('\r\n');
-    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const parts = [];
-    if (filters?.from) {
-        parts.push(filters.from);
-    }
-    if (filters?.to) {
-        parts.push(filters.to);
-    }
-    const range = parts.length ? `_${parts.join('_')}` : '';
-    a.href = url;
-    a.download = `revenue-period-summary${range}.csv`;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-}
+// Client-side CSV export is deprecated in favor of server-side Excel export
 
 /**
  * @param {{ summary?: RevenueSummary, filters?: RevenueSummaryFilters, onBillDateRangeChange?: (from: string, to: string) => void, billDateFilterYear?: number }} props
@@ -280,9 +238,6 @@ export function RevenueSummaryTable({ summary, filters, onBillDateRangeChange, b
                 <div className="min-w-0 space-y-1.5">
                     <CardTitle className="text-base">Period summary</CardTitle>
                     <p className="text-sm font-medium leading-snug text-foreground">{periodLabel}</p>
-                    <p className="text-sm text-muted-foreground">
-                        Billings issued in this range (by bill date) and cash position.
-                    </p>
                 </div>
                 <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
                     <Select
@@ -335,14 +290,19 @@ export function RevenueSummaryTable({ summary, filters, onBillDateRangeChange, b
                         </SelectContent>
                     </Select>
                     <Button
-                        type="button"
                         variant="outline"
                         size="sm"
                         className="h-9 shrink-0"
-                        onClick={() => exportSummaryCsv(s, filters, year)}
+                        asChild
                     >
-                        <Download className="mr-2 h-4 w-4" aria-hidden />
-                        Export CSV
+                        <a href={route('reports.revenue.export', {
+                            from: filters?.from,
+                            to: filters?.to,
+                            search: filters?.search
+                        })}>
+                            <Download className="mr-2 h-4 w-4" aria-hidden />
+                            Export Excel
+                        </a>
                     </Button>
                 </div>
             </CardHeader>

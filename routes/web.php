@@ -74,6 +74,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('reports')->group(function () {
         Route::get('/revenue', [ReportController::class, 'revenue'])->name('reports.revenue');
+        Route::get('/revenue/export', [ReportController::class, 'exportRevenue'])->name('reports.revenue.export');
 
         Route::get('/water-usage', [ReportController::class, 'waterUsage'])->name('reports.water-usage');
     });
@@ -109,6 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::post('service-charges/{service_charge}/confirm-payment', [ServiceChargeController::class, 'confirmPayment'])->name('service-charges.confirm-payment');
     Route::resource('service-charges', ServiceChargeController::class);
+    Route::get('bills/export', [BillController::class, 'export'])->name('bills.export');
     Route::get('bills/{bill}/print', [BillController::class, 'print'])->name('bills.print');
     Route::get('bills/bulk-print', [BillController::class, 'bulkPrint'])->name('bills.bulk-print');
     Route::get('bills/printing-list', [BillController::class, 'printingList'])->name('bills.printing-list');
