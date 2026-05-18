@@ -43,6 +43,16 @@ test('authenticated verified users can access gis map page', function (): void {
     $this->actingAs($user)->get(route('gis.map'))->assertOk();
 });
 
+test('authenticated verified users can access gis zone boundaries page', function (): void {
+    $dept = Department::query()->where('name', 'admin')->first();
+    $user = User::factory()->create([
+        'department_id' => $dept->id,
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($user)->get(route('gis.zone-boundaries'))->assertOk();
+});
+
 test('authenticated users can list water points', function (): void {
     $dept = Department::query()->where('name', 'admin')->first();
     $user = User::factory()->create([

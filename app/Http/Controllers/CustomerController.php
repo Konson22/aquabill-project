@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\CustomerPaymentsExport;
+use App\Exports\CustomerReadingsExport;
+use App\Exports\CustomerServiceChargesExport;
 use App\Models\Customer;
 use App\Models\Meter;
 use App\Models\MeterReading;
@@ -12,8 +15,11 @@ use App\Models\Zone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CustomerController extends Controller
 {
@@ -38,7 +44,12 @@ class CustomerController extends Controller
             'email' => 'nullable|email|max:255',
             'national_id' => 'nullable|string|max:50',
             'address' => 'nullable|string',
-            'plot_no' => 'nullable|string|max:255',
+            'plot_no' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('customers', 'plot_no'),
+            ],
             'customer_type' => 'required|string|in:residential,commercial,government',
             'status' => 'required|string|in:active,inactive',
             'zone_id' => 'required|exists:zones,id',
@@ -232,7 +243,12 @@ class CustomerController extends Controller
             'email' => 'nullable|email|max:255',
             'national_id' => 'nullable|string|max:50',
             'address' => 'nullable|string',
-            'plot_no' => 'nullable|string|max:255',
+            'plot_no' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('customers', 'plot_no')->ignore($customer->id),
+            ],
             'customer_type' => 'required|string|in:residential,commercial,government',
             'status' => 'required|string|in:active,inactive',
             'zone_id' => 'required|exists:zones,id',
@@ -240,8 +256,42 @@ class CustomerController extends Controller
             'connection_date' => 'nullable|date',
         ]);
 
-        $customer->update($validated);
+        $customer->update([
+            ...$validated,
+            'address' => filled($validated['address'] ?? null) ? $validated['address'] : null,
+        ]);
 
         return redirect()->route('customers.show', $customer->id)->with('success', 'Customer updated successfully.');
+    }
+
+    public function exportReadings(Customer $customer): BinaryFileResponse
+    {
+        return Excel::download(
+            new CustomerReadingsExport($customer->id),
+            $this->customerExportFilename($customer, 'readings'),
+        );
+    }
+
+    public function exportPayments(Customer $customer): BinaryFileResponse
+    {
+        return Excel::download(
+            new CustomerPaymentsExport($customer->id),
+            $this->customerExportFilename($customer, 'payments'),
+        );
+    }
+
+    public function exportServiceCharges(Customer $customer): BinaryFileResponse
+    {
+        return Excel::download(
+            new CustomerServiceChargesExport($customer->id),
+            $this->customerExportFilename($customer, 'service_charges'),
+        );
+    }
+
+    private function customerExportFilename(Customer $customer, string $prefix): string
+    {
+        $suffix = str_replace(['/', '\\'], '-', $customer->account_number ?? (string) $customer->id);
+
+        return "{$prefix}_{$suffix}_".now()->format('Y-m-d_His').'.xlsx';
     }
 }

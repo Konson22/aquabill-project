@@ -26,7 +26,16 @@ function todayIsoDate() {
     return new Date().toISOString().slice(0, 10);
 }
 
-export default function PaymentModal({ open, onOpenChange, bill }) {
+/** Prefer seeded "Main branch" desk; otherwise first station in the list. */
+function defaultPaymentStationId(stations) {
+    if (!stations?.length) {
+        return '';
+    }
+    const main = stations.find((s) => s.name?.trim().toLowerCase() === 'main branch');
+    return String((main ?? stations[0]).id);
+}
+
+export default function PaymentModal({ open, onOpenChange, bill, stations = [] }) {
     const billId = bill?.id ?? null;
     const customerName = bill?.customer?.name ?? '—';
     const accountNumber = bill?.customer?.account_number ?? '—';
@@ -53,19 +62,23 @@ export default function PaymentModal({ open, onOpenChange, bill }) {
         payment_method: 'cash',
         reference_number: '',
         notes: billId ? `Payment for bill #${billId}` : '',
+        station_id: defaultPaymentStationId(stations),
     });
 
     useEffect(() => {
         if (!open) return;
+
+        const defaultStationId = defaultPaymentStationId(stations);
 
         form.setData((data) => ({
             ...data,
             amount: balanceDue || '',
             payment_date: todayIsoDate(),
             notes: billId ? `Payment for bill #${billId}` : data.notes,
+            station_id: defaultStationId,
         }));
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, billId, balanceDue]);
+    }, [open, billId, balanceDue, stations]);
 
     const paymentAmountEntered = useMemo(() => {
         const raw = form.data.amount;
@@ -91,7 +104,6 @@ export default function PaymentModal({ open, onOpenChange, bill }) {
         form.post(route('bills.payments.store', billId), {
             preserveScroll: true,
             onSuccess: () => {
-                form.reset();
                 onOpenChange?.(false);
             },
         });

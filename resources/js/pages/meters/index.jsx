@@ -15,17 +15,16 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import EditMeterModal from './components/edit-meter-modal';
 import {
     Search,
     Plus,
     Activity,
     User,
-    Settings,
-    MoreVertical,
+    Pencil,
     History,
     ChevronLeft,
     ChevronRight,
-    MapPin
 } from 'lucide-react';
 
 const breadcrumbs = [
@@ -37,6 +36,7 @@ const breadcrumbs = [
 
 export default function Meters({ meters, filters = {} }) {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [editingMeter, setEditingMeter] = useState(null);
     const [search, setSearch] = useState(filters?.search ?? '');
     const isTypingSearch = useMemo(() => (filters?.search ?? '') !== search, [filters?.search, search]);
 
@@ -221,14 +221,17 @@ export default function Meters({ meters, filters = {} }) {
                                 {meters.data.map((meter) => (
                                     <tr key={meter.id} className="hover:bg-muted/30 transition-colors">
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-8 w-8 rounded bg-blue-100 flex items-center justify-center text-blue-600">
+                                            <Link
+                                                href={route('meters.show', meter.id)}
+                                                className="flex items-center gap-3 hover:text-primary"
+                                            >
+                                                <div className="flex h-8 w-8 items-center justify-center rounded bg-blue-100 text-blue-600">
                                                     <Activity className="h-4 w-4" />
                                                 </div>
                                                 <span className="font-mono text-sm font-bold tracking-tight">
                                                     {meter.meter_number}
                                                 </span>
-                                            </div>
+                                            </Link>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
@@ -253,11 +256,18 @@ export default function Meters({ meters, filters = {} }) {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-1">
-                                                <Button variant="ghost" size="icon" title="History">
-                                                    <History className="h-4 w-4" />
+                                                <Button variant="ghost" size="icon" title="View history" asChild>
+                                                    <Link href={route('meters.show', meter.id)}>
+                                                        <History className="h-4 w-4" />
+                                                    </Link>
                                                 </Button>
-                                                <Button variant="ghost" size="icon">
-                                                    <MoreVertical className="h-4 w-4" />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    title="Edit meter"
+                                                    onClick={() => setEditingMeter(meter)}
+                                                >
+                                                    <Pencil className="h-4 w-4" />
                                                 </Button>
                                             </div>
                                         </td>
@@ -309,6 +319,12 @@ export default function Meters({ meters, filters = {} }) {
                         </div>
                     )}
                 </div>
+
+                <EditMeterModal
+                    meter={editingMeter}
+                    isOpen={!!editingMeter}
+                    onClose={() => setEditingMeter(null)}
+                />
             </div>
         </AppLayout>
     );

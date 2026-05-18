@@ -25,7 +25,6 @@ class MeterReadingSeeder extends Seeder
                 'current_reading' => 100,
                 'recorded_by' => $user->id,
                 'notes' => 'Initial reading',
-                'is_initial' => true,
             ]);
         }
     }

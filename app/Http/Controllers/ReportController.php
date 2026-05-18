@@ -2,20 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\PaymentsReportExport;
+use App\Exports\RevenueSummaryExport;
+use App\Exports\WaterUsageReportExport;
 use App\Models\Bill;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\ServiceCharge;
+use App\Models\Tariff;
 use App\Models\Zone;
+use App\Services\FinanceReportService;
+use App\Services\PaymentsReportService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\RevenueSummaryExport;
 
 class ReportController extends Controller
 {
+    public function __construct(
+        private FinanceReportService $financeReportService,
+        private PaymentsReportService $paymentsReportService,
+    ) {}
+
     /**
      * Display the revenue report.
      */
@@ -48,11 +60,12 @@ class ReportController extends Controller
         /*
          * Water revenue (summary.total_revenue): sum of bill current_charge (consumption × unit price; usage only).
          * Fixed charge revenue: sum of fixed_charge snapshots (tariff fixed fees on bills).
-         * Total billed revenue: water + fixed on bills in scope (excludes previous_balance / arrears).
+         * Total billed revenue: water + fixed on bills + service charges issued in scope (excludes previous_balance / arrears).
          */
         $totalRevenue = (float) (clone $billsInScope)->sum('current_charge');
         $fixedChargeRevenue = (float) (clone $billsInScope)->sum('fixed_charge');
-        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue;
+        $serviceChargesRevenue = ServiceCharge::sumTotalDue($chargesInScope);
+        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue + $serviceChargesRevenue;
         $totalPaid = (float) Payment::query()
             ->where('payable_type', Bill::class)
             ->whereIn('payable_id', $billsInScope->clone()->select('id'))
@@ -68,26 +81,33 @@ class ReportController extends Controller
                 });
             });
 
-        $paidChargesSum = (float) $paidChargesQuery->sum('amount');
+        $paidChargesSum = ServiceCharge::sumTotalDue($paidChargesQuery);
 
         $actualTotalPaid = $totalPaid + $paidChargesSum;
 
-        $billOutstanding = (float) (clone $billsInScope)
-            ->withSum('payments', 'amount')
-            ->get()
+        $billsWithPayments = (clone $billsInScope)->withSum('payments', 'amount')->get();
+
+        $billOutstanding = (float) $billsWithPayments
             ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
 
-        $chargeOutstanding = (float) ServiceCharge::query()
-            ->where('status', 'unpaid')
-            ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
-            ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
-            ->when(filled($search), function ($q) use ($search): void {
-                $q->whereHas('customer', function ($c) use ($search): void {
-                    $c->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('account_number', 'like', '%'.$search.'%');
-                });
-            })
-            ->sum('amount');
+        $billRevenueBreakdown = $this->billRevenuePaidUnpaidBreakdown(
+            $billsWithPayments,
+            $totalRevenue,
+            $fixedChargeRevenue,
+        );
+
+        $chargeOutstanding = ServiceCharge::sumTotalDue(
+            ServiceCharge::query()
+                ->where('status', 'unpaid')
+                ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
+                ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
+                ->when(filled($search), function ($q) use ($search): void {
+                    $q->whereHas('customer', function ($c) use ($search): void {
+                        $c->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('account_number', 'like', '%'.$search.'%');
+                    });
+                }),
+        );
 
         $totalOutstanding = $billOutstanding + $chargeOutstanding;
 
@@ -154,17 +174,18 @@ class ReportController extends Controller
                     ->whereIn('payable_id', $billsCreatedInClip->clone()->select('id'))
                     ->sum('amount');
 
-                $paidChargesInMonth = (float) ServiceCharge::query()
-                    ->where('status', 'paid')
-                    ->whereDate('issued_date', '>=', $clipStart->toDateString())
-                    ->whereDate('issued_date', '<=', $clipEnd->toDateString())
-                    ->when(filled($search), function ($q) use ($search): void {
-                        $q->whereHas('customer', function ($c) use ($search): void {
-                            $c->where('name', 'like', '%'.$search.'%')
-                                ->orWhere('account_number', 'like', '%'.$search.'%');
-                        });
-                    })
-                    ->sum('amount');
+                $paidChargesInMonth = ServiceCharge::sumTotalDue(
+                    ServiceCharge::query()
+                        ->where('status', 'paid')
+                        ->whereDate('issued_date', '>=', $clipStart->toDateString())
+                        ->whereDate('issued_date', '<=', $clipEnd->toDateString())
+                        ->when(filled($search), function ($q) use ($search): void {
+                            $q->whereHas('customer', function ($c) use ($search): void {
+                                $c->where('name', 'like', '%'.$search.'%')
+                                    ->orWhere('account_number', 'like', '%'.$search.'%');
+                            });
+                        }),
+                );
 
                 $monthCollected = $billAmountPaid + $paidChargesInMonth;
 
@@ -183,47 +204,35 @@ class ReportController extends Controller
             ? round(($actualTotalPaid / $totalBilledRevenue) * 100, 1)
             : 0.0;
 
-        $today = Carbon::today();
-        $overdueBaseQuery = Bill::query()
-            ->whereIn('status', ['pending', 'partial'])
-            ->whereDate('due_date', '<', $today);
+        $totalBillsGenerated = (int) (clone $billsInScope)->count();
+        $billsPaidCount = (int) (clone $billsInScope)->where('status', 'paid')->count();
+        $billsPendingCount = (int) (clone $billsInScope)->whereIn('status', ['pending', 'partial'])->count();
+        $billsForwardedCount = (int) (clone $billsInScope)->where('status', 'forwarded')->count();
 
-        $overdueBillsMeta = [
-            'total_count' => (int) (clone $overdueBaseQuery)->count(),
-            'total_outstanding' => (float) (clone $overdueBaseQuery)
-                ->withSum('payments', 'amount')
-                ->get()
-                ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0))),
-        ];
+        $finance = $this->financeReportService->buildForRevenuePage($request);
 
-        $overdueBills = (clone $overdueBaseQuery)
-            ->with(['customer:id,name,account_number'])
-            ->withSum('payments', 'amount')
-            ->orderBy('due_date')
-            ->limit(15)
-            ->get()
-            ->map(fn (Bill $bill): array => [
-                'id' => $bill->id,
-                'due_date' => $bill->due_date?->toDateString(),
-                'reference' => 'BILL-'.str_pad((string) $bill->id, 6, '0', STR_PAD_LEFT),
-                'status' => $bill->status,
-                'current_balance' => (float) $bill->current_balance,
-                'total_amount' => (float) $bill->total_amount,
-                'customer_name' => $bill->customer?->name,
-                'account_number' => $bill->customer?->account_number,
-            ])
-            ->values()
-            ->all();
+        $revenueMonthlyBreakdown = $this->revenueMonthlyBreakdown($chartYear, $search);
 
-        return Inertia::render('reports/revenue', [
+        return Inertia::render('revenue-report/index', [
             'summary' => [
                 'total_revenue' => (float) $totalRevenue,
+                'total_revenue_paid' => $billRevenueBreakdown['water_paid'],
+                'total_revenue_unpaid' => $billRevenueBreakdown['water_unpaid'],
                 'fixed_charge_revenue' => (float) $fixedChargeRevenue,
+                'fixed_charge_paid' => $billRevenueBreakdown['fixed_paid'],
+                'fixed_charge_unpaid' => $billRevenueBreakdown['fixed_unpaid'],
+                'service_charges_revenue' => (float) $serviceChargesRevenue,
+                'service_charges_paid' => (float) $paidChargesSum,
+                'service_charges_unpaid' => (float) $chargeOutstanding,
                 'total_billed_revenue' => (float) $totalBilledRevenue,
                 'total_paid' => (float) $actualTotalPaid,
                 'total_outstanding' => (float) $totalOutstanding,
                 'collection_rate_percent' => (float) $collectionRatePercent,
                 'payments_count' => $paymentsCount,
+                'total_bills_generated' => $totalBillsGenerated,
+                'bills_paid_count' => $billsPaidCount,
+                'bills_pending_count' => $billsPendingCount,
+                'bills_forwarded_count' => $billsForwardedCount,
             ],
             'chartData' => $chartData,
             'rows' => $bills->through(fn ($bill) => [
@@ -240,8 +249,9 @@ class ReportController extends Controller
                 'from' => $from,
                 'to' => $to,
             ],
-            'overdueBills' => $overdueBills,
-            'overdueBillsMeta' => $overdueBillsMeta,
+            'monthlyBreakdown' => $revenueMonthlyBreakdown,
+            'monthlyBreakdownYear' => $chartYear,
+            ...$finance,
         ]);
     }
 
@@ -266,43 +276,62 @@ class ReportController extends Controller
                 });
             });
 
+        $chargesInScope = ServiceCharge::query()
+            ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
+            ->when(filled($search), function ($q) use ($search): void {
+                $q->whereHas('customer', function ($c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            });
+
         $totalRevenue = (float) (clone $billsInScope)->sum('current_charge');
         $fixedChargeRevenue = (float) (clone $billsInScope)->sum('fixed_charge');
-        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue;
+        $serviceChargesRevenue = ServiceCharge::sumTotalDue($chargesInScope);
+        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue + $serviceChargesRevenue;
         $totalPaid = (float) Payment::query()
             ->where('payable_type', Bill::class)
             ->whereIn('payable_id', $billsInScope->clone()->select('id'))
             ->sum('amount');
 
-        $paidChargesSum = (float) ServiceCharge::where('status', 'paid')
-            ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
-            ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
-            ->when(filled($search), function ($q) use ($search): void {
-                $q->whereHas('customer', function ($c) use ($search): void {
-                    $c->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('account_number', 'like', '%'.$search.'%');
-                });
-            })
-            ->sum('amount');
+        $paidChargesSum = ServiceCharge::sumTotalDue(
+            ServiceCharge::where('status', 'paid')
+                ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
+                ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
+                ->when(filled($search), function ($q) use ($search): void {
+                    $q->whereHas('customer', function ($c) use ($search): void {
+                        $c->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('account_number', 'like', '%'.$search.'%');
+                    });
+                }),
+        );
 
         $actualTotalPaid = $totalPaid + $paidChargesSum;
 
-        $billOutstanding = (float) (clone $billsInScope)
-            ->withSum('payments', 'amount')
-            ->get()
+        $billsWithPayments = (clone $billsInScope)->withSum('payments', 'amount')->get();
+
+        $billOutstanding = (float) $billsWithPayments
             ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
 
-        $chargeOutstanding = (float) ServiceCharge::query()
-            ->where('status', 'unpaid')
-            ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
-            ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
-            ->when(filled($search), function ($q) use ($search): void {
-                $q->whereHas('customer', function ($c) use ($search): void {
-                    $c->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('account_number', 'like', '%'.$search.'%');
-                });
-            })
-            ->sum('amount');
+        $billRevenueBreakdown = $this->billRevenuePaidUnpaidBreakdown(
+            $billsWithPayments,
+            $totalRevenue,
+            $fixedChargeRevenue,
+        );
+
+        $chargeOutstanding = ServiceCharge::sumTotalDue(
+            ServiceCharge::query()
+                ->where('status', 'unpaid')
+                ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
+                ->when($to, fn ($q) => $q->whereDate('issued_date', '<=', $to))
+                ->when(filled($search), function ($q) use ($search): void {
+                    $q->whereHas('customer', function ($c) use ($search): void {
+                        $c->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('account_number', 'like', '%'.$search.'%');
+                    });
+                }),
+        );
 
         $totalOutstanding = $billOutstanding + $chargeOutstanding;
 
@@ -312,7 +341,14 @@ class ReportController extends Controller
 
         $summary = [
             'total_revenue' => $totalRevenue,
+            'total_revenue_paid' => $billRevenueBreakdown['water_paid'],
+            'total_revenue_unpaid' => $billRevenueBreakdown['water_unpaid'],
             'fixed_charge_revenue' => $fixedChargeRevenue,
+            'fixed_charge_paid' => $billRevenueBreakdown['fixed_paid'],
+            'fixed_charge_unpaid' => $billRevenueBreakdown['fixed_unpaid'],
+            'service_charges_revenue' => $serviceChargesRevenue,
+            'service_charges_paid' => $paidChargesSum,
+            'service_charges_unpaid' => $chargeOutstanding,
             'total_billed_revenue' => $totalBilledRevenue,
             'total_paid' => $actualTotalPaid,
             'total_outstanding' => $totalOutstanding,
@@ -340,7 +376,7 @@ class ReportController extends Controller
             'to' => $to,
         ];
 
-        $filename = 'revenue_report_' . now()->format('Y-m-d_His') . '.xlsx';
+        $filename = 'revenue_report_'.now()->format('Y-m-d_His').'.xlsx';
 
         return Excel::download(new RevenueSummaryExport($summary, $filters, $bills), $filename);
     }
@@ -350,21 +386,61 @@ class ReportController extends Controller
      */
     public function waterUsage(Request $request)
     {
-        $fromInput = $request->string('from')->toString();
-        $toInput = $request->string('to')->toString();
+        $report = $this->buildWaterUsageReportData($request);
 
-        $range = $this->resolveWaterUsageDateRange($fromInput, $toInput);
-        $fromStr = $range['from'];
-        $toStr = $range['to'];
-        $start = $range['start'];
-        $end = $range['end'];
+        return Inertia::render('water-report/index', [
+            ...$report,
+            'filterOptions' => [
+                'zones' => Zone::query()->orderBy('name')->get(['id', 'name']),
+                'tariffs' => Tariff::query()->orderBy('name')->get(['id', 'name']),
+            ],
+        ]);
+    }
 
-        $billsInPeriod = Bill::query()
-            ->whereDate('created_at', '>=', $fromStr)
-            ->whereDate('created_at', '<=', $toStr);
+    public function exportWaterUsage(Request $request)
+    {
+        $report = $this->buildWaterUsageReportData($request);
+        $filename = 'water_usage_report_'.now()->format('Y-m-d_His').'.xlsx';
 
-        $totalConsumption = (float) (clone $billsInPeriod)->sum('consumption');
-        $billsCount = (clone $billsInPeriod)->count();
+        return Excel::download(
+            new WaterUsageReportExport(
+                $report['summary'],
+                $report['filters'],
+                $report['chartData'],
+                $report['chartMeta'],
+                $report['zoneData'],
+                $report['monthlyBreakdown'],
+                $report['topConsumers'],
+            ),
+            $filename,
+        );
+    }
+
+    /**
+     * @return array{
+     *     summary: array{total_consumption: float, avg_consumption: float, bills_count: int},
+     *     chartData: list<array{date: string, consumption: float}>,
+     *     chartMeta: array{granularity: string},
+     *     zoneData: list<array{name: string, consumption: float}>,
+     *     monthlyBreakdown: list<array{month: string, label: string, consumption: float, bills_count: int}>,
+     *     topConsumers: list<array{id: int, name: string, account: string, consumption: float}>,
+     *     filters: array{month: string, zone_id: int|null, tariff_id: int|null, from: string, to: string},
+     * }
+     */
+    private function buildWaterUsageReportData(Request $request): array
+    {
+        $filterContext = $this->resolveWaterUsageFilters($request);
+        $fromStr = $filterContext['from'];
+        $toStr = $filterContext['to'];
+        $start = $filterContext['start'];
+        $end = $filterContext['end'];
+        $zoneId = $filterContext['zone_id'];
+        $tariffId = $filterContext['tariff_id'];
+
+        $billsInPeriod = $this->waterUsageBillsInPeriodQuery($fromStr, $toStr, $zoneId, $tariffId);
+
+        $totalConsumption = (float) (clone $billsInPeriod)->sum('bills.consumption');
+        $billsCount = (clone $billsInPeriod)->count('bills.id');
         $avgConsumption = $billsCount > 0 ? $totalConsumption / $billsCount : 0.0;
 
         /*
@@ -374,10 +450,19 @@ class ReportController extends Controller
             ->select('zones.id', 'zones.name')
             ->selectRaw('COALESCE(SUM(bills.consumption), 0) as zone_consumption')
             ->leftJoin('customers', 'customers.zone_id', '=', 'zones.id')
-            ->leftJoin('bills', function ($join) use ($fromStr, $toStr): void {
-                $join->on('bills.customer_id', '=', 'customers.id')
-                    ->whereDate('bills.created_at', '>=', $fromStr)
-                    ->whereDate('bills.created_at', '<=', $toStr);
+            ->leftJoin('bills', 'bills.customer_id', '=', 'customers.id')
+            ->leftJoin('meter_readings', function ($join) use ($fromStr, $toStr, $zoneId, $tariffId): void {
+                $join->on('meter_readings.id', '=', 'bills.reading_id')
+                    ->whereDate('meter_readings.reading_date', '>=', $fromStr)
+                    ->whereDate('meter_readings.reading_date', '<=', $toStr);
+
+                if ($zoneId !== null) {
+                    $join->where('customers.zone_id', $zoneId);
+                }
+
+                if ($tariffId !== null) {
+                    $join->where('customers.tariff_id', $tariffId);
+                }
             })
             ->groupBy('zones.id', 'zones.name')
             ->orderByDesc('zone_consumption')
@@ -389,17 +474,33 @@ class ReportController extends Controller
             ->values()
             ->all();
 
+        $allMonths = $filterContext['month'] === 'all';
         $daysInRange = $start->diffInDays($end) + 1;
-        $chartGranularity = $daysInRange > 45 ? 'month' : 'day';
+        $chartGranularity = $allMonths || $daysInRange > 45 ? 'month' : 'day';
         $chartData = $chartGranularity === 'month'
-            ? $this->waterUsageChartByMonth($fromStr, $toStr, $start, $end)
-            : $this->waterUsageChartByDay($fromStr, $toStr, $start, $end);
+            ? $this->waterUsageChartByMonth($fromStr, $toStr, $start, $end, $zoneId, $tariffId)
+            : $this->waterUsageChartByDay($fromStr, $toStr, $start, $end, $zoneId, $tariffId);
+
+        $breakdownStart = $allMonths
+            ? $start->copy()->startOfMonth()
+            : $start->copy()->subMonth()->startOfMonth();
+        $monthlyBreakdown = $this->waterUsageMonthlyBreakdown(
+            $breakdownStart->toDateString(),
+            $toStr,
+            $breakdownStart,
+            $end,
+            $zoneId,
+            $tariffId,
+        );
 
         $topConsumers = Customer::query()
             ->select('customers.id', 'customers.name', 'customers.account_number')
             ->join('bills', 'bills.customer_id', '=', 'customers.id')
-            ->whereDate('bills.created_at', '>=', $fromStr)
-            ->whereDate('bills.created_at', '<=', $toStr)
+            ->join('meter_readings', 'meter_readings.id', '=', 'bills.reading_id')
+            ->whereDate('meter_readings.reading_date', '>=', $fromStr)
+            ->whereDate('meter_readings.reading_date', '<=', $toStr)
+            ->when($zoneId !== null, fn ($query) => $query->where('customers.zone_id', $zoneId))
+            ->when($tariffId !== null, fn ($query) => $query->where('customers.tariff_id', $tariffId))
             ->groupBy('customers.id', 'customers.name', 'customers.account_number')
             ->selectRaw('SUM(bills.consumption) as period_consumption')
             ->orderByDesc('period_consumption')
@@ -414,7 +515,7 @@ class ReportController extends Controller
             ->values()
             ->all();
 
-        return Inertia::render('reports/water-usage', [
+        return [
             'summary' => [
                 'total_consumption' => $totalConsumption,
                 'avg_consumption' => round($avgConsumption, 2),
@@ -425,38 +526,79 @@ class ReportController extends Controller
                 'granularity' => $chartGranularity,
             ],
             'zoneData' => $usageByZone,
+            'monthlyBreakdown' => $monthlyBreakdown,
             'topConsumers' => $topConsumers,
             'filters' => [
+                'month' => $filterContext['month'],
+                'zone_id' => $zoneId,
+                'tariff_id' => $tariffId,
                 'from' => $fromStr,
                 'to' => $toStr,
             ],
-        ]);
+        ];
     }
 
     /**
-     * @return array{start: Carbon, end: Carbon, from: string, to: string}
+     * Paginated list of bill and service-charge payments with filters.
      */
-    private function resolveWaterUsageDateRange(string $from, string $to): array
+    public function paymentsReport(Request $request)
     {
-        if ($from === '' && $to === '') {
+        return Inertia::render('payments-report/index', $this->paymentsReportService->build($request));
+    }
+
+    public function exportPaymentsReport(Request $request)
+    {
+        $payload = $this->paymentsReportService->dataForExport($request);
+        $filename = 'payments_report_'.now()->format('Ymd_His').'.xlsx';
+
+        return Excel::download(
+            new PaymentsReportExport($payload['rows'], $payload['filters'], $payload['summary']),
+            $filename
+        );
+    }
+
+    /**
+     * @return array{
+     *     month: string,
+     *     zone_id: int|null,
+     *     tariff_id: int|null,
+     *     start: Carbon,
+     *     end: Carbon,
+     *     from: string,
+     *     to: string,
+     * }
+     */
+    private function resolveWaterUsageFilters(Request $request): array
+    {
+        $monthInput = $request->string('month')->toString();
+        $allMonths = $monthInput === '' || $monthInput === 'all';
+
+        if ($allMonths) {
             $start = now()->startOfYear()->startOfDay();
             $end = now()->endOfYear()->endOfDay();
-        } elseif ($from !== '' && $to !== '') {
-            $start = Carbon::parse($from)->startOfDay();
-            $end = Carbon::parse($to)->endOfDay();
-        } elseif ($from !== '') {
-            $start = Carbon::parse($from)->startOfDay();
-            $end = $start->copy()->endOfYear()->endOfDay();
+            $month = 'all';
         } else {
-            $end = Carbon::parse($to)->endOfDay();
-            $start = $end->copy()->startOfYear()->startOfDay();
+            $month = preg_match('/^\d{4}-\d{2}$/', $monthInput)
+                ? $monthInput
+                : now()->format('Y-m');
+            $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->startOfDay();
+            $end = $start->copy()->endOfMonth()->endOfDay();
         }
 
-        if ($start->gt($end)) {
-            [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
+        $zoneId = $request->integer('zone_id') ?: null;
+        if ($zoneId !== null && ! Zone::query()->whereKey($zoneId)->exists()) {
+            $zoneId = null;
+        }
+
+        $tariffId = $request->integer('tariff_id') ?: null;
+        if ($tariffId !== null && ! Tariff::query()->whereKey($tariffId)->exists()) {
+            $tariffId = null;
         }
 
         return [
+            'month' => $month,
+            'zone_id' => $zoneId,
+            'tariff_id' => $tariffId,
             'start' => $start,
             'end' => $end,
             'from' => $start->toDateString(),
@@ -465,15 +607,37 @@ class ReportController extends Controller
     }
 
     /**
+     * @return Builder<Bill>
+     */
+    private function waterUsageBillsInPeriodQuery(
+        string $fromStr,
+        string $toStr,
+        ?int $zoneId = null,
+        ?int $tariffId = null,
+    ) {
+        return Bill::query()
+            ->join('meter_readings', 'meter_readings.id', '=', 'bills.reading_id')
+            ->join('customers', 'customers.id', '=', 'bills.customer_id')
+            ->whereDate('meter_readings.reading_date', '>=', $fromStr)
+            ->whereDate('meter_readings.reading_date', '<=', $toStr)
+            ->when($zoneId !== null, fn ($query) => $query->where('customers.zone_id', $zoneId))
+            ->when($tariffId !== null, fn ($query) => $query->where('customers.tariff_id', $tariffId));
+    }
+
+    /**
      * @return list<array{date: string, consumption: float}>
      */
-    private function waterUsageChartByDay(string $fromStr, string $toStr, Carbon $start, Carbon $end): array
-    {
-        $dayExpr = $this->billCreatedDayExpression();
-        $totals = Bill::query()
-            ->whereDate('created_at', '>=', $fromStr)
-            ->whereDate('created_at', '<=', $toStr)
-            ->selectRaw("{$dayExpr} as period, SUM(consumption) as total")
+    private function waterUsageChartByDay(
+        string $fromStr,
+        string $toStr,
+        Carbon $start,
+        Carbon $end,
+        ?int $zoneId = null,
+        ?int $tariffId = null,
+    ): array {
+        $dayExpr = $this->readingDateDayExpression();
+        $totals = $this->waterUsageBillsInPeriodQuery($fromStr, $toStr, $zoneId, $tariffId)
+            ->selectRaw("{$dayExpr} as period, SUM(bills.consumption) as total")
             ->groupByRaw($dayExpr)
             ->pluck('total', 'period');
 
@@ -492,13 +656,17 @@ class ReportController extends Controller
     /**
      * @return list<array{date: string, consumption: float}>
      */
-    private function waterUsageChartByMonth(string $fromStr, string $toStr, Carbon $start, Carbon $end): array
-    {
-        $monthExpr = $this->billCreatedMonthExpression();
-        $totals = Bill::query()
-            ->whereDate('created_at', '>=', $fromStr)
-            ->whereDate('created_at', '<=', $toStr)
-            ->selectRaw("{$monthExpr} as period, SUM(consumption) as total")
+    private function waterUsageChartByMonth(
+        string $fromStr,
+        string $toStr,
+        Carbon $start,
+        Carbon $end,
+        ?int $zoneId = null,
+        ?int $tariffId = null,
+    ): array {
+        $monthExpr = $this->readingDateMonthExpression();
+        $totals = $this->waterUsageBillsInPeriodQuery($fromStr, $toStr, $zoneId, $tariffId)
+            ->selectRaw("{$monthExpr} as period, SUM(bills.consumption) as total")
             ->groupByRaw($monthExpr)
             ->pluck('total', 'period');
 
@@ -514,21 +682,179 @@ class ReportController extends Controller
         return $series;
     }
 
-    private function billCreatedDayExpression(): string
+    /**
+     * @return list<array{
+     *     month: string,
+     *     label: string,
+     *     amount_expected: float,
+     *     payments_amount: float,
+     *     bills_count: int
+     * }>
+     */
+    private function revenueMonthlyBreakdown(int $year, ?string $search): array
+    {
+        $billMonthExpr = $this->billCreatedMonthExpression();
+        $paymentMonthExpr = $this->paymentDateMonthExpression();
+
+        $billsRows = Bill::query()
+            ->whereYear('created_at', $year)
+            ->when(filled($search), function (Builder $q) use ($search): void {
+                $q->whereHas('customer', function (Builder $c) use ($search): void {
+                    $c->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('account_number', 'like', '%'.$search.'%');
+                });
+            })
+            ->selectRaw("{$billMonthExpr} as period")
+            ->selectRaw('COUNT(bills.id) as bills_count')
+            ->selectRaw('SUM(bills.total_amount) as bills_amount_expected')
+            ->groupByRaw($billMonthExpr)
+            ->get()
+            ->keyBy('period');
+
+        $paymentsRows = Payment::query()
+            ->whereYear('payment_date', $year)
+            ->when(filled($search), function (Builder $q) use ($search): void {
+                $q->where(function (Builder $q) use ($search): void {
+                    $q->whereHasMorph('payable', [Bill::class], function (Builder $bq) use ($search): void {
+                        $bq->whereHas('customer', function (Builder $c) use ($search): void {
+                            $c->where('name', 'like', '%'.$search.'%')
+                                ->orWhere('account_number', 'like', '%'.$search.'%');
+                        });
+                    })->orWhereHasMorph('payable', [ServiceCharge::class], function (Builder $sq) use ($search): void {
+                        $sq->whereHas('customer', function (Builder $c) use ($search): void {
+                            $c->where('name', 'like', '%'.$search.'%')
+                                ->orWhere('account_number', 'like', '%'.$search.'%');
+                        });
+                    });
+                });
+            })
+            ->selectRaw("{$paymentMonthExpr} as period")
+            ->selectRaw('SUM(payments.amount) as payments_amount')
+            ->groupByRaw($paymentMonthExpr)
+            ->get()
+            ->keyBy('period');
+
+        $series = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $cursor = Carbon::createFromDate($year, $month, 1);
+            $key = $cursor->format('Y-m');
+            $paymentRow = $paymentsRows->get($key);
+            $billRow = $billsRows->get($key);
+
+            $series[] = [
+                'month' => $key,
+                'label' => $cursor->format('M Y'),
+                'amount_expected' => round((float) ($billRow->bills_amount_expected ?? 0), 2),
+                'payments_amount' => (float) ($paymentRow->payments_amount ?? 0),
+                'bills_count' => (int) ($billRow->bills_count ?? 0),
+            ];
+        }
+
+        return $series;
+    }
+
+    private function waterUsageMonthlyBreakdown(
+        string $fromStr,
+        string $toStr,
+        Carbon $start,
+        Carbon $end,
+        ?int $zoneId = null,
+        ?int $tariffId = null,
+    ): array {
+        $monthExpr = $this->readingDateMonthExpression();
+        $rows = $this->waterUsageBillsInPeriodQuery($fromStr, $toStr, $zoneId, $tariffId)
+            ->selectRaw("{$monthExpr} as period")
+            ->selectRaw('SUM(bills.consumption) as total_consumption')
+            ->selectRaw('COUNT(bills.id) as bills_count')
+            ->groupByRaw($monthExpr)
+            ->get()
+            ->keyBy('period');
+
+        $series = [];
+        for ($cursor = $start->copy()->startOfMonth(); $cursor->lte($end); $cursor->addMonth()) {
+            $key = $cursor->format('Y-m');
+            $row = $rows->get($key);
+            $series[] = [
+                'month' => $key,
+                'label' => $cursor->format('M Y'),
+                'consumption' => (float) ($row->total_consumption ?? 0),
+                'bills_count' => (int) ($row->bills_count ?? 0),
+            ];
+        }
+
+        return $series;
+    }
+
+    /**
+     * Allocate bill payments to water (current_charge) and fixed portions of this-cycle revenue.
+     *
+     * @param  Collection<int, Bill>  $bills
+     * @return array{water_paid: float, water_unpaid: float, fixed_paid: float, fixed_unpaid: float}
+     */
+    private function billRevenuePaidUnpaidBreakdown(Collection $bills, float $totalRevenue, float $fixedChargeRevenue): array
+    {
+        $waterPaid = 0.0;
+        $fixedPaid = 0.0;
+
+        foreach ($bills as $bill) {
+            $current = (float) $bill->current_charge;
+            $fixed = (float) $bill->fixed_charge;
+            $cycle = $current + $fixed;
+
+            if ($cycle <= 0.00001) {
+                continue;
+            }
+
+            $paidTotal = (float) ($bill->payments_sum_amount ?? 0);
+            $previous = max(0.0, (float) $bill->previous_balance);
+            $paidToCycle = max(0.0, min($cycle, $paidTotal - min($paidTotal, $previous)));
+
+            $waterPaid += $paidToCycle * ($current / $cycle);
+            $fixedPaid += $paidToCycle * ($fixed / $cycle);
+        }
+
+        return [
+            'water_paid' => round($waterPaid, 2),
+            'water_unpaid' => round(max(0.0, $totalRevenue - $waterPaid), 2),
+            'fixed_paid' => round($fixedPaid, 2),
+            'fixed_unpaid' => round(max(0.0, $fixedChargeRevenue - $fixedPaid), 2),
+        ];
+    }
+
+    private function readingDateDayExpression(): string
     {
         return match (DB::connection()->getDriverName()) {
-            'pgsql' => '(created_at::date)',
-            'sqlite' => 'date(created_at)',
-            default => 'DATE(created_at)',
+            'pgsql' => '(meter_readings.reading_date::date)',
+            'sqlite' => 'date(meter_readings.reading_date)',
+            default => 'DATE(meter_readings.reading_date)',
         };
     }
 
     private function billCreatedMonthExpression(): string
     {
         return match (DB::connection()->getDriverName()) {
-            'pgsql' => "to_char(created_at, 'YYYY-MM')",
-            'sqlite' => "strftime('%Y-%m', created_at)",
-            default => "DATE_FORMAT(created_at, '%Y-%m')",
+            'pgsql' => "to_char(bills.created_at, 'YYYY-MM')",
+            'sqlite' => "strftime('%Y-%m', bills.created_at)",
+            default => "DATE_FORMAT(bills.created_at, '%Y-%m')",
+        };
+    }
+
+    private function paymentDateMonthExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "to_char(payments.payment_date, 'YYYY-MM')",
+            'sqlite' => "strftime('%Y-%m', payments.payment_date)",
+            default => "DATE_FORMAT(payments.payment_date, '%Y-%m')",
+        };
+    }
+
+    private function readingDateMonthExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "to_char(meter_readings.reading_date, 'YYYY-MM')",
+            'sqlite' => "strftime('%Y-%m', meter_readings.reading_date)",
+            default => "DATE_FORMAT(meter_readings.reading_date, '%Y-%m')",
         };
     }
 }

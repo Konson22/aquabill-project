@@ -2,13 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\BillsExport;
 use App\Models\Bill;
+use App\Models\Customer;
+use App\Models\Station;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\BillsExport;
 
 class BillController extends Controller
 {
@@ -21,11 +23,17 @@ class BillController extends Controller
         $status = trim((string) $request->input('status', 'all'));
 
         $bills = Bill::query()
-            ->with(['customer.zone', 'meter'])
+            ->with([
+                'customer.zone',
+                'meter',
+                'payments' => fn ($query) => $query
+                    ->orderByDesc('payment_date')
+                    ->orderByDesc('id'),
+            ])
             ->withSum('payments', 'amount')
             ->when($status === 'pending', function ($query) {
                 $query->where('status', 'pending')
-                      ->whereDate('due_date', '>=', Carbon::today());
+                    ->whereDate('due_date', '>=', Carbon::today());
             })
             ->when($status === 'partial', function ($query) {
                 $query->where('status', 'partial');
@@ -38,7 +46,7 @@ class BillController extends Controller
             })
             ->when($status === 'overdue', function ($query) {
                 $query->whereIn('status', ['pending', 'partial'])
-                      ->whereDate('due_date', '<', Carbon::today());
+                    ->whereDate('due_date', '<', Carbon::today());
             })
             ->when($search !== '', function ($query) use ($search): void {
                 $pattern = '%'.addcslashes($search, '%_\\').'%';
@@ -63,6 +71,18 @@ class BillController extends Controller
 
         return Inertia::render('bills/index', [
             'bills' => $bills,
+            'stations' => Station::query()
+                ->with(['accountant:id,name,email'])
+                ->orderBy('name')
+                ->get([
+                    'id',
+                    'name',
+                    'zone_id',
+                    'accountant_id',
+                    'manager_name',
+                    'manager_phone',
+                    'coordinate',
+                ]),
             'filters' => [
                 'search' => $search,
                 'status' => $status,
@@ -77,9 +97,17 @@ class BillController extends Controller
     {
         $search = trim((string) $request->input('search', ''));
         $status = trim((string) $request->input('status', 'all'));
-        $filename = 'bills_' . now()->format('Y-m-d_His') . '.xlsx';
+        $customerId = $request->integer('customer_id') ?: null;
 
-        return Excel::download(new BillsExport($search, $status), $filename);
+        $filename = 'bills_'.now()->format('Y-m-d_His').'.xlsx';
+
+        if ($customerId !== null) {
+            $accountNumber = Customer::query()->whereKey($customerId)->value('account_number');
+            $suffix = $accountNumber ? str_replace(['/', '\\'], '-', $accountNumber) : (string) $customerId;
+            $filename = 'bills_'.$suffix.'_'.now()->format('Y-m-d_His').'.xlsx';
+        }
+
+        return Excel::download(new BillsExport($search, $status, $customerId), $filename);
     }
 
     /**
@@ -143,8 +171,8 @@ class BillController extends Controller
         ]);
         $bill->loadSum('payments', 'amount');
 
-        return Inertia::render('bills/print-single', [
-            'bill' => $bill,
+        return Inertia::render('bills/print-multiple', [
+            'bills' => [$bill],
         ]);
     }
 

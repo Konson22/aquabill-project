@@ -52,11 +52,17 @@ class UserController extends Controller
 
         return Inertia::render('admin/users/index', [
             'users' => $users,
-            'departments' => Department::select('id', 'name')->get(),
-            'roles' => Role::select('id', 'name')->get(),
             'filters' => [
                 'search' => $search,
             ],
+        ]);
+    }
+
+    public function create(): Response
+    {
+        return Inertia::render('admin/users/create', [
+            'departments' => Department::select('id', 'name')->get(),
+            'roles' => Role::select('id', 'name')->get(),
         ]);
     }
 
@@ -83,7 +89,7 @@ class UserController extends Controller
             $user->roles()->sync($validated['roles']);
         }
 
-        return back()->with('success', 'User created successfully.');
+        return redirect()->route('users.index')->with('success', 'User created successfully.');
     }
 
     public function show(User $user): Response

@@ -23,7 +23,7 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect('/');
+    $response->assertRedirect(route('dashboard'));
 });
 
 test('users can not authenticate with invalid password', function () {
@@ -67,5 +67,5 @@ test('login accepts plain password seed pattern with hashed cast and verified em
     ]);
 
     $this->assertAuthenticated();
-    $response->assertRedirect('/');
+    $response->assertRedirect(route('dashboard'));
 });

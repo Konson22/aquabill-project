@@ -14,6 +14,31 @@ import { MapPin, Plus, CalendarDays, Edit2, Clock } from 'lucide-react';
 import { useState } from 'react';
 import CreateZoneModal from './components/create-zone-modal';
 
+function openStreetMapUrlFromBoundary(boundary) {
+    if (!boundary || boundary.type !== 'Polygon' || !boundary.coordinates?.[0]?.length) {
+        return null;
+    }
+    const ring = boundary.coordinates[0];
+    let sumLat = 0;
+    let sumLng = 0;
+    let n = 0;
+    for (const p of ring) {
+        const [lng, lat] = p;
+        if (typeof lat !== 'number' || typeof lng !== 'number') {
+            continue;
+        }
+        sumLat += lat;
+        sumLng += lng;
+        n += 1;
+    }
+    if (!n) {
+        return null;
+    }
+    const clat = sumLat / n;
+    const clng = sumLng / n;
+    return `https://www.openstreetmap.org/#map=14/${clat}/${clng}`;
+}
+
 const breadcrumbs = [
     {
         title: 'Zones',
@@ -53,6 +78,7 @@ export default function Zones({ zones }) {
                                 <TableHead className="px-4 py-3 text-right">Customers</TableHead>
                                 <TableHead className="px-4 py-3">Supply day</TableHead>
                                 <TableHead className="px-4 py-3">Supply time</TableHead>
+                                <TableHead className="px-4 py-3">Map</TableHead>
                                 <TableHead className="px-4 py-3">Status</TableHead>
                                 <TableHead className="px-4 py-3 text-right">Actions</TableHead>
                             </TableRow>
@@ -75,7 +101,7 @@ export default function Zones({ zones }) {
                                         <TableCell className="px-4 py-4">
                                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                 <CalendarDays className="h-4 w-4 shrink-0" />
-                                                {zone.supply_day || 'N/A'}
+                                                {zone.supply_day?.name ?? 'N/A'}
                                             </div>
                                         </TableCell>
                                         <TableCell className="px-4 py-4">
@@ -83,6 +109,23 @@ export default function Zones({ zones }) {
                                                 <Clock className="h-4 w-4 shrink-0" />
                                                 {zone.supply_time || 'Not set'}
                                             </div>
+                                        </TableCell>
+                                        <TableCell className="px-4 py-4">
+                                            {(() => {
+                                                const href = openStreetMapUrlFromBoundary(zone.boundary_geojson);
+                                                return href ? (
+                                                    <a
+                                                        href={href}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-sm font-medium text-primary hover:underline"
+                                                    >
+                                                        Open map
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-sm text-muted-foreground">Not set</span>
+                                                );
+                                            })()}
                                         </TableCell>
                                         <TableCell className="px-4 py-4">
                                             <Badge variant={zone.status === 'active' ? 'success' : 'secondary'}>
@@ -100,7 +143,7 @@ export default function Zones({ zones }) {
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={6}
+                                        colSpan={7}
                                         className="px-4 py-12 text-center text-sm text-muted-foreground"
                                     >
                                         No billing zones yet. Create one to get started.

@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import PaymentModal from '@/components/payment-modal';
+import EditPaymentModal from './components/edit-payment-modal';
+import DeletePaymentModal from './components/delete-payment-modal';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -24,6 +26,8 @@ import {
     ChevronRight,
     CreditCard,
     DollarSign,
+    Pencil,
+    Trash2,
 } from 'lucide-react';
 
 const breadcrumbs = [
@@ -38,9 +42,36 @@ function canRecordPayment(status) {
     return status === 'pending';
 }
 
-export default function Bills({ bills, filters = {} }) {
+/** Edit an existing payment on partial or fully paid bills. */
+function canEditPayment(bill) {
+    if (!['partial', 'paid'].includes(bill?.status)) {
+        return false;
+    }
+
+    const paid = Number(bill?.amount_paid ?? 0);
+
+    return paid > 0 && (bill?.payments?.length ?? 0) > 0;
+}
+
+function canDeletePayment(bill) {
+    return canEditPayment(bill);
+}
+
+function latestPayment(bill) {
+    return bill?.payments?.[0] ?? null;
+}
+
+export default function Bills({ bills, stations = [], filters = {} }) {
+    const { auth } = usePage().props;
+    /** Align with sidebar: admin department may edit or remove recorded payments. */
+    const isAdmin = (auth.user?.department?.name || 'admin') === 'admin';
+
     const [paymentOpen, setPaymentOpen] = useState(false);
+    const [editPaymentOpen, setEditPaymentOpen] = useState(false);
+    const [deletePaymentOpen, setDeletePaymentOpen] = useState(false);
     const [activeBill, setActiveBill] = useState(null);
+    const [activePayment, setActivePayment] = useState(null);
+    const [activePaymentForDelete, setActivePaymentForDelete] = useState(null);
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? 'all');
 
@@ -67,6 +98,18 @@ export default function Bills({ bills, filters = {} }) {
     const openPayment = (bill) => {
         setActiveBill(bill);
         setPaymentOpen(true);
+    };
+
+    const openEditPayment = (bill) => {
+        setActiveBill(bill);
+        setActivePayment(latestPayment(bill));
+        setEditPaymentOpen(true);
+    };
+
+    const openDeletePayment = (bill) => {
+        setActiveBill(bill);
+        setActivePaymentForDelete(latestPayment(bill));
+        setDeletePaymentOpen(true);
     };
 
     return (
@@ -237,6 +280,40 @@ export default function Bills({ bills, filters = {} }) {
                                                                 />
                                                                 <span>Record payment</span>
                                                             </DropdownMenuItem>
+                                                            {isAdmin && (
+                                                                <DropdownMenuItem
+                                                                    disabled={!canEditPayment(bill)}
+                                                                    title={
+                                                                        !canEditPayment(bill)
+                                                                            ? 'Edit payment is available after a payment has been recorded'
+                                                                            : 'Edit payment'
+                                                                    }
+                                                                    onSelect={() => openEditPayment(bill)}
+                                                                    className="cursor-pointer gap-2 py-2"
+                                                                >
+                                                                    <Pencil
+                                                                        className={`h-4 w-4 ${canEditPayment(bill) ? 'text-blue-600' : 'text-muted-foreground'}`}
+                                                                    />
+                                                                    <span>Edit payment</span>
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {isAdmin && (
+                                                                <DropdownMenuItem
+                                                                    disabled={!canDeletePayment(bill)}
+                                                                    title={
+                                                                        !canDeletePayment(bill)
+                                                                            ? 'Delete payment is available after a payment has been recorded'
+                                                                            : 'Delete payment'
+                                                                    }
+                                                                    onSelect={() => openDeletePayment(bill)}
+                                                                    className="cursor-pointer gap-2 py-2 text-destructive focus:text-destructive"
+                                                                >
+                                                                    <Trash2
+                                                                        className={`h-4 w-4 ${canDeletePayment(bill) ? 'text-destructive' : 'text-muted-foreground'}`}
+                                                                    />
+                                                                    <span>Delete payment</span>
+                                                                </DropdownMenuItem>
+                                                            )}
                                                             <DropdownMenuItem asChild className="cursor-pointer">
                                                                 <Link
                                                                     href={route('bills.print', bill.id)}
@@ -309,7 +386,43 @@ export default function Bills({ bills, filters = {} }) {
                     if (!v) setActiveBill(null);
                 }}
                 bill={activeBill}
+                stations={stations}
             />
+
+            {isAdmin && (
+                <EditPaymentModal
+                    open={editPaymentOpen}
+                    onOpenChange={(open) => {
+                        setEditPaymentOpen(open);
+                        if (!open) {
+                            setActiveBill(null);
+                            setActivePayment(null);
+                        }
+                    }}
+                    bill={activeBill}
+                    payment={activePayment}
+                    payments={activeBill?.payments ?? []}
+                    stations={stations}
+                    onPaymentChange={setActivePayment}
+                />
+            )}
+
+            {isAdmin && (
+                <DeletePaymentModal
+                    open={deletePaymentOpen}
+                    onOpenChange={(open) => {
+                        setDeletePaymentOpen(open);
+                        if (!open) {
+                            setActiveBill(null);
+                            setActivePaymentForDelete(null);
+                        }
+                    }}
+                    bill={activeBill}
+                    payment={activePaymentForDelete}
+                    payments={activeBill?.payments ?? []}
+                    onPaymentChange={setActivePaymentForDelete}
+                />
+            )}
         </AppLayout>
     );
 }

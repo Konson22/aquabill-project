@@ -9,7 +9,8 @@ import {
     Building, 
     Settings,
     ChevronRight,
-    ArrowRight
+    ArrowRight,
+    Landmark
 } from 'lucide-react';
 
 const SettingCard = ({ icon: Icon, title, description, href, color }) => (
@@ -86,6 +87,13 @@ export default function Index() {
                     color: "bg-amber-500"
                 },
                 {
+                    title: "Collection stations",
+                    description: "Payment desks and field offices used when recording customer payments.",
+                    icon: Landmark,
+                    href: "/admin/stations",
+                    color: "bg-cyan-600"
+                },
+                {
                     title: "Service Charges",
                     description: "Manage installation, reconnection, and inspection fee types.",
                     icon: CreditCard,
@@ -101,7 +109,7 @@ export default function Index() {
             <Head title="System Settings" />
 
             <div className="p-6 md:p-12 max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 bg-primary/10 rounded-lg">
@@ -114,6 +122,14 @@ export default function Index() {
                             Configure the core billing engine, user access levels, and operational parameters of the Aquabill platform.
                         </p>
                     </div>
+                    <Link
+                        href="/admin/stations"
+                        className="inline-flex shrink-0 items-center gap-2 self-start rounded-2xl border border-cyan-500/30 bg-cyan-500/5 px-4 py-3 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-500/10 hover:text-cyan-900 dark:text-cyan-400 dark:hover:text-cyan-200 md:self-end"
+                    >
+                        <Landmark className="h-4 w-4" />
+                        Collection stations
+                        <ChevronRight className="h-4 w-4 opacity-70" />
+                    </Link>
                 </div>
 
                 <div className="space-y-16">
@@ -146,4 +162,4 @@ export default function Index() {
             </div>
         </AppLayout>
     );
-}
+}

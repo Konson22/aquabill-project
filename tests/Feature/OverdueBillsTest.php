@@ -30,7 +30,7 @@ test('overdue bills page only shows pending or partial bills with due_date in th
 
     $zone = Zone::query()->create([
         'name' => 'TEST-ZONE',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 

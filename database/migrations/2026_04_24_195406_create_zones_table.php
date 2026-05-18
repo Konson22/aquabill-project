@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('zones', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
-            $table->string('supply_day')->nullable();
             $table->time('supply_time')->nullable();
             $table->text('description')->nullable();
+            $table->json('boundary_geojson')->nullable()->comment('GeoJSON Polygon, WGS84, exterior ring [lng,lat]...');
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
         });

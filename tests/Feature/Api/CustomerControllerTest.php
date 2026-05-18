@@ -84,7 +84,6 @@ test('api customers reading_date prefers latest meter reading over stale custome
         'previous_reading' => 0,
         'current_reading' => 120,
         'consumption' => 120,
-        'is_initial' => false,
     ]);
     $meter->refresh();
     $meter->forceFill([

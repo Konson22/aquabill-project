@@ -116,7 +116,7 @@ test('it prevents negative consumption', function () {
     ]);
 })->throws(InvalidArgumentException::class);
 
-test('readings index does not include initial readings', function () {
+test('readings index excludes opening readings where previous_reading is zero', function () {
     $this->actingAs(User::factory()->create());
 
     $tariff = Tariff::create([
@@ -148,7 +148,6 @@ test('readings index does not include initial readings', function () {
         'reading_date' => now()->subDays(2),
         'previous_reading' => 0,
         'current_reading' => 10,
-        'is_initial' => true,
     ]);
 
     $normal = MeterReading::create([
@@ -156,7 +155,6 @@ test('readings index does not include initial readings', function () {
         'reading_date' => now()->subDay(),
         'previous_reading' => 10,
         'current_reading' => 30,
-        'is_initial' => false,
     ]);
 
     $response = $this->get('/readings');
@@ -166,6 +164,157 @@ test('readings index does not include initial readings', function () {
 
     expect($ids)->toContain($normal->id);
     expect($ids)->not->toContain($initial->id);
+});
+
+test('overdue readings page lists active customers without a reading this month', function () {
+    $this->actingAs(User::factory()->create());
+
+    $tariff = Tariff::create([
+        'name' => 'Residential',
+        'price_per_unit' => 50,
+        'fixed_charge' => 500,
+    ]);
+
+    $zone = Zone::create(['name' => 'Test Zone']);
+
+    $overdueCustomer = Customer::create([
+        'customer_type' => 'residential',
+        'name' => 'Overdue Page Customer',
+        'phone' => '123456789',
+        'address' => '123 Main St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'account_number' => 'WTR-PAGE-OD',
+        'status' => 'active',
+        'last_reading_date' => now()->subMonths(2)->startOfMonth(),
+    ]);
+
+    Meter::create([
+        'customer_id' => $overdueCustomer->id,
+        'meter_number' => 'MTR-PAGE-OD',
+        'status' => 'active',
+    ]);
+
+    $response = $this->get(route('readings.overdue'));
+
+    $response->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('readings/overdue-readings')
+            ->has('overdueCustomers.data', 1)
+            ->where('overdueCustomers.data.0.name', 'Overdue Page Customer'));
+});
+
+test('readings index overdue tab lists active customers without a reading this month', function () {
+    $this->actingAs(User::factory()->create());
+
+    $tariff = Tariff::create([
+        'name' => 'Residential',
+        'price_per_unit' => 50,
+        'fixed_charge' => 500,
+    ]);
+
+    $zone = Zone::create(['name' => 'Test Zone']);
+
+    $overdueCustomer = Customer::create([
+        'customer_type' => 'residential',
+        'name' => 'Overdue Customer',
+        'phone' => '123456789',
+        'address' => '123 Main St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'account_number' => 'WTR-OVERDUE',
+        'status' => 'active',
+        'last_reading_date' => now()->subMonths(2)->startOfMonth(),
+    ]);
+
+    Meter::create([
+        'customer_id' => $overdueCustomer->id,
+        'meter_number' => 'MTR-OVERDUE',
+        'status' => 'active',
+    ]);
+
+    $currentCustomer = Customer::create([
+        'customer_type' => 'residential',
+        'name' => 'Current Customer',
+        'phone' => '987654321',
+        'address' => '456 Main St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'account_number' => 'WTR-CURRENT',
+        'status' => 'active',
+        'last_reading_date' => now()->startOfMonth(),
+    ]);
+
+    Meter::create([
+        'customer_id' => $currentCustomer->id,
+        'meter_number' => 'MTR-CURRENT',
+        'status' => 'active',
+    ]);
+
+    $response = $this->get('/readings?tab=overdue');
+    $response->assertOk();
+
+    $ids = collect($response->viewData('page')['props']['overdueCustomers']['data'] ?? [])->pluck('id')->all();
+
+    expect($ids)->toContain($overdueCustomer->id);
+    expect($ids)->not->toContain($currentCustomer->id);
+    expect($response->viewData('page')['props']['tabCounts']['overdue'])->toBe(1);
+});
+
+test('overdue readings export returns csv for customers without a reading this month', function () {
+    $this->actingAs(User::factory()->create());
+
+    $tariff = Tariff::create([
+        'name' => 'Residential',
+        'price_per_unit' => 50,
+        'fixed_charge' => 500,
+    ]);
+
+    $zone = Zone::create(['name' => 'Export Zone']);
+
+    $overdueCustomer = Customer::create([
+        'customer_type' => 'residential',
+        'name' => 'Export Overdue Customer',
+        'phone' => '123456789',
+        'address' => '123 Main St',
+        'plot_no' => 'P-1',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'account_number' => 'WTR-EXPORT-OD',
+        'status' => 'active',
+        'last_reading_date' => now()->subMonths(2)->startOfMonth(),
+    ]);
+
+    Meter::create([
+        'customer_id' => $overdueCustomer->id,
+        'meter_number' => 'MTR-EXPORT-OD',
+        'status' => 'active',
+    ]);
+
+    Customer::create([
+        'customer_type' => 'residential',
+        'name' => 'Current Customer',
+        'phone' => '987654321',
+        'address' => '456 Main St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'account_number' => 'WTR-CURRENT-OD',
+        'status' => 'active',
+        'last_reading_date' => now()->startOfMonth(),
+    ]);
+
+    $response = $this->get(route('readings.overdue.export'));
+
+    $response->assertOk();
+    expect($response->headers->get('content-type'))->toContain('text/csv');
+
+    $content = $response->streamedContent();
+
+    expect($content)
+        ->toContain('Export Overdue Customer')
+        ->toContain('WTR-EXPORT-OD')
+        ->toContain('MTR-EXPORT-OD')
+        ->not->toContain('Current Customer');
 });
 
 test('meter reassignment does not reuse previous customer last reading', function () {

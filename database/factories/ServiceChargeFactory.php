@@ -26,6 +26,7 @@ class ServiceChargeFactory extends Factory
             'customer_id' => Customer::factory(),
             'service_charge_type_id' => $type->id,
             'amount' => $type->amount,
+            'other_charges' => 0,
             'issued_by' => User::inRandomOrder()->first()?->id,
             'issued_date' => $this->faker->date(),
             'due_date' => $this->faker->dateTimeBetween('now', '+30 days')->format('Y-m-d'),

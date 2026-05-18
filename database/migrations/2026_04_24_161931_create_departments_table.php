@@ -17,6 +17,12 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->timestamps();
         });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreignId('department_id')->nullable()->constrained('departments')->nullOnDelete();
+            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->timestamp('last_login_at')->nullable();
+        });
     }
 
     /**
@@ -24,6 +30,11 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign(['department_id']);
+            $table->dropColumn(['department_id', 'status', 'last_login_at']);
+        });
+
         Schema::dropIfExists('departments');
     }
 };

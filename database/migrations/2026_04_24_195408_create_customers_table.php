@@ -19,8 +19,8 @@ return new class extends Migration
             $table->string('phone');
             $table->string('email')->nullable();
             $table->string('national_id')->nullable();
-            $table->string('plot_no')->nullable();
-            $table->text('address');
+            $table->string('plot_no')->nullable()->unique();
+            $table->text('address')->nullable();
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
             $table->foreignId('zone_id')->constrained('zones')->onDelete('cascade');

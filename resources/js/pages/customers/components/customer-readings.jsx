@@ -53,7 +53,7 @@ export default function CustomerReadings({ readings }) {
                                 {reading.consumption ?? '—'}
                             </td>
                             <td className="px-4 py-3 text-center">
-                                {reading.is_initial ? (
+                                {Number(reading.previous_reading) === 0 ? (
                                     <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-600 border-amber-200">Initial</Badge>
                                 ) : (
                                     <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-600 border-blue-200">Regular</Badge>

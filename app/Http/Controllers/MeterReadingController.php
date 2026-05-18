@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateMeterReadingRequest;
+use App\Models\Customer;
 use App\Models\MeterReading;
 use App\Services\BillService;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -16,36 +19,115 @@ use Inertia\Response;
 
 class MeterReadingController extends Controller
 {
+    private const TAB_KEYS = ['readings', 'overdue'];
+
     public function index(Request $request): Response
     {
         $search = trim((string) $request->string('search'));
         $from = $request->input('from'); // YYYY-MM-DD
         $to = $request->input('to'); // YYYY-MM-DD
+        $tab = in_array($request->input('tab'), self::TAB_KEYS, true)
+            ? $request->input('tab')
+            : 'readings';
 
-        $readings = MeterReading::with(['meter.customer', 'recorder'])
-            ->where('is_initial', false)
-            ->when($search !== '', function ($q) use ($search) {
-                $q->whereHas('meter', function ($mq) use ($search) {
-                    $mq->where('meter_number', 'like', "%{$search}%")
-                        ->orWhereHas('customer', function ($cq) use ($search) {
-                            $cq->where('name', 'like', "%{$search}%");
-                        });
-                });
-            })
-            ->when($from, fn ($q) => $q->whereDate('reading_date', '>=', $from))
-            ->when($to, fn ($q) => $q->whereDate('reading_date', '<=', $to))
-            ->orderBy('id', 'desc')
-            ->paginate(100)
-            ->withQueryString();
+        $overdueCount = $this->overdueCustomersQuery($search)->count();
+
+        $readings = null;
+        $overdueCustomers = null;
+
+        if ($tab === 'overdue') {
+            $overdueCustomers = $this->paginatedOverdueCustomers($search);
+        } else {
+            // Hide opening-cycle rows (previous_reading 0); replaces legacy is_initial flag on meter_readings.
+            $readings = MeterReading::with(['meter.customer', 'recorder'])
+                ->where('previous_reading', '>', 0)
+                ->when($search !== '', function ($q) use ($search) {
+                    $q->whereHas('meter', function ($mq) use ($search) {
+                        $mq->where('meter_number', 'like', "%{$search}%")
+                            ->orWhereHas('customer', function ($cq) use ($search) {
+                                $cq->where('name', 'like', "%{$search}%");
+                            });
+                    });
+                })
+                ->when($from, fn ($q) => $q->whereDate('reading_date', '>=', $from))
+                ->when($to, fn ($q) => $q->whereDate('reading_date', '<=', $to))
+                ->orderBy('id', 'desc')
+                ->paginate(100)
+                ->withQueryString();
+        }
 
         return Inertia::render('readings/index', [
             'readings' => $readings,
+            'overdueCustomers' => $overdueCustomers,
+            'tabCounts' => [
+                'overdue' => $overdueCount,
+            ],
             'filters' => [
                 'search' => $search,
                 'from' => $from,
                 'to' => $to,
+                'tab' => $tab,
             ],
         ]);
+    }
+
+    public function overdue(Request $request): Response
+    {
+        $search = trim((string) $request->string('search'));
+
+        return Inertia::render('readings/overdue-readings', [
+            'overdueCustomers' => $this->paginatedOverdueCustomers($search),
+            'filters' => [
+                'search' => $search,
+            ],
+        ]);
+    }
+
+    /**
+     * Active customers with an active meter and no reading recorded in the current calendar month.
+     *
+     * @return Builder<Customer>
+     */
+    private function overdueCustomersQuery(string $search = ''): Builder
+    {
+        $startOfMonth = Carbon::now()->startOfMonth();
+
+        return Customer::query()
+            ->where('status', 'active')
+            ->whereHas('meters', fn ($query) => $query->where('status', 'active'))
+            ->where(function ($query) use ($startOfMonth) {
+                $query->whereNull('last_reading_date')
+                    ->orWhereDate('last_reading_date', '<', $startOfMonth);
+            })
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('name', 'like', "%{$search}%")
+                        ->orWhere('account_number', 'like', "%{$search}%")
+                        ->orWhere('plot_no', 'like', "%{$search}%")
+                        ->orWhereHas('meters', function ($meterQuery) use ($search) {
+                            $meterQuery->where('meter_number', 'like', "%{$search}%");
+                        });
+                });
+            });
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Customer>
+     */
+    private function paginatedOverdueCustomers(string $search = '')
+    {
+        $overdueCustomers = $this->overdueCustomersQuery($search)
+            ->with(['zone', 'meters' => fn ($query) => $query->where('status', 'active')])
+            ->orderByRaw('last_reading_date IS NULL DESC')
+            ->orderBy('last_reading_date')
+            ->paginate(100)
+            ->withQueryString();
+
+        return $overdueCustomers->through(function (Customer $customer) {
+            $customer->days_overdue = $this->daysOverdueForCustomer($customer);
+
+            return $customer;
+        });
     }
 
     public function store(Request $request, BillService $billService)
@@ -120,7 +202,7 @@ class MeterReadingController extends Controller
         $to = $request->input('to');
 
         $query = MeterReading::with(['meter.customer', 'recorder'])
-            ->where('is_initial', false)
+            ->where('previous_reading', '>', 0) // align with readings index (no is_initial column)
             ->when($search !== '', function ($q) use ($search) {
                 $q->whereHas('meter', function ($mq) use ($search) {
                     $mq->where('meter_number', 'like', "%{$search}%")
@@ -187,5 +269,80 @@ class MeterReadingController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    public function exportOverdue(Request $request)
+    {
+        $search = trim((string) $request->string('search'));
+
+        $query = $this->overdueCustomersQuery($search)
+            ->with(['zone', 'meters' => fn ($meterQuery) => $meterQuery->where('status', 'active')])
+            ->orderByRaw('last_reading_date IS NULL DESC')
+            ->orderBy('last_reading_date');
+
+        $totalCount = (clone $query)->count();
+
+        $filename = 'overdue_readings_'.date('Y-m-d_His').'.csv';
+        $headers = [
+            'Content-type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=$filename",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($query, $totalCount) {
+            $file = fopen('php://output', 'w');
+
+            fputcsv($file, ['Export Summary']);
+            fputcsv($file, ['Overdue Customers', $totalCount]);
+            fputcsv($file, []);
+
+            fputcsv($file, [
+                'Customer Name',
+                'Account Number',
+                'Meter Number',
+                'Zone',
+                'Plot No',
+                'Phone',
+                'Last Reading Date',
+                'Days Overdue',
+            ]);
+
+            $query->chunk(500, function ($customers) use ($file) {
+                foreach ($customers as $customer) {
+                    $meterNumber = $customer->meters->first()?->meter_number ?? 'N/A';
+                    $daysOverdue = $this->daysOverdueForCustomer($customer);
+
+                    fputcsv($file, [
+                        $customer->name,
+                        $customer->account_number,
+                        $meterNumber,
+                        $customer->zone?->name ?? 'N/A',
+                        $customer->plot_no ?? '',
+                        $customer->phone,
+                        $customer->last_reading_date
+                            ? Carbon::parse($customer->last_reading_date)->format('Y-m-d')
+                            : 'Never',
+                        $daysOverdue ?? '',
+                    ]);
+                }
+            });
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    private function daysOverdueForCustomer(Customer $customer): ?int
+    {
+        $referenceDate = $customer->last_reading_date ?? $customer->connection_date;
+
+        if ($referenceDate === null) {
+            return null;
+        }
+
+        return Carbon::parse($referenceDate)->startOfDay()->diffInDays(Carbon::today());
     }
 }

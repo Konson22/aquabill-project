@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('meter_number')->nullable();
             $table->unsignedBigInteger('meter_id');
+            $table->unsignedBigInteger('customer_id')->nullable();
             $table->date('reading_date');
             $table->decimal('previous_reading', 10, 2);
             $table->decimal('current_reading', 10, 2);
@@ -22,12 +23,12 @@ return new class extends Migration
             $table->string('image')->nullable();
             $table->foreignId('recorded_by')->nullable()->constrained('users')->onDelete('set null');
             $table->text('notes')->nullable();
-            $table->boolean('is_initial')->default(false);
+            $table->string('bill_no')->nullable();
             $table->timestamps();
 
             $table->index('meter_number');
             $table->index('meter_id');
-            $table->index('is_initial');
+            $table->index('customer_id');
             $table->index('reading_date');
             $table->index(['meter_number', 'reading_date']);
             $table->index(['meter_id', 'reading_date']);

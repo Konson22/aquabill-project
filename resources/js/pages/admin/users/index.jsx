@@ -2,34 +2,12 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Search, Shield, UserCog, Plus, Loader2, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Head, Link, router } from '@inertiajs/react';
+import { Search, Shield, UserCog, Plus, Eye, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-export default function UsersIndex({ users, departments, roles, filters }) {
+export default function UsersIndex({ users, filters }) {
     const [search, setSearch] = useState(filters?.search ?? '');
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-    const { data, setData, post, processing, errors, reset, clearErrors } = useForm({
-        name: '',
-        email: '',
-        password: '',
-        password_confirmation: '',
-        department_id: '',
-        roles: [],
-    });
 
     const isTypingSearch = useMemo(() => {
         return (filters?.search ?? '') !== search;
@@ -47,36 +25,9 @@ export default function UsersIndex({ users, departments, roles, filters }) {
         return () => clearTimeout(timeout);
     }, [search]);
 
-    const handleCreateUser = (e) => {
-        e.preventDefault();
-        post(route('users.store'), {
-            onSuccess: () => {
-                setIsCreateModalOpen(false);
-                reset();
-            },
-        });
-    };
-
-    const handleModalOpenChange = (open) => {
-        setIsCreateModalOpen(open);
-        if (!open) {
-            reset();
-            clearErrors();
-        }
-    };
-
     const handleDeleteUser = (user) => {
         if (confirm(`Are you sure you want to delete ${user.name}?`)) {
             router.delete(route('users.destroy', user.id));
-        }
-    };
-
-    const toggleRole = (roleId) => {
-        const currentRoles = [...data.roles];
-        if (currentRoles.includes(roleId)) {
-            setData('roles', currentRoles.filter(id => id !== roleId));
-        } else {
-            setData('roles', [...currentRoles, roleId]);
         }
     };
 
@@ -99,118 +50,12 @@ export default function UsersIndex({ users, departments, roles, filters }) {
                             <Shield className="mr-2 h-4 w-4" />
                             Audit
                         </Button>
-                        <Dialog open={isCreateModalOpen} onOpenChange={handleModalOpenChange}>
-                            <DialogTrigger asChild>
-                                <Button size="sm">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Add User
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[500px]">
-                                <form onSubmit={handleCreateUser}>
-                                    <DialogHeader>
-                                        <DialogTitle>Create New User</DialogTitle>
-                                        <DialogDescription>
-                                            Add a new user to the system. They will receive an email to verify their account.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="grid gap-4 py-4">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="name">Full Name</Label>
-                                            <Input
-                                                id="name"
-                                                value={data.name}
-                                                onChange={(e) => setData('name', e.target.value)}
-                                                placeholder="John Doe"
-                                                required
-                                            />
-                                            {errors.name && <span className="text-sm text-destructive">{errors.name}</span>}
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="email">Email Address</Label>
-                                            <Input
-                                                id="email"
-                                                type="email"
-                                                value={data.email}
-                                                onChange={(e) => setData('email', e.target.value)}
-                                                placeholder="john@example.com"
-                                                required
-                                            />
-                                            {errors.email && <span className="text-sm text-destructive">{errors.email}</span>}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="password">Password</Label>
-                                                <Input
-                                                    id="password"
-                                                    type="password"
-                                                    value={data.password}
-                                                    onChange={(e) => setData('password', e.target.value)}
-                                                    required
-                                                />
-                                                {errors.password && <span className="text-sm text-destructive">{errors.password}</span>}
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="password_confirmation">Confirm Password</Label>
-                                                <Input
-                                                    id="password_confirmation"
-                                                    type="password"
-                                                    value={data.password_confirmation}
-                                                    onChange={(e) => setData('password_confirmation', e.target.value)}
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="department">Department</Label>
-                                            <Select value={data.department_id} onValueChange={(value) => setData('department_id', value)}>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select a department" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {departments.map((dept) => (
-                                                        <SelectItem key={dept.id} value={dept.id.toString()}>
-                                                            <span className="capitalize">{dept.name}</span>
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {errors.department_id && <span className="text-sm text-destructive">{errors.department_id}</span>}
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label>Roles</Label>
-                                            <div className="grid grid-cols-2 gap-2 mt-1 p-3 border rounded-md bg-muted/20">
-                                                {roles.map((role) => (
-                                                    <div key={role.id} className="flex items-center space-x-2">
-                                                        <Checkbox
-                                                            id={`role-${role.id}`}
-                                                            checked={data.roles.includes(role.id.toString())}
-                                                            onCheckedChange={() => toggleRole(role.id.toString())}
-                                                        />
-                                                        <Label
-                                                            htmlFor={`role-${role.id}`}
-                                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                                        >
-                                                            {role.name}
-                                                        </Label>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            {errors.roles && <span className="text-sm text-destructive">{errors.roles}</span>}
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button variant="outline" type="button" onClick={() => setIsCreateModalOpen(false)}>
-                                            Cancel
-                                        </Button>
-                                        <Button type="submit" disabled={processing}>
-                                            {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                            Create User
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
+                        <Button size="sm" asChild>
+                            <Link href={route('users.create')}>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Add User
+                            </Link>
+                        </Button>
                     </div>
                 </div>
 
@@ -294,9 +139,9 @@ export default function UsersIndex({ users, departments, roles, filters }) {
                                                         <Pencil className="h-4 w-4" />
                                                     </Link>
                                                 </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                                                     onClick={() => handleDeleteUser(user)}
                                                 >

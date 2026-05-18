@@ -2,20 +2,22 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithTitle;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Carbon\Carbon;
-use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class RevenueSummaryExport implements WithMultipleSheets
 {
     protected $summary;
+
     protected $filters;
+
     protected $bills;
 
     public function __construct($summary, $filters, $bills = [])
@@ -34,9 +36,10 @@ class RevenueSummaryExport implements WithMultipleSheets
     }
 }
 
-class RevenueSummarySheet implements FromArray, WithHeadings, WithStyles, ShouldAutoSize, WithTitle
+class RevenueSummarySheet implements FromArray, ShouldAutoSize, WithHeadings, WithStyles, WithTitle
 {
     protected $summary;
+
     protected $filters;
 
     public function __construct($summary, $filters)
@@ -56,11 +59,11 @@ class RevenueSummarySheet implements FromArray, WithHeadings, WithStyles, Should
         $to = $this->filters['to'] ?? null;
 
         if ($from && $to) {
-            return Carbon::parse($from)->format('M d, Y') . ' - ' . Carbon::parse($to)->format('M d, Y');
+            return Carbon::parse($from)->format('M d, Y').' - '.Carbon::parse($to)->format('M d, Y');
         } elseif ($from) {
-            return 'From ' . Carbon::parse($from)->format('M d, Y');
+            return 'From '.Carbon::parse($from)->format('M d, Y');
         } elseif ($to) {
-            return 'Up to ' . Carbon::parse($to)->format('M d, Y');
+            return 'Up to '.Carbon::parse($to)->format('M d, Y');
         }
 
         return 'All Time';
@@ -82,6 +85,9 @@ class RevenueSummarySheet implements FromArray, WithHeadings, WithStyles, Should
         return [
             ['Water Revenue', $this->summary['total_revenue']],
             ['Fixed Charges', $this->summary['fixed_charge_revenue']],
+            ['Service Charges (total)', $this->summary['service_charges_revenue'] ?? 0],
+            ['Service Charges (paid)', $this->summary['service_charges_paid'] ?? 0],
+            ['Service Charges (unpaid)', $this->summary['service_charges_unpaid'] ?? 0],
             ['Total Billed Revenue', $this->summary['total_billed_revenue']],
             ['Total Collected', $this->summary['total_paid']],
             ['Collection Rate (%)', $this->summary['collection_rate_percent']],
@@ -100,17 +106,18 @@ class RevenueSummarySheet implements FromArray, WithHeadings, WithStyles, Should
             5 => [
                 'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
                 'fill' => [
-                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                    'startColor' => ['argb' => 'FF047857'] // Emerald 700
-                ]
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['argb' => 'FF047857'], // Emerald 700
+                ],
             ],
         ];
     }
 }
 
-class RevenueBillsSheet implements FromArray, WithHeadings, WithStyles, ShouldAutoSize, WithTitle
+class RevenueBillsSheet implements FromArray, ShouldAutoSize, WithHeadings, WithStyles, WithTitle
 {
     protected $bills;
+
     protected $filters;
 
     public function __construct($bills, $filters)
@@ -130,11 +137,11 @@ class RevenueBillsSheet implements FromArray, WithHeadings, WithStyles, ShouldAu
         $to = $this->filters['to'] ?? null;
 
         if ($from && $to) {
-            return Carbon::parse($from)->format('M d, Y') . ' - ' . Carbon::parse($to)->format('M d, Y');
+            return Carbon::parse($from)->format('M d, Y').' - '.Carbon::parse($to)->format('M d, Y');
         } elseif ($from) {
-            return 'From ' . Carbon::parse($from)->format('M d, Y');
+            return 'From '.Carbon::parse($from)->format('M d, Y');
         } elseif ($to) {
-            return 'Up to ' . Carbon::parse($to)->format('M d, Y');
+            return 'Up to '.Carbon::parse($to)->format('M d, Y');
         }
 
         return 'All Time';
@@ -154,7 +161,7 @@ class RevenueBillsSheet implements FromArray, WithHeadings, WithStyles, ShouldAu
                 'Account Number',
                 'Paid Amount',
                 'Outstanding',
-            ]
+            ],
         ];
     }
 
@@ -174,9 +181,9 @@ class RevenueBillsSheet implements FromArray, WithHeadings, WithStyles, ShouldAu
             5 => [
                 'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
                 'fill' => [
-                    'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                    'startColor' => ['argb' => 'FF047857'] // Emerald 700
-                ]
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['argb' => 'FF047857'], // Emerald 700
+                ],
             ],
         ];
     }

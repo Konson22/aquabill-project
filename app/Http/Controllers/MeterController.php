@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateMeterRequest;
 use App\Models\Customer;
 use App\Models\Meter;
 use App\Models\MeterHistory;
@@ -64,17 +65,51 @@ class MeterController extends Controller
         return back()->with('success', 'Meter created successfully.');
     }
 
-    public function update(Request $request, Meter $meter): RedirectResponse
+    public function show(Meter $meter): Response
     {
-        $validated = $request->validate([
-            'status' => ['required', 'in:active,inactive,maintenance,damage'],
+        $meter->load([
+            'customer.zone',
         ]);
 
-        $meter->update([
+        $readings = $meter->readings()
+            ->with([
+                'recorder:id,name',
+                'bill:id,reading_id,status,bill_no,total_amount',
+            ])
+            ->orderByDesc('reading_date')
+            ->orderByDesc('id')
+            ->paginate(15)
+            ->withQueryString();
+
+        return Inertia::render('meters/show', [
+            'meter' => $meter,
+            'readings' => $readings,
+        ]);
+    }
+
+    public function update(UpdateMeterRequest $request, Meter $meter): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        $attributes = [
             'status' => $validated['status'],
-        ]);
+        ];
 
-        return back()->with('success', 'Meter status updated successfully.');
+        if (array_key_exists('meter_number', $validated)) {
+            $attributes['meter_number'] = $validated['meter_number'];
+        }
+
+        if (array_key_exists('last_reading', $validated)) {
+            $attributes['last_reading'] = (float) ($validated['last_reading'] ?? 0);
+        }
+
+        $meter->update($attributes);
+
+        $message = array_key_exists('meter_number', $validated) || array_key_exists('last_reading', $validated)
+            ? 'Meter updated successfully.'
+            : 'Meter status updated successfully.';
+
+        return back()->with('success', $message);
     }
 
     public function replace(Request $request, Meter $meter): RedirectResponse

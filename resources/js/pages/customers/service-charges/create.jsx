@@ -5,19 +5,27 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CURRENCY_CODE } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { ArrowLeft, CreditCard, Calendar, Loader2 } from 'lucide-react';
 
 /**
- * @param {{ customer: { id: number, name: string, account_number: string, status: string }, serviceChargeTypes?: { id: number, name: string, amount?: string }[] }} props
+ * @param {{ customer: { id: number, name: string, account_number: string, status: string }, serviceChargeTypes?: { id: number, name: string, amount?: string | number }[] }} props
  */
 export default function CreateServiceCharge({ customer, serviceChargeTypes = [] }) {
     const { data, setData, post, processing, errors } = useForm({
         service_charge_type_id: '',
-        amount: '',
+        other_charges: '',
         issued_date: new Date().toISOString().split('T')[0],
         notes: '',
     });
+
+    const selectedType = serviceChargeTypes.find(
+        (type) => String(type.id) === String(data.service_charge_type_id),
+    );
+
+    const typeAmount = selectedType ? Number(selectedType.amount) || 0 : 0;
+    const otherAmount = data.other_charges === '' ? 0 : Number(data.other_charges) || 0;
+    const totalDue = typeAmount + otherAmount;
 
     const breadcrumbs = [
         { title: 'Customers', href: '/customers' },
@@ -81,41 +89,53 @@ export default function CreateServiceCharge({ customer, serviceChargeTypes = [] 
                                     value={data.service_charge_type_id}
                                     onChange={(e) => setData('service_charge_type_id', e.target.value)}
                                     className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    autoFocus
                                 >
                                     <option value="">Select a charge type...</option>
                                     {serviceChargeTypes.map((type) => (
                                         <option key={type.id} value={type.id}>
-                                            {type.name}
+                                            {type.name} ({formatCurrency(type.amount)})
                                         </option>
                                     ))}
                                 </select>
                                 {errors.service_charge_type_id && (
                                     <p className="text-xs text-red-500">{errors.service_charge_type_id}</p>
                                 )}
+                                {selectedType ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Type amount:{' '}
+                                        <span className="font-mono font-semibold text-foreground">
+                                            {formatCurrency(selectedType.amount)}
+                                        </span>
+                                    </p>
+                                ) : null}
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="amount">Amount (SSP)</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="amount"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={data.amount}
-                                        onChange={(e) => setData('amount', e.target.value)}
-                                        placeholder="Enter amount..."
-                                        className="pr-10"
-                                        autoFocus
-                                    />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase text-muted-foreground">
-                                        {CURRENCY_CODE}
-                                    </div>
-                                </div>
-                                {errors.amount && <p className="text-xs text-red-500">{errors.amount}</p>}
+                            <div className="grid gap-2">
+                                <Label htmlFor="other_charges">Other charges (optional)</Label>
+                                <Input
+                                    id="other_charges"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={data.other_charges}
+                                    onChange={(e) => setData('other_charges', e.target.value)}
+                                    placeholder="0.00"
+                                />
+                                {errors.other_charges && (
+                                    <p className="text-xs text-red-500">{errors.other_charges}</p>
+                                )}
+                                {selectedType ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Total due:{' '}
+                                        <span className="font-mono font-semibold text-foreground">
+                                            {formatCurrency(totalDue)}
+                                        </span>
+                                    </p>
+                                ) : null}
                             </div>
 
-                            <div className="grid gap-2">
                                 <Label htmlFor="issued_date">Issued date</Label>
                                 <div className="relative">
                                     <Input
@@ -147,7 +167,7 @@ export default function CreateServiceCharge({ customer, serviceChargeTypes = [] 
                                 </Button>
                                 <Button
                                     type="submit"
-                                    disabled={processing || !data.service_charge_type_id || !data.amount}
+                                    disabled={processing || !data.service_charge_type_id}
                                     className="bg-emerald-600 hover:bg-emerald-700"
                                 >
                                     {processing ? (

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\SupplyDay;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +45,7 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function supplyDayId(string $name): int
 {
-    // ..
+    return (int) SupplyDay::query()->where('name', $name)->where('status', 'active')->value('id');
 }

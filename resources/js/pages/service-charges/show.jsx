@@ -33,7 +33,7 @@ function formatDisplayDate(value) {
 /**
  * @param {{ charge: Record<string, unknown> }} props
  */
-export default function ServiceChargeShow({ charge }) {
+export default function ServiceChargeShow({ charge, stations = [] }) {
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
     const breadcrumbs = [
@@ -90,7 +90,7 @@ export default function ServiceChargeShow({ charge }) {
                     <div className="border-b py-5">
                         <p className="text-sm text-muted-foreground">Amount</p>
                         <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">
-                            {formatCurrency(charge.amount)}
+                            {formatCurrency(charge.total_due ?? charge.amount)}
                         </p>
                     </div>
 
@@ -155,6 +155,7 @@ export default function ServiceChargeShow({ charge }) {
 
             <ConfirmPaymentModal
                 charge={charge}
+                stations={stations}
                 isOpen={isPaymentModalOpen}
                 onClose={() => setIsPaymentModalOpen(false)}
             />

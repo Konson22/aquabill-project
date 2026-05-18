@@ -135,7 +135,7 @@ export default function CreateCustomer({ zones = [], tariffs = [], existingMeter
                                 <InputError message={errors.national_id} />
                             </div>
                             <div className="grid gap-2 md:col-span-2">
-                                <Label htmlFor="address">Address</Label>
+                                <Label htmlFor="address">Address (optional)</Label>
                                 <Textarea
                                     id="address"
                                     rows={3}
@@ -146,13 +146,18 @@ export default function CreateCustomer({ zones = [], tariffs = [], existingMeter
                                 <InputError message={errors.address} />
                             </div>
                             <div className="grid gap-2">
-                                <Label htmlFor="plot_no">Plot number</Label>
+                                <Label htmlFor="plot_no">
+                                    Plot number <span className="text-destructive">*</span>
+                                </Label>
                                 <Input
                                     id="plot_no"
+                                    required
                                     value={data.plot_no}
                                     onChange={(e) => setData('plot_no', e.target.value)}
                                     placeholder="e.g. 12A"
+                                    autoComplete="off"
                                 />
+                                <p className="text-xs text-muted-foreground">Must be unique across all customers.</p>
                                 <InputError message={errors.plot_no} />
                             </div>
                         </CardContent>

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Customer;
 use App\Models\Meter;
 use App\Models\Subzone;
+use App\Models\SupplyDay;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Carbon\Carbon;
@@ -14,6 +15,11 @@ use Illuminate\Support\Facades\File;
 
 class CustomerSeeder extends Seeder
 {
+    /**
+     * @var array<string, true>
+     */
+    private array $assignedPlotNumbers = [];
+
     /**
      * Center coordinates for Juba Jebel market (Bongroki / HAI GWONGOROKI).
      */
@@ -41,7 +47,7 @@ class CustomerSeeder extends Seeder
         $zone = Zone::updateOrCreate(
             ['name' => 'Jebel'],
             [
-                'supply_day' => 'Monday',
+                'supply_day_id' => SupplyDay::query()->where('name', 'Monday')->where('status', 'active')->value('id'),
                 'supply_time' => '08:00:00',
                 'description' => 'Default zone for all customers.',
                 'status' => 'active',
@@ -96,7 +102,7 @@ class CustomerSeeder extends Seeder
                         'email' => null,
                         'national_id' => null,
                         'address' => $address !== '' ? $address : $area,
-                        'plot_no' => $housePlotNo !== '' ? $housePlotNo : null,
+                        'plot_no' => $this->resolvePlotNo($housePlotNo, $accountNumber),
                         'latitude' => $latitude,
                         'longitude' => $longitude,
                         'zone_id' => $zone->id,
@@ -130,6 +136,29 @@ class CustomerSeeder extends Seeder
                 }
             }
         }
+    }
+
+    private function resolvePlotNo(string $housePlotNo, string $accountNumber): ?string
+    {
+        if ($housePlotNo === '') {
+            return null;
+        }
+
+        $plotNo = $housePlotNo;
+
+        if (isset($this->assignedPlotNumbers[$plotNo])) {
+            $digits = preg_replace('/\D+/', '', $accountNumber) ?: '';
+            $suffix = $digits !== '' ? $digits : substr(md5($accountNumber), 0, 8);
+            $plotNo = $housePlotNo.'-'.$suffix;
+        }
+
+        while (isset($this->assignedPlotNumbers[$plotNo])) {
+            $plotNo = $housePlotNo.'-'.substr(md5($accountNumber.$plotNo), 0, 8);
+        }
+
+        $this->assignedPlotNumbers[$plotNo] = true;
+
+        return $plotNo;
     }
 
     public function parseConnectionDate(mixed $value): ?Carbon

@@ -22,7 +22,7 @@ test('bills index includes summed payments for each bill', function () {
 
     $zone = Zone::query()->create([
         'name' => 'Jebel',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -93,13 +93,13 @@ test('bills index search filters by customer name, zone, meter number, phone, an
 
     $zoneAlpha = Zone::query()->create([
         'name' => 'SearchZoneAlpha',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
     $zoneBeta = Zone::query()->create([
         'name' => 'SearchZoneBeta',
-        'supply_day' => 'Tuesday',
+        'supply_day_id' => supplyDayId('Tuesday'),
         'supply_time' => '09:00:00',
     ]);
 
@@ -225,7 +225,7 @@ test('bill payment store rejects partial paid forwarded statuses', function () {
 
     $zone = Zone::query()->create([
         'name' => 'ZonePay',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 

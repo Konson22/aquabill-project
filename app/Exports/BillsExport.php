@@ -4,27 +4,31 @@ namespace App\Exports;
 
 use App\Models\Bill;
 use Illuminate\Support\Carbon;
-use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\Exportable;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithStyles;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class BillsExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithColumnFormatting, WithStyles
+class BillsExport implements FromQuery, ShouldAutoSize, WithColumnFormatting, WithHeadings, WithMapping, WithStyles
 {
     use Exportable;
 
-    protected $search;
-    protected $status;
+    protected string $search;
 
-    public function __construct($search = '', $status = 'all')
+    protected string $status;
+
+    protected ?int $customerId;
+
+    public function __construct(string $search = '', string $status = 'all', ?int $customerId = null)
     {
         $this->search = $search;
         $this->status = $status;
+        $this->customerId = $customerId;
     }
 
     public function query()
@@ -35,9 +39,12 @@ class BillsExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
         return Bill::query()
             ->with(['customer.zone', 'meter'])
             ->withSum('payments', 'amount')
+            ->when($this->customerId !== null, function ($query): void {
+                $query->where('customer_id', $this->customerId);
+            })
             ->when($status === 'pending', function ($query) {
                 $query->where('status', 'pending')
-                      ->whereDate('due_date', '>=', Carbon::today());
+                    ->whereDate('due_date', '>=', Carbon::today());
             })
             ->when($status === 'partial', function ($query) {
                 $query->where('status', 'partial');
@@ -50,7 +57,7 @@ class BillsExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
             })
             ->when($status === 'overdue', function ($query) {
                 $query->whereIn('status', ['pending', 'partial'])
-                      ->whereDate('due_date', '<', Carbon::today());
+                    ->whereDate('due_date', '<', Carbon::today());
             })
             ->when($search !== '', function ($query) use ($search): void {
                 $pattern = '%'.addcslashes($search, '%_\\').'%';

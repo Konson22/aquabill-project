@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            AppSettingSeeder::class,
             DepartmentSeeder::class,
             HrDepartmentSeeder::class,
             PermissionSeeder::class,
@@ -20,6 +21,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             UserSeeder::class,
             ZoneSeeder::class,
+            StationSeeder::class,
             GisDemoDataSeeder::class,
             WaterPointReadingSeeder::class,
             TariffSeeder::class,

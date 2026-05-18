@@ -1,194 +1,163 @@
-Act as a senior software documentation engineer and Laravel/React system analyst.
+# AquaBill — System Documentation
 
-I want you to explore the entire codebase and generate a complete documentation package for the AquaBill Billing System for SSUWC.
+## Overview
 
-First, inspect the system carefully:
-- Read routes
-- Read controllers
-- Read models
-- Read migrations
-- Read database seeders
-- Read React/Inertia pages
-- Read API routes
-- Read config files
-- Read services/helpers
-- Understand all modules and relationships before writing documentation
+AquaBill is an enterprise water-billing and utility-management system built for the South Sudan Urban Water Corporation (SSUWC). It handles the full lifecycle of water distribution: customer registration, meter management, reading capture, billing, payments, disconnections, tariff administration, service charges, geographic information (GIS), human-resource management, and staff training.
 
-Do not guess. Base the documentation on the actual codebase and database structure.
+---
 
-System context:
-- System name: AquaBill Billing System
-- Client: South Sudan Urban Water Corporation (SSUWC)
-- Purpose: Water billing, customer management, meter reading, payments, reporting, HR, attendance, leave, payroll, staff documents, and training management.
-- Tech stack: Laravel, React/Inertia, MySQL, Tailwind CSS, Sanctum API.
+## Tech Stack
 
-Generate the following documentation files inside a new folder:
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Backend Framework | Laravel | 12 |
+| PHP | | 8.2 |
+| Frontend | React | 19 |
+| SPA Bridge | Inertia.js | 2 |
+| CSS Framework | Tailwind CSS | 4 |
+| UI Components | Radix UI (shadcn/ui) | — |
+| Charts | Recharts | 3.8 |
+| Tables | TanStack React Table | 8 |
+| Maps | Leaflet + React-Leaflet | 5 |
+| Icons | Lucide React | — |
+| Routing (JS) | Ziggy | 2 |
+| Auth / Permissions | Spatie Laravel Permission | 6 |
+| Excel Export | Maatwebsite/Excel | 3.1 |
+| API Auth | Laravel Sanctum | 4 |
+| Testing | Pest | 3 |
+| Code Style | Laravel Pint | 1 |
+| Build | Vite | 6 |
 
-/docs
+---
 
-1. SYSTEM_OVERVIEW.md
-Audience: SSUWC management, JICA, stakeholders.
-Include:
-- Introduction
-- Objectives
-- System modules
-- Key features
-- Benefits to SSUWC
-- High-level workflows
-- Future improvements
+## Application Modules
 
-2. USER_MANUAL.md
-Audience: end users.
-Include step-by-step guides for:
-- Login/logout
-- Dashboard
-- Customer management
-- Meter readings
-- Billing
-- Payments
-- Reports
-- HR module
-- Attendance
-- Leave
+### 1. Dashboard
+Central overview of the system with key metrics.
+
+### 2. Customer Management
+- Customer registration and profile management
+- Meter assignment and meter replacement
+- Service charges per customer
+- Disconnection/reconnection workflow (notify, disconnect, reconnect, cancel notice)
+- Print disconnection notifications
+
+### 3. Meter Management
+- Meter CRUD (index, store, update)
+- Meter replacement history
+- Meter readings (index, store, show, edit, update, export)
+
+### 4. Billing
+- Automated bill generation from meter readings
+- Bill listing with filters and export
+- Individual bill print and bulk print
+- Printing list and overdue bills view
+- Bill payments (store on a per-bill basis)
+
+### 5. Tariff Administration
+- Tariff CRUD (index, show, store, update, destroy)
+- Admin-only creation and modification
+
+### 6. Service Charges
+- Service charge types management (admin)
+- Per-customer service charges
+- Payment confirmation workflow
+
+### 7. Zones
+- Zone management for geographic organization of customers and infrastructure
+
+### 8. GIS (Geographic Information System)
+- GIS Dashboard
+- Interactive map view
+- Water point types and water points CRUD
+- Pipes and valves CRUD
+- API endpoints for map data
+
+### 9. Finance Department
+
+#### 9a. Finance Reports
+- Financial reports listing
+- Report export
+- Monthly reports
+
+#### 9b. Finance Dashboard
+- Inertia page `finance/dashboard` with revenue, bill status, and chart summaries (`FinanceController`)
+
+### 10. Human Resources (HR)
+- HR Dashboard
+- Department management
+- Staff management (CRUD)
+- Attendance tracking
+- Leave management
 - Payroll
 - Staff documents
-- Training management
-Use clear language and add placeholders for screenshots like:
-[SCREENSHOT: Login page]
+- HR Reports
 
-3. TRAINING_MANUAL.md
-Audience: trainers and workshop participants.
-Include:
-- Training objectives
-- Training agenda
-- Module-by-module explanation
-- Practical exercises
-- Example scenarios
-- Assessment/checklist
+### 11. Training Management
+- Training programs CRUD
+- Training participants (add, update, remove)
+- Training documents upload
+- Training reports
 
-4. TECHNICAL_DOCUMENTATION.md
-Audience: developers and IT team.
-Include:
-- System architecture
-- Folder structure
-- Backend structure
-- Frontend structure
-- Database overview
-- Authentication and authorization
-- Key business logic
-- Services/controllers/models explanation
-- Important configuration files
+### 12. Reports
+- Revenue reports with export
+- Water usage reports
 
-5. DATABASE_DOCUMENTATION.md
-Audience: developers and database administrators.
-Explore migrations and models and document:
-- All database tables
-- Fields and data types
-- Relationships
-- Indexes
-- Foreign keys
-- Important constraints
-- Suggested ERD in Mermaid syntax
+### 13. Admin
+- User management (CRUD)
+- Roles management
+- Department listing
+- System settings
+- Service charge type configuration
 
-6. API_DOCUMENTATION.md
-Audience: developers/integrators.
-Explore api.php and controllers.
-Document:
-- Authentication
-- Endpoints
-- Methods
-- Request payloads
-- Response examples
-- Validation rules
-- Error responses
-- API usage flow
+---
 
-7. DEPLOYMENT_GUIDE.md
-Audience: IT/admin team.
-Include:
-- Server requirements
-- Environment requirements
-- Installation steps
-- .env configuration
-- Database setup
-- Migration/seed commands
-- Storage link setup
-- Apache/Nginx setup
-- Queue/scheduler setup if used
-- Backup notes
-- Troubleshooting
+## Permissions
 
-8. OPERATIONS_MAINTENANCE_GUIDE.md
-Audience: SSUWC IT handover team.
-Include:
-- Daily operations
-- User management
-- Backup procedure
-- Restore procedure
-- Monitoring
-- Troubleshooting common issues
-- Updating the system
-- Managing uploaded files
-- Security practices
-- Handover checklist
+`manage_users`, `create_bill`, `view_bill`, `record_payment`, `view_reports`, `handle_complaints`, `view_hr_dashboard`, `manage_departments`, `manage_staff`, `manage_attendance`, `manage_leave`, `approve_leave`, `manage_payroll`, `manage_staff_documents`, `view_hr_reports`, `view_training`, `manage_training_programs`, `manage_training_participants`, `manage_training_documents`, `view_training_reports`
 
-9. ADMIN_MANUAL.md
-Audience: system administrators.
-Include:
-- Managing users and roles
-- Managing system settings
-- Managing departments
-- Managing tariffs/zones if available
-- Managing HR settings
-- Managing reports
-- Exporting data
-- Audit/security checks
+---
 
-10. REPORTS_ANALYTICS_GUIDE.md
-Audience: management and reporting officers.
-Include:
-- List of all reports found in the system
-- Purpose of each report
-- Filters available
-- Export options
-- How reports support decision-making
+## Department-Based Navigation
 
-11. SECURITY_DOCUMENTATION.md
-Audience: IT/admin/management.
-Include:
-- Authentication
-- Role-based access control
-- Permissions
-- Data protection
-- Document/file access
-- Backup security
-- Recommended improvements
+The sidebar dynamically renders based on the authenticated user's department:
 
-12. CHANGELOG.md
-Audience: project team.
-Create a clean changelog template:
-- Version
-- Date
-- Added
-- Changed
-- Fixed
-- Notes
+| Department | Menu Items |
+|-----------|------------|
+| **System Admin** | Dashboard, Revenue, Water Usage, Customers, Meter Readings, Bills, Service Charges, Tariffs, Meters, Zones, GIS |
+| **Admin** | Dashboard, Customers, Zones, GIS, Tariffs, Bills, Service Charges, System Logs, System Settings |
+| **Finance** | Dashboard, Tariffs, Reports, Revenue, Bills, Service Charges |
+| **Ledger** | Dashboard, Zones, GIS, Meters, Meter Readings, Billing Cycles |
+| **HR** | Dashboard, HR Home, Departments, Staff, Attendance, Leave, Payroll, Documents, Training, Training Reports, Reports |
+| **Customer Care** | Dashboard, Customers, Complaints, Tickets |
+| **Distribution** | Dashboard, Zones, GIS |
 
-Important writing style:
-- Use professional but simple English
-- Use SSUWC context
-- Avoid unnecessary technical jargon in user-facing documents
-- Use tables where useful
-- Use Mermaid diagrams where useful
-- Use clear headings
-- Add screenshot placeholders where screenshots are needed
-- Clearly mark sections that need screenshots or confirmation
-- Do not invent features that are not in the codebase
-- If a feature is partially implemented, write “Partially implemented” and explain what exists
-- If something is missing but recommended, place it under “Recommended Improvements”
+---
 
-After generating the documentation:
-- Create /docs/README.md as an index linking all documents
-- Summarize what documents were created
-- Summarize any missing or unclear areas found in the codebase
-- Suggest next improvements for documentation quality
+## Seeders
+
+Core demo and reference data are registered in `database/seeders/DatabaseSeeder.php` (departments, users, zones, tariffs, customers, GIS samples, and related seeders).
+
+---
+
+## Testing
+
+Pest feature tests live under `tests/Feature/`. Finance UI and aggregates are covered in `tests/Feature/Finance/FinanceDashboardTest.php`.
+
+---
+
+## Route Structure
+
+Finance routes are grouped under `/finance/*` with middleware: `auth`, `verified`, `department:finance`.
+
+Key route patterns:
+
+- `GET /finance` — Finance dashboard (`FinanceController@index`)
+- `GET /finance/reports` — Redirects to `GET /reports/revenue` (unified revenue & collections report)
+- `GET /finance/reports/export` — Finance collections CSV export (`FinanceReportService`)
+
+---
+
+## Currency
+
+Default currency: **SSP** (South Sudanese Pound). All monetary columns use `decimal(18, 2)`.

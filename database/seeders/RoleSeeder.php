@@ -44,7 +44,8 @@ class RoleSeeder extends Seeder
                 'System Admin' => $allPermissions,
             ],
             'finance' => [
-                'Accountant' => [$viewBill, $recordPayment, $viewReports],
+                'Finance Manager' => [$viewBill, $recordPayment, $viewReports],
+                'Accountant' => [$viewBill, $viewReports],
                 'Cashier' => [$viewBill, $recordPayment],
             ],
             'ledger' => [
@@ -61,10 +62,26 @@ class RoleSeeder extends Seeder
             'distribution' => [
                 'Distribution Officer' => [$viewBill, $viewReports],
             ],
+            'water_quality' => [
+                'Quality Manager' => [$viewReports],
+                'Laboratory Technician' => [$viewBill],
+            ],
+            'water_purification' => [
+                'Plant Manager' => [$viewReports],
+                'Treatment Operator' => [$viewBill],
+            ],
+            'stores' => [
+                'Stores Manager' => [$viewReports],
+                'Storekeeper' => [$viewBill],
+            ],
         ];
 
         foreach ($roles as $deptName => $deptRoles) {
             $department = Department::where('name', $deptName)->first();
+
+            if (! $department) {
+                continue;
+            }
 
             foreach ($deptRoles as $roleName => $permissions) {
                 $role = Role::create([

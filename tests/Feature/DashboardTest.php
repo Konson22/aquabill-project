@@ -25,3 +25,24 @@ test('distribution department users see the distribution dashboard', function ()
 
     $this->actingAs($user)->get('/dashboard')->assertOk()->assertInertia(fn ($page) => $page->component('distribution/dashboard'));
 });
+
+test('water quality users are sent to the water quality department home', function () {
+    $dept = Department::query()->create([
+        'name' => 'water_quality',
+        'description' => 'Laboratory',
+    ]);
+    $user = User::factory()->create(['department_id' => $dept->id]);
+
+    $this->actingAs($user)->get('/dashboard')->assertRedirect(route('water-quality'));
+
+    $this->actingAs($user)->get(route('water-quality'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('departments/workspace'));
+});
+
+test('department middleware blocks the wrong organisation department', function () {
+    $stores = Department::query()->create(['name' => 'stores', 'description' => 'Stores']);
+    $user = User::factory()->create(['department_id' => $stores->id]);
+
+    $this->actingAs($user)->get(route('water-quality'))->assertForbidden();
+});

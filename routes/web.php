@@ -1,19 +1,23 @@
 <?php
 
+use App\Http\Controllers\Admin\StationController as AdminStationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\BillPaymentController;
+use App\Http\Controllers\ConnectionRequestController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDisconnectionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Departments\AdminController;
 use App\Http\Controllers\Departments\CustomerCareController;
+use App\Http\Controllers\Departments\DepartmentWorkspaceController;
 use App\Http\Controllers\Departments\FinanceController;
 use App\Http\Controllers\Departments\FinanceReportController;
 use App\Http\Controllers\Departments\HRController;
 use App\Http\Controllers\Departments\LedgerController;
 use App\Http\Controllers\Gis\GisDashboardController;
 use App\Http\Controllers\Gis\GisMapController;
+use App\Http\Controllers\Gis\GisZoneBoundaryController;
 use App\Http\Controllers\Gis\PipeController as GisPipeController;
 use App\Http\Controllers\Gis\ValveController as GisValveController;
 use App\Http\Controllers\Gis\WaterPointController as GisWaterPointController;
@@ -29,6 +33,8 @@ use App\Http\Controllers\ServiceChargeController;
 use App\Http\Controllers\ServiceChargeTypeController;
 use App\Http\Controllers\TariffController;
 use App\Http\Controllers\ZoneController;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -43,7 +49,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('finance')->middleware('department:finance')->name('finance.')->group(function () {
         Route::get('/reports', [FinanceReportController::class, 'index'])->name('reports.index');
         Route::get('/reports/export', [FinanceReportController::class, 'export'])->name('reports.export');
-        Route::get('/reports/monthly', [FinanceReportController::class, 'index'])->name('reports.monthly');
     });
     Route::get('/ledger', [LedgerController::class, 'index'])->middleware('department:ledger')->name('ledger');
     Route::prefix('hr')->middleware('department:hr')->group(function () {
@@ -72,11 +77,47 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::get('/customer-care', [CustomerCareController::class, 'index'])->middleware('department:customer_care')->name('customer-care');
 
-    Route::prefix('reports')->group(function () {
-        Route::get('/revenue', [ReportController::class, 'revenue'])->name('reports.revenue');
-        Route::get('/revenue/export', [ReportController::class, 'exportRevenue'])->name('reports.revenue.export');
+    Route::get('/water-quality', DepartmentWorkspaceController::class)->middleware('department:water_quality')->name('water-quality');
+    Route::get('/water-purification', DepartmentWorkspaceController::class)->middleware('department:water_purification')->name('water-purification');
+    Route::get('/stores', DepartmentWorkspaceController::class)->middleware('department:stores')->name('stores');
 
-        Route::get('/water-usage', [ReportController::class, 'waterUsage'])->name('reports.water-usage');
+    Route::get('/water-report', [ReportController::class, 'waterUsage'])->name('water-report.index');
+    Route::get('/water-report/export', [ReportController::class, 'exportWaterUsage'])->name('water-report.export');
+    Route::get('/revenue-report', [ReportController::class, 'revenue'])->name('revenue-report.index');
+    Route::get('/revenue-report/export', [ReportController::class, 'exportRevenue'])->name('revenue-report.export');
+    Route::get('/payments-report', [ReportController::class, 'paymentsReport'])->name('payments-report.index');
+    Route::get('/payments-report/export', [ReportController::class, 'exportPaymentsReport'])->name('payments-report.export');
+
+    Route::get('/reports/water-usage', function (Request $request) {
+        $params = [];
+
+        if ($request->filled('month')) {
+            $params['month'] = $request->string('month')->toString();
+        } elseif ($request->filled('from')) {
+            $params['month'] = Carbon::parse($request->string('from')->toString())->format('Y-m');
+        }
+
+        if ($request->filled('zone_id')) {
+            $params['zone_id'] = $request->integer('zone_id');
+        }
+
+        if ($request->filled('tariff_id')) {
+            $params['tariff_id'] = $request->integer('tariff_id');
+        }
+
+        return redirect()->route('water-report.index', $params);
+    });
+    Route::get('/reports/revenue', function (Request $request) {
+        return redirect()->route('revenue-report.index', $request->query());
+    });
+    Route::get('/reports/revenue/export', function (Request $request) {
+        return redirect()->route('revenue-report.export', $request->query());
+    });
+    Route::get('/reports/payments', function (Request $request) {
+        return redirect()->route('payments-report.index', $request->query());
+    });
+    Route::get('/reports/payments/export', function (Request $request) {
+        return redirect()->route('payments-report.export', $request->query());
     });
 
     Route::resource('customers', CustomerController::class)->only(['index', 'create', 'store', 'show', 'edit', 'update']);
@@ -89,20 +130,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('customers/{customer}/reconnect', [CustomerDisconnectionController::class, 'reconnect'])->name('customers.reconnect');
     Route::get('customers/{customer}/service-charges/create', [ServiceChargeController::class, 'createForCustomer'])->name('customers.service-charges.create');
     Route::post('customers/{customer}/service-charges', [ServiceChargeController::class, 'store'])->name('customers.service-charges.store');
+    Route::get('customers/{customer}/readings/export', [CustomerController::class, 'exportReadings'])->name('customers.readings.export');
+    Route::get('customers/{customer}/payments/export', [CustomerController::class, 'exportPayments'])->name('customers.payments.export');
+    Route::get('customers/{customer}/service-charges/export', [CustomerController::class, 'exportServiceCharges'])->name('customers.service-charges.export');
+    Route::get('connection-requests', [ConnectionRequestController::class, 'index'])->name('connection-requests.index');
+    Route::get('connection-requests/create', [ConnectionRequestController::class, 'create'])->name('connection-requests.create');
+    Route::post('connection-requests', [ConnectionRequestController::class, 'store'])->name('connection-requests.store');
+    Route::get('connection-requests/{connectionRequest}', [ConnectionRequestController::class, 'show'])->name('connection-requests.show');
+    Route::get('connection-requests/{connectionRequest}/print', [ConnectionRequestController::class, 'print'])->name('connection-requests.print');
+    Route::post('connection-requests/{connectionRequest}/mark-paid', [ConnectionRequestController::class, 'markPaid'])->name('connection-requests.mark-paid');
+    Route::post('connection-requests/{connectionRequest}/convert', [ConnectionRequestController::class, 'convertToCustomer'])->name('connection-requests.convert');
+    Route::post('connection-requests/{connectionRequest}/cancel', [ConnectionRequestController::class, 'cancel'])->name('connection-requests.cancel');
     Route::get('tariffs', [TariffController::class, 'index'])->name('tariffs.index');
     Route::get('tariffs/{tariff}', [TariffController::class, 'show'])->name('tariffs.show');
     Route::post('tariffs', [TariffController::class, 'store'])->middleware('department:admin')->name('tariffs.store');
     Route::match(['put', 'patch'], 'tariffs/{tariff}', [TariffController::class, 'update'])->middleware('department:admin')->name('tariffs.update');
     Route::delete('tariffs/{tariff}', [TariffController::class, 'destroy'])->middleware('department:admin')->name('tariffs.destroy');
     Route::post('meters/{meter}/replace', [MeterController::class, 'replace'])->name('meters.replace');
-    Route::resource('meters', MeterController::class)->only(['index', 'store', 'update']);
+    Route::resource('meters', MeterController::class)->only(['index', 'store', 'show', 'update']);
     Route::get('readings/export', [MeterReadingController::class, 'export'])->name('readings.export');
+    Route::get('readings/overdue/export', [MeterReadingController::class, 'exportOverdue'])->name('readings.overdue.export');
+    Route::get('readings/overdue-readings', [MeterReadingController::class, 'overdue'])->name('readings.overdue');
     Route::resource('readings', MeterReadingController::class)->only(['index', 'store', 'show', 'edit', 'update']);
+    Route::patch('zones/{zone}/boundary', [ZoneController::class, 'updateBoundary'])->name('zones.boundary.update');
     Route::resource('zones', ZoneController::class)->only(['index', 'store']);
 
     Route::prefix('gis')->name('gis.')->group(function () {
         Route::get('/', [GisDashboardController::class, 'index'])->name('dashboard');
         Route::get('/map', GisMapController::class)->name('map');
+        Route::get('/zone-boundaries', GisZoneBoundaryController::class)->name('zone-boundaries');
         Route::resource('water-point-types', GisWaterPointTypeController::class);
         Route::resource('water-points', GisWaterPointController::class);
         Route::resource('pipes', GisPipeController::class);
@@ -116,6 +172,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('bills/printing-list', [BillController::class, 'printingList'])->name('bills.printing-list');
     Route::get('bills/overdue-bills', [BillController::class, 'overdue'])->name('bills.overdue');
     Route::post('bills/{bill}/payments', [BillPaymentController::class, 'store'])->name('bills.payments.store');
+    Route::patch('bills/{bill}/payments/{payment}', [BillPaymentController::class, 'update'])
+        ->middleware('department:admin')
+        ->name('bills.payments.update');
+    Route::delete('bills/{bill}/payments/{payment}', [BillPaymentController::class, 'destroy'])
+        ->middleware('department:admin')
+        ->name('bills.payments.destroy');
     Route::resource('bills', BillController::class)->only(['index', 'show']);
 
     // Keeping these for now if needed, or we can move them inside admin prefix
@@ -133,6 +195,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings', function () {
             return Inertia\Inertia::render('admin/setting/index');
         })->name('admin.settings');
+
+        Route::get('/stations', [AdminStationController::class, 'index'])->name('admin.stations.index');
+        Route::post('/stations', [AdminStationController::class, 'store'])->name('admin.stations.store');
 
         Route::resource('settings/service-charges', ServiceChargeTypeController::class)->only([
             'index',

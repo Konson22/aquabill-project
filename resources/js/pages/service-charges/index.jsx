@@ -65,7 +65,7 @@ function formatIssuedDate(value) {
     }
 }
 
-export default function ServiceChargesIndex({ charges }) {
+export default function ServiceChargesIndex({ charges, stations = [] }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [dateFilter, setDateFilter] = useState('all');
@@ -327,7 +327,7 @@ export default function ServiceChargesIndex({ charges }) {
                                             <TableCell className="py-4">
                                                 <div className="flex flex-col">
                                                     <span className="font-black text-base text-primary">
-                                                        {formatCurrency(charge.amount)}
+                                                        {formatCurrency(charge.total_due ?? charge.amount)}
                                                     </span>
                                                 </div>
                                             </TableCell>
@@ -428,6 +428,7 @@ export default function ServiceChargesIndex({ charges }) {
 
             <ConfirmPaymentModal 
                 charge={selectedCharge}
+                stations={stations}
                 isOpen={isPaymentModalOpen}
                 onClose={() => setIsPaymentModalOpen(false)}
             />

@@ -2,6 +2,7 @@
 
 use App\Models\Bill;
 use App\Models\Customer;
+use App\Models\Department;
 use App\Models\Meter;
 use App\Models\MeterReading;
 use App\Models\Payment;
@@ -25,7 +26,7 @@ test('recording a bill payment creates a payments row linked to the bill', funct
 
     $zone = Zone::query()->create([
         'name' => 'Pay Table Zone',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -87,6 +88,235 @@ test('recording a bill payment creates a payments row linked to the bill', funct
     expect((float) $bill->amount_paid)->toBe(25.0);
 });
 
+test('authenticated user can update a bill payment and bill status is recalculated', function () {
+    $adminDept = Department::query()->create([
+        'name' => 'admin',
+        'description' => 'Admin',
+    ]);
+    $user = User::factory()->create(['department_id' => $adminDept->id]);
+
+    $tariff = Tariff::query()->create([
+        'name' => 'DOMESTIC',
+        'price_per_unit' => 50,
+        'fixed_charge' => 0,
+    ]);
+
+    $zone = Zone::query()->create([
+        'name' => 'Edit Pay Zone',
+        'supply_day_id' => supplyDayId('Monday'),
+        'supply_time' => '08:00:00',
+    ]);
+
+    $customer = Customer::query()->create([
+        'customer_type' => 'residential',
+        'name' => 'Edit Pay Customer',
+        'phone' => '100200301',
+        'address' => '1 Edit St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+
+    $meter = Meter::query()->create([
+        'customer_id' => $customer->id,
+        'meter_number' => 'MTR-EDIT-PAY',
+        'status' => 'active',
+    ]);
+
+    $reading = MeterReading::query()->create([
+        'meter_id' => $meter->id,
+        'reading_date' => now()->toDateString(),
+        'previous_reading' => 0,
+        'current_reading' => 10,
+        'notes' => 'Test',
+    ]);
+
+    $bill = Bill::query()->create([
+        'customer_id' => $customer->id,
+        'meter_id' => $meter->id,
+        'reading_id' => $reading->id,
+        'consumption' => 10,
+        'unit_price' => 1,
+        'fixed_charge' => 0,
+        'current_charge' => 10,
+        'previous_balance' => 0,
+        'total_amount' => 100,
+        'status' => 'partial',
+        'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $payment = $bill->payments()->create([
+        'amount' => 40,
+        'current_balance' => 60.0,
+        'payment_date' => now()->toDateString(),
+        'payment_method' => 'cash',
+        'reference_number' => 'OLD-REF',
+    ]);
+
+    $this->actingAs($user)->patch(route('bills.payments.update', [$bill, $payment]), [
+        'amount' => 100,
+        'payment_date' => '2026-05-10',
+        'payment_method' => 'bank',
+        'reference_number' => 'NEW-REF',
+        'notes' => 'Corrected payment',
+    ])->assertRedirect();
+
+    $payment->refresh();
+    $bill->refresh();
+
+    expect((float) $payment->amount)->toBe(100.0);
+    expect($payment->payment_method)->toBe('bank');
+    expect($payment->reference_number)->toBe('NEW-REF');
+    expect($payment->payment_date->toDateString())->toBe('2026-05-10');
+    expect((float) $payment->current_balance)->toBe(0.0);
+    expect($bill->status)->toBe('paid');
+    expect((float) $bill->amount_paid)->toBe(100.0);
+});
+
+test('authenticated user can delete a bill payment and bill returns to pending when none remain', function () {
+    $adminDept = Department::query()->create([
+        'name' => 'admin',
+        'description' => 'Admin',
+    ]);
+    $user = User::factory()->create(['department_id' => $adminDept->id]);
+
+    $tariff = Tariff::query()->create([
+        'name' => 'DOMESTIC',
+        'price_per_unit' => 50,
+        'fixed_charge' => 0,
+    ]);
+
+    $zone = Zone::query()->create([
+        'name' => 'Delete Pay Zone',
+        'supply_day_id' => supplyDayId('Monday'),
+        'supply_time' => '08:00:00',
+    ]);
+
+    $customer = Customer::query()->create([
+        'customer_type' => 'residential',
+        'name' => 'Delete Pay Customer',
+        'phone' => '100200302',
+        'address' => '1 Delete St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+
+    $meter = Meter::query()->create([
+        'customer_id' => $customer->id,
+        'meter_number' => 'MTR-DEL-PAY',
+        'status' => 'active',
+    ]);
+
+    $reading = MeterReading::query()->create([
+        'meter_id' => $meter->id,
+        'reading_date' => now()->toDateString(),
+        'previous_reading' => 0,
+        'current_reading' => 10,
+        'notes' => 'Test',
+    ]);
+
+    $bill = Bill::query()->create([
+        'customer_id' => $customer->id,
+        'meter_id' => $meter->id,
+        'reading_id' => $reading->id,
+        'consumption' => 10,
+        'unit_price' => 1,
+        'fixed_charge' => 0,
+        'current_charge' => 10,
+        'previous_balance' => 0,
+        'total_amount' => 100,
+        'status' => 'partial',
+        'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $payment = $bill->payments()->create([
+        'amount' => 40,
+        'current_balance' => 60.0,
+        'payment_date' => now()->toDateString(),
+        'payment_method' => 'cash',
+    ]);
+
+    $this->actingAs($user)->delete(route('bills.payments.destroy', [$bill, $payment]))->assertRedirect();
+
+    expect(Payment::query()->whereKey($payment->id)->exists())->toBeFalse();
+
+    $bill->refresh();
+    expect($bill->status)->toBe('pending');
+    expect($bill->payments()->count())->toBe(0);
+});
+
+test('non-admin users cannot update bill payments', function () {
+    $financeDept = Department::query()->create([
+        'name' => 'finance',
+        'description' => 'Finance',
+    ]);
+    $user = User::factory()->create(['department_id' => $financeDept->id]);
+
+    $tariff = Tariff::query()->create([
+        'name' => 'DOMESTIC',
+        'price_per_unit' => 50,
+        'fixed_charge' => 0,
+    ]);
+
+    $zone = Zone::query()->create([
+        'name' => 'Finance Pay Zone',
+        'supply_day_id' => supplyDayId('Monday'),
+        'supply_time' => '08:00:00',
+    ]);
+
+    $customer = Customer::query()->create([
+        'customer_type' => 'residential',
+        'name' => 'Finance Pay Customer',
+        'phone' => '100200303',
+        'address' => '1 Finance St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+
+    $meter = Meter::query()->create([
+        'customer_id' => $customer->id,
+        'meter_number' => 'MTR-FIN-PAY',
+        'status' => 'active',
+    ]);
+
+    $reading = MeterReading::query()->create([
+        'meter_id' => $meter->id,
+        'reading_date' => now()->toDateString(),
+        'previous_reading' => 0,
+        'current_reading' => 10,
+        'notes' => 'Test',
+    ]);
+
+    $bill = Bill::query()->create([
+        'customer_id' => $customer->id,
+        'meter_id' => $meter->id,
+        'reading_id' => $reading->id,
+        'consumption' => 10,
+        'unit_price' => 1,
+        'fixed_charge' => 0,
+        'current_charge' => 10,
+        'previous_balance' => 0,
+        'total_amount' => 100,
+        'status' => 'partial',
+        'due_date' => now()->addDays(30)->toDateString(),
+    ]);
+
+    $payment = $bill->payments()->create([
+        'amount' => 40,
+        'current_balance' => 60.0,
+        'payment_date' => now()->toDateString(),
+        'payment_method' => 'cash',
+    ]);
+
+    $this->actingAs($user)->patch(route('bills.payments.update', [$bill, $payment]), [
+        'amount' => 50,
+        'payment_date' => now()->toDateString(),
+        'payment_method' => 'cash',
+    ])->assertForbidden();
+});
+
 test('confirming a service charge creates a payments row linked to the charge', function () {
     $user = User::factory()->create();
 
@@ -98,7 +328,7 @@ test('confirming a service charge creates a payments row linked to the charge', 
 
     $zone = Zone::query()->create([
         'name' => 'Pay SC Zone',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -149,7 +379,7 @@ test('confirming an already paid service charge does not create another payment'
 
     $zone = Zone::query()->create([
         'name' => 'Pay SC Zone 2',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 

@@ -6,8 +6,6 @@ import {
     Store,
     Users,
     FileText,
-    ShoppingCart,
-    Package,
     CreditCard,
     Clock,
     MapPin,
@@ -21,6 +19,10 @@ import {
     Droplets,
     BarChart3,
     Globe2,
+    Beaker,
+    FlaskConical,
+    Warehouse,
+    FilePlus2,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -36,9 +38,11 @@ const getNavItems = (user) => {
     if (isAdmin) {
         return [
             ...items,
-            { title: 'Revenue', url: route('reports.revenue'), icon: CreditCard },
-            { title: 'Water usage', url: route('reports.water-usage'), icon: Droplets },
+            { title: 'Revenue report', url: route('revenue-report.index'), icon: PieChart },
+            { title: 'Payments', url: route('payments-report.index'), icon: CreditCard },
+            { title: 'Water report', url: route('water-report.index'), icon: Droplets },
             { title: 'Customers', url: route('customers.index'), icon: Users },
+            { title: 'Connection requests', url: route('connection-requests.index'), icon: FilePlus2 },
             { title: 'Meter Readings', url: route('readings.index'), icon: MapPin },
             { title: 'Bills', url: route('bills.index'), icon: FileText },
             { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard },
@@ -53,6 +57,7 @@ const getNavItems = (user) => {
     if (department === 'admin') {
         items.push(
             { title: 'Customers', url: route('customers.index'), icon: Users },
+            { title: 'Connection requests', url: route('connection-requests.index'), icon: FilePlus2 },
             { title: 'Zones', url: route('zones.index'), icon: MapPin },
             { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 },
             { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
@@ -64,18 +69,19 @@ const getNavItems = (user) => {
     } else if (department === 'finance') {
         items.push(
             { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
-            { title: 'Reports', url: route('finance.reports.index'), icon: BarChart3 },
-            { title: 'Revenue', url: route('reports.revenue'), icon: CreditCard },
-            { title: 'Water usage', url: route('reports.water-usage'), icon: Droplets },
+            { title: 'Revenue report', url: route('revenue-report.index'), icon: BarChart3 },
+            { title: 'Payments', url: route('payments-report.index'), icon: CreditCard },
             { title: 'Bills', url: route('bills.index'), icon: FileText },
-            { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard }
+            { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard },
+
         );
     } else if (department === 'ledger') {
         items.push(
-            { title: 'Zones', url: route('zones.index'), icon: MapPin },
-            { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 },
+            { title: 'Customers', url: route('customers.index'), icon: Users },
             { title: 'Meters', url: route('meters.index'), icon: MapPin },
             { title: 'Meter Readings', url: route('readings.index'), icon: MapPin },
+            { title: 'Zones', url: route('zones.index'), icon: MapPin },
+            { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 },
             { title: 'Billing Cycles', url: '#', icon: Calendar }
         );
     } else if (department === 'hr') {
@@ -94,6 +100,7 @@ const getNavItems = (user) => {
     } else if (department === 'customer_care') {
         items.push(
             { title: 'Customers', url: route('customers.index'), icon: Users },
+            { title: 'Connection requests', url: route('connection-requests.index'), icon: FilePlus2 },
             { title: 'Complaints', url: '#', icon: FileText },
             { title: 'Tickets', url: '#', icon: Clock }
         );
@@ -102,6 +109,12 @@ const getNavItems = (user) => {
             { title: 'Zones', url: route('zones.index'), icon: MapPin },
             { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 }
         );
+    } else if (department === 'water_quality') {
+        items.push({ title: 'Department home', url: route('water-quality'), icon: Beaker });
+    } else if (department === 'water_purification') {
+        items.push({ title: 'Department home', url: route('water-purification'), icon: FlaskConical });
+    } else if (department === 'stores') {
+        items.push({ title: 'Department home', url: route('stores'), icon: Warehouse });
     }
 
     return items;
@@ -110,14 +123,6 @@ const getNavItems = (user) => {
 export function AppSidebar() {
     const { auth } = usePage().props;
     const mainNavItems = getNavItems(auth.user);
-
-    const footerNavItems = [
-        {
-            title: 'Help Center',
-            url: '#',
-            icon: BookOpen,
-        }
-    ];
 
     return (
         <Sidebar collapsible="icon" variant="sidebar">

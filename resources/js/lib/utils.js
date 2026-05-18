@@ -77,3 +77,17 @@ export function formatCompactNumber(value) {
     }
     return value.toString();
 }
+
+/**
+ * Subtitle for collection station options when a User is assigned as station accountant.
+ *
+ * @param {{ accountant?: { name?: string|null, email?: string|null }|null }|null|undefined} station
+ * @returns {string|null}
+ */
+export function formatStationAccountantSubtitle(station) {
+    const user = station?.accountant;
+    if (user?.name) {
+        return user.email ? `${user.name} · ${user.email}` : user.name;
+    }
+    return null;
+}

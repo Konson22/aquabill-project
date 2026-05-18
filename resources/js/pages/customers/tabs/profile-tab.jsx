@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BadgeCheck, Calendar, MapPin, Phone, User } from 'lucide-react';
-import DisconnectionManagement from '../components/disconnection-management';
+import DisconnectionManagement from '@/pages/connection-management/components/disconnection-management';
 
 export default function ProfileTab({
     customer,

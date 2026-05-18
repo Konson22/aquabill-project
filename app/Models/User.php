@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -53,7 +54,13 @@ class User extends Authenticatable
         ];
     }
 
-    public function department()
+    /**
+     * Primary organisation department for first landing after login and for `department:{name}` route middleware.
+     * Permissions are attached to roles; each role belongs to a department (`roles.department_id`).
+     *
+     * @return BelongsTo<Department, User>
+     */
+    public function department(): BelongsTo
     {
         return $this->belongsTo(Department::class);
     }
@@ -71,6 +78,16 @@ class User extends Authenticatable
     public function recordedReadings(): HasMany
     {
         return $this->hasMany(MeterReading::class, 'recorded_by');
+    }
+
+    /**
+     * Collection stations where this user is the assigned accountant.
+     *
+     * @return HasMany<Station, User>
+     */
+    public function stationsAsAccountant(): HasMany
+    {
+        return $this->hasMany(Station::class, 'accountant_id');
     }
 
     /**

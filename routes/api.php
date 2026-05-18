@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BillController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\Gis\MapDataController as GisMapDataController;
 use App\Http\Controllers\Api\Gis\PipeController as ApiGisPipeController;
@@ -30,6 +31,7 @@ Route::middleware('auth:sanctum')->name('api.')->group(function () {
         return ServiceChargeType::all();
     });
     Route::apiResource('readings', ReadingController::class)->only(['index', 'store']);
+    Route::apiResource('bills', BillController::class)->only(['index', 'show']);
 
     Route::prefix('gis')->name('gis.')->group(function () {
         Route::get('map-data', GisMapDataController::class)->name('map-data');

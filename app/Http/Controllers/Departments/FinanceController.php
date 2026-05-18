@@ -19,7 +19,7 @@ class FinanceController extends Controller
         $totalRevenueCollected = (float) Payment::query()
             ->where('payable_type', Bill::class)
             ->sum('amount')
-            + (float) ServiceCharge::query()->where('status', 'paid')->sum('amount');
+            + ServiceCharge::sumTotalDue(ServiceCharge::query()->where('status', 'paid'));
 
         $outstandingBills = (float) Bill::query()
             ->whereIn('status', ['pending', 'partial'])
@@ -27,22 +27,47 @@ class FinanceController extends Controller
             ->get()
             ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
 
-        $overdueBills = (int) Bill::query()
+        $overdueBillCount = (int) Bill::query()
             ->whereIn('status', ['pending', 'partial'])
             ->whereDate('due_date', '<', Carbon::today()->toDateString())
             ->count();
 
-        $monthlyCollectionSummary = $this->monthlyCollectionSummary();
-        $zoneRevenueComparison = $this->zoneRevenueComparison();
+        $thisMonthCollected = (float) Payment::query()
+            ->where('payable_type', Bill::class)
+            ->whereMonth('payment_date', now()->month)
+            ->whereYear('payment_date', now()->year)
+            ->sum('amount');
+
+        $totalBilled = (float) Bill::query()->sum('total_amount');
+        $collectionRate = $totalBilled > 0
+            ? round(($totalRevenueCollected / $totalBilled) * 100, 1)
+            : 0;
+
+        $billStatusCounts = [
+            'pending' => (int) Bill::query()->where('status', 'pending')->count(),
+            'partial' => (int) Bill::query()->where('status', 'partial')->count(),
+            'paid' => (int) Bill::query()->where('status', 'paid')->count(),
+            'overdue' => $overdueBillCount,
+        ];
+
+        $billStatusAmounts = [
+            'pending' => (float) Bill::query()->where('status', 'pending')->sum('total_amount'),
+            'partial' => (float) Bill::query()->where('status', 'partial')->sum('total_amount'),
+            'paid' => (float) Bill::query()->where('status', 'paid')->sum('total_amount'),
+        ];
 
         return Inertia::render('finance/dashboard', [
             'summary' => [
                 'total_revenue_collected' => $totalRevenueCollected,
                 'outstanding_bills' => $outstandingBills,
-                'overdue_bills' => $overdueBills,
+                'overdue_bills' => $overdueBillCount,
+                'this_month_collected' => $thisMonthCollected,
+                'collection_rate' => $collectionRate,
             ],
-            'monthlyCollectionSummary' => $monthlyCollectionSummary,
-            'zoneRevenueComparison' => $zoneRevenueComparison,
+            'billStatusCounts' => $billStatusCounts,
+            'billStatusAmounts' => $billStatusAmounts,
+            'monthlyCollectionSummary' => $this->monthlyCollectionSummary(),
+            'zoneRevenueComparison' => $this->zoneRevenueComparison(),
         ]);
     }
 

@@ -21,7 +21,7 @@ function seedReadingEditScenario(): array
 
     $zone = Zone::query()->create([
         'name' => 'Zone ER',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 

@@ -23,7 +23,7 @@ beforeEach(function () {
     $this->user = User::factory()->create();
     $this->zone = Zone::query()->create([
         'name' => 'Tab Test Zone',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
     $this->tariff = Tariff::query()->create([

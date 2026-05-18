@@ -19,6 +19,9 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::dropIfExists('connection_request_items');
+        Schema::dropIfExists('connection_requests');
+        Schema::dropIfExists('tariff_histories');
         Schema::dropIfExists('tariffs');
     }
 };

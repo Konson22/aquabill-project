@@ -25,4 +25,19 @@ test('distribution department and seeded user exist after core seeders run', fun
     expect($user->department_id)->toBe($dept->id);
     expect(Hash::check('123', $user->password))->toBeTrue();
     expect($user->roles()->where('name', 'Distribution Officer')->exists())->toBeTrue();
+
+    $waterQuality = User::query()->where('email', 'waterquality@gmail.com')->first();
+    expect($waterQuality)->not->toBeNull();
+    expect($waterQuality->department?->name)->toBe('water_quality');
+    expect($waterQuality->roles()->where('name', 'Quality Manager')->exists())->toBeTrue();
+
+    $waterPurification = User::query()->where('email', 'waterpurification@gmail.com')->first();
+    expect($waterPurification)->not->toBeNull();
+    expect($waterPurification->department?->name)->toBe('water_purification');
+    expect($waterPurification->roles()->where('name', 'Plant Manager')->exists())->toBeTrue();
+
+    $stores = User::query()->where('email', 'stores@gmail.com')->first();
+    expect($stores)->not->toBeNull();
+    expect($stores->department?->name)->toBe('stores');
+    expect($stores->roles()->where('name', 'Stores Manager')->exists())->toBeTrue();
 });

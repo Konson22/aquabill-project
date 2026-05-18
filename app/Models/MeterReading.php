@@ -27,7 +27,6 @@ class MeterReading extends Model
         'recorded_by',
         'notes',
         'bill_no',
-        'is_initial',
     ];
 
     protected $appends = ['image_url'];
@@ -44,7 +43,6 @@ class MeterReading extends Model
             'previous_reading' => 'decimal:2',
             'current_reading' => 'decimal:2',
             'consumption' => 'decimal:2',
-            'is_initial' => 'boolean',
         ];
     }
 

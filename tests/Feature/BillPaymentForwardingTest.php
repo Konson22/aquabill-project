@@ -20,7 +20,7 @@ test('generating a new bill forwards the customer last open bill', function () {
 
     $zone = Zone::create([
         'name' => 'Jebel',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 

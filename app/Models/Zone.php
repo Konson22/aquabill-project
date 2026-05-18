@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\ZoneFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
@@ -15,11 +16,30 @@ class Zone extends Model
 
     protected $fillable = [
         'name',
-        'supply_day',
+        'supply_day_id',
         'supply_time',
         'description',
+        'boundary_geojson',
         'status',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'boundary_geojson' => 'array',
+        ];
+    }
+
+    /**
+     * @return BelongsTo<SupplyDay, Zone>
+     */
+    public function supplyDay(): BelongsTo
+    {
+        return $this->belongsTo(SupplyDay::class);
+    }
 
     /**
      * Get the customers for the zone.
@@ -69,5 +89,13 @@ class Zone extends Model
     public function valves(): HasMany
     {
         return $this->hasMany(Valve::class);
+    }
+
+    /**
+     * @return HasMany<Station, Zone>
+     */
+    public function stations(): HasMany
+    {
+        return $this->hasMany(Station::class);
     }
 }

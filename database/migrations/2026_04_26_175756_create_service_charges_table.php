@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('customer_id')->constrained()->onDelete('cascade');
             $table->foreignId('service_charge_type_id')->constrained()->onDelete('cascade');
-            $table->decimal('amount', 10, 2);
+            $table->decimal('amount', 10, 2); // snapshot of service_charge_types.amount at issue time
+            $table->decimal('other_charges', 10, 2)->default(0);
             $table->foreignId('issued_by')->nullable()->constrained('users')->onDelete('set null');
             $table->date('issued_date');
             $table->date('due_date')->nullable();

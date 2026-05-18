@@ -23,7 +23,7 @@ test('revenue report total revenue sums current charges without double counting 
 
     $zone = Zone::create([
         'name' => 'Jebel',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -104,15 +104,22 @@ test('revenue report total revenue sums current charges without double counting 
     ]);
 
     $this->actingAs($user)
-        ->get('/reports/revenue')
+        ->get('/revenue-report')
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('reports/revenue')
+            ->component('revenue-report/index')
             ->has('summary')
             ->where('summary.total_revenue', 140)
             ->where('summary.fixed_charge_revenue', 0)
-            ->where('summary.total_billed_revenue', 140)
+            ->where('summary.service_charges_revenue', 999)
+            ->where('summary.service_charges_paid', 0)
+            ->where('summary.service_charges_unpaid', 999)
+            ->where('summary.total_billed_revenue', 1139)
             ->where('summary.collection_rate_percent', 0)
+            ->where('summary.total_bills_generated', 2)
+            ->where('summary.bills_paid_count', 0)
+            ->where('summary.bills_pending_count', 2)
+            ->where('summary.bills_forwarded_count', 0)
             ->has('chartData', 12)
             ->has('overdueBills')
             ->has('overdueBillsMeta')
@@ -130,7 +137,7 @@ test('revenue report total revenue respects customer search filter', function ()
 
     $zone = Zone::create([
         'name' => 'Zone A',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -204,14 +211,18 @@ test('revenue report total revenue respects customer search filter', function ()
     ]);
 
     $this->actingAs($user)
-        ->get('/reports/revenue?search='.urlencode('Alice'))
+        ->get('/revenue-report?search='.urlencode('Alice'))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('reports/revenue')
+            ->component('revenue-report/index')
             ->where('summary.total_revenue', 300)
             ->where('summary.fixed_charge_revenue', 0)
             ->where('summary.total_billed_revenue', 300)
             ->where('summary.collection_rate_percent', 0)
+            ->where('summary.total_bills_generated', 1)
+            ->where('summary.bills_paid_count', 0)
+            ->where('summary.bills_pending_count', 1)
+            ->where('summary.bills_forwarded_count', 0)
             ->has('chartData', 12)
             ->has('overdueBills')
             ->has('overdueBillsMeta'));
@@ -228,7 +239,7 @@ test('revenue report fixed charge revenue sums tariff fixed fees on bills', func
 
     $zone = Zone::create([
         'name' => 'Zone X',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -272,14 +283,18 @@ test('revenue report fixed charge revenue sums tariff fixed fees on bills', func
     ]);
 
     $this->actingAs($user)
-        ->get('/reports/revenue')
+        ->get('/revenue-report')
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('reports/revenue')
+            ->component('revenue-report/index')
             ->where('summary.total_revenue', 75)
             ->where('summary.fixed_charge_revenue', 25)
             ->where('summary.total_billed_revenue', 100)
             ->where('summary.collection_rate_percent', 0)
+            ->where('summary.total_bills_generated', 1)
+            ->where('summary.bills_paid_count', 0)
+            ->where('summary.bills_pending_count', 1)
+            ->where('summary.bills_forwarded_count', 0)
             ->has('chartData', 12)
             ->has('overdueBills')
             ->has('overdueBillsMeta'));
@@ -296,7 +311,7 @@ test('revenue report includes overdue bill snapshot when bills are past due', fu
 
     $zone = Zone::create([
         'name' => 'Zone Overdue',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -340,10 +355,14 @@ test('revenue report includes overdue bill snapshot when bills are past due', fu
     ]);
 
     $this->actingAs($user)
-        ->get('/reports/revenue')
+        ->get('/revenue-report')
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('reports/revenue')
+            ->component('revenue-report/index')
+            ->where('summary.total_bills_generated', 1)
+            ->where('summary.bills_paid_count', 0)
+            ->where('summary.bills_pending_count', 1)
+            ->where('summary.bills_forwarded_count', 0)
             ->has('overdueBills', 1)
             ->where('overdueBillsMeta.total_count', 1)
             ->where('overdueBillsMeta.total_outstanding', 20)
@@ -364,7 +383,7 @@ test('revenue report chart monthly collection rate uses billed vs collected in t
 
     $zone = Zone::create([
         'name' => 'Zone Chart CR',
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -422,10 +441,22 @@ test('revenue report chart monthly collection rate uses billed vs collected in t
     $to = sprintf('%d-12-31', $year);
 
     $this->actingAs($user)
-        ->get('/reports/revenue?'.http_build_query(['from' => $from, 'to' => $to]))
+        ->get('/revenue-report?'.http_build_query(['from' => $from, 'to' => $to]))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('reports/revenue')
+            ->component('revenue-report/index')
+            ->where('summary.total_bills_generated', 1)
+            ->where('summary.bills_paid_count', 1)
+            ->where('summary.bills_pending_count', 0)
+            ->where('summary.bills_forwarded_count', 0)
+            ->where('summary.collection_rate_percent', 100)
             ->has('chartData', 12)
-            ->where('chartData.1.collection_rate_percent', 100));
+            ->where('chartData.1.collection_rate_percent', 100)
+            ->has('monthlyBreakdown', 12)
+            ->where('monthlyBreakdownYear', $year)
+            ->where('monthlyBreakdown.0.payments_amount', 0)
+            ->where('monthlyBreakdown.0.bills_count', 0)
+            ->where('monthlyBreakdown.1.amount_expected', 50)
+            ->where('monthlyBreakdown.1.payments_amount', 50)
+            ->where('monthlyBreakdown.1.bills_count', 1));
 });

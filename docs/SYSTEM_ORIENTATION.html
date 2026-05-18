@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AquaBill — system orientation (for clients)</title>
+    <style>
+        body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; font-size: 11pt; line-height: 1.35; color: #222; max-width: 48rem; margin: 1.5rem auto; padding: 0 1rem; }
+        h1 { font-size: 22pt; border-bottom: 2pt solid #2563eb; padding-bottom: 0.35rem; }
+        h2 { font-size: 14pt; margin-top: 1.75rem; color: #1e3a5f; }
+        h3 { font-size: 12pt; margin-top: 1rem; color: #334155; }
+        p { margin: 0.5rem 0; }
+        table { border-collapse: collapse; width: 100%; margin: 0.75rem 0 1.25rem; }
+        th, td { border: 1pt solid #94a3b8; padding: 6pt 8pt; text-align: left; vertical-align: top; }
+        th { background: #e2e8f0; font-weight: bold; }
+        ul { margin: 0.35rem 0 0.75rem 1.25rem; }
+        .meta { background: #f1f5f9; padding: 10pt 12pt; margin: 1rem 0; border: 1pt solid #cbd5e1; }
+        .note { font-size: 10pt; color: #475569; margin-top: 2rem; border-top: 1pt solid #cbd5e1; padding-top: 10pt; }
+    </style>
+</head>
+<body>
+
+<h1>AquaBill — system orientation (for clients)</h1>
+
+<div class="meta">
+    <strong>Document purpose:</strong> Explain what each main part of AquaBill is for, what you typically do there, and how major processes fit together—in plain language.<br />
+    <strong>Audience:</strong> Customer service, billing, finance, field teams, supervisors, and executives.<br />
+    <strong>Technical reference (IT):</strong> See <code>docs/SYSTEM_REVIEW.md</code> in the same folder as this file.<br />
+    <strong>Save as Word:</strong> In Word, use <em>File → Save As → Word Document (.docx)</em>.
+</div>
+
+<p><strong>Access:</strong> <strong>System administrators</strong> create users, set each person’s <strong>department</strong>, maintain <strong>system settings</strong>, and assign <strong>roles</strong> (with <strong>permissions</strong>) so menus match the job. If a screen is missing from your menu, your access needs an admin change.</p>
+
+<h2>Document control</h2>
+<table>
+    <tr><th>Item</th><th>Detail</th></tr>
+    <tr><td>Product</td><td>AquaBill</td></tr>
+    <tr><td>Document type</td><td>Client system orientation</td></tr>
+    <tr><td>Maintainer</td><td>Update when modules, menus, or major workflows change</td></tr>
+</table>
+
+<h2>1. Administrator role, departments, and access</h2>
+<p><strong>Administrator role</strong> — Staff with administrator access maintain <strong>user accounts</strong>, <strong>system settings</strong> (organisation-wide options and catalogues), <strong>collection stations</strong>, and <strong>roles</strong> that bundle <strong>permissions</strong>. There is <strong>no self-registration</strong>: logins are created and updated only through <strong>Administration</strong>.</p>
+<p><strong>Departments and role access</strong> — Each user belongs to a <strong>department</strong> (for example Finance, Ledger, Distribution, HR), which affects the default workspace and how work is grouped. <strong>Role</strong> and <strong>permissions</strong> then control <strong>which screens and actions</strong> that person can use—two colleagues in the same department can still have different menus if their roles differ. If a needed screen is missing, an administrator adjusts <strong>department</strong>, <strong>role</strong>, or <strong>permissions</strong>; staff should not share passwords to work around access limits.</p>
+
+<h2>2. Home and dashboards</h2>
+<p>After sign-in you land on a <strong>dashboard</strong>. Which one you see depends on your <strong>department</strong> (Finance, Ledger, Admin, HR, Customer care, Distribution).</p>
+<table>
+    <tr><th>Screen</th><th>Core functionality</th></tr>
+    <tr><td>Main dashboard</td><td>Key figures and shortcuts for daily work (what appears depends on your <strong>role</strong>).</td></tr>
+    <tr><td>Department home</td><td>Starting point tailored to your team.</td></tr>
+    <tr><td>Simple workspace</td><td>Minimal home until more features are rolled out; still reflects your <strong>department</strong>.</td></tr>
+</table>
+<h3>Typical tasks</h3>
+<ul>
+    <li>Start from the dashboard for reminders or summary numbers your organisation chose to show.</li>
+    <li>Use sidebar links to reach your most-used areas.</li>
+</ul>
+<p><strong>Tip:</strong> If the dashboard looks empty, your <strong>role</strong> may limit you to a narrow set of tasks—that can be normal for specialised accounts.</p>
+
+<h2>3. Customers (accounts)</h2>
+<p>Everything about <strong>who is connected</strong>, <strong>where they are supplied</strong>, and <strong>their billing history</strong> starts from the <strong>customer</strong> (account) record. The customer is the anchor for meters, readings, bills, payments, and service charges—so most enquiries from account holders begin here.</p>
+<table>
+    <tr><th>Screen</th><th>Core functionality</th></tr>
+    <tr><td>Customer list</td><td><strong>Search</strong> by name or account number; <strong>open</strong> a record; <strong>start</strong> a new customer. The list may offer filters or tabs (for example active vs inactive) depending on how your organisation configured the system.</td></tr>
+    <tr><td>New customer</td><td>Capture a <strong>new account</strong>: identity, contact details, address, <strong>zone</strong> (supply area), <strong>tariff</strong> (price scheme), and related setup such as linking or registering a meter.</td></tr>
+    <tr><td>Customer profile (detail)</td><td>A <strong>single place</strong> for the full picture: personal details, <strong>meters</strong>, <strong>readings</strong>, <strong>bills</strong>, <strong>payments</strong>, and <strong>service charges</strong>, often as <strong>tabs</strong> so you can switch views without losing context.</td></tr>
+    <tr><td>Edit customer</td><td>Update <strong>master data</strong>—address, phone numbers, account status, and other fields—whenever the customer’s situation changes (moved house, new phone, temporary suspension, etc.).</td></tr>
+    <tr><td>Disconnection status</td><td>See where the customer stands in the <strong>disconnection workflow</strong>: notices sent, key dates, and what should happen next according to your process.</td></tr>
+    <tr><td>Print disconnection notice</td><td>Open a <strong>print-friendly</strong> notice for the customer; use the browser’s <strong>Print</strong> or <strong>Save as PDF</strong> to produce paper or a file.</td></tr>
+    <tr><td>New service charge (from customer)</td><td>Record a <strong>one-off charge</strong> (for example a reconnection or administrative fee) <strong>against this customer</strong> without going through normal monthly water billing.</td></tr>
+</table>
+<h3>Typical tasks</h3>
+<ul>
+    <li>Search the customer list before creating a new account, to avoid duplicate records.</li>
+    <li>From the profile, open a bill or reading while you are on the phone with the customer so you can answer questions with the same numbers they see.</li>
+    <li>Update contact details when the customer moves within your supply area or changes phone or email.</li>
+</ul>
+<p><strong>Tip:</strong> The <strong>customer profile</strong> is usually the fastest way to answer “why is my bill this amount?”—review <strong>readings</strong>, <strong>tariff</strong>, and <strong>bill history</strong> together before escalating.</p>
+
+<h2>4. Meters and meter readings</h2>
+<p><strong>Meters</strong> and <strong>meter readings</strong> are related but different. A <strong>meter</strong> is the piece of equipment (or its registry record): serial or meter number, type, and whether it is <strong>assigned</strong> to a customer account or <strong>not assigned</strong> (for example in stock, withdrawn, or awaiting installation). <strong>Readings</strong> are the periodic <strong>index values</strong> taken from a meter on specific dates; those values drive <strong>consumption</strong> and therefore <strong>billing</strong>. Use the meters area to manage the asset and its link to the customer; use the readings area to work with the numbers used on bills.</p>
+
+<h3>4.1 Meters (equipment and assignment)</h3>
+<p>The <strong>Meters</strong> screens are where you maintain the meter <strong>register</strong>: create or look up meters, see whether each meter is <strong>assigned to a customer</strong> or <strong>unassigned</strong>, and update <strong>status</strong> (for example active, replaced, faulty) when your procedures allow. When a meter is assigned, it is the one whose readings will normally feed that customer’s billing; when it is not assigned, staff can still see it in the list for stock control, replacements, or linking it later to an account.</p>
+<table>
+    <tr><th>Screen / focus</th><th>Core functionality</th></tr>
+    <tr><td>Meters (list and detail)</td><td>List <strong>water meters</strong>: meter numbers or serials, type, and <strong>assignment</strong>—which customer account the meter is linked to, or that it is <strong>not assigned</strong> yet. Manage <strong>status</strong> (active, replaced, etc.) and, where your process supports it, <strong>replacement</strong> history when one meter is swapped for another on the same account.</td></tr>
+</table>
+
+<h3>4.2 Meter readings</h3>
+<p>Once a meter is <strong>assigned</strong> to a customer, staff (or authorised field users) record <strong>readings</strong>: the meter <strong>index</strong> on a <strong>reading date</strong>, sometimes with <strong>notes</strong> or a <strong>photo</strong> of the dial. The system derives <strong>consumption</strong> for the period (typically the increase in the index since the last accepted reading). That consumption is what billing uses—not the raw index alone, unless it is the first reading on a new meter.</p>
+
+<h4>Where readings are collected</h4>
+<ul>
+    <li><strong>Web application (browser):</strong> Office and call-centre staff use the same AquaBill site they use for customers and bills—<strong>readings list</strong>, reading forms, and shortcuts (for example from a customer’s profile) to enter or review readings while signed in.</li>
+    <li><strong>Mobile app (field):</strong> Readers in the street use your organisation’s <strong>companion app</strong>, which sends readings to AquaBill through the <strong>readings API</strong>. The app can send the same core fields (customer or meter, date, current index, optional previous index, notes) and may attach a <strong>meter photo</strong> or an optional <strong>bill number</strong> for printing workflows. Behind the scenes, web and app follow the same validation and billing rules.</li>
+</ul>
+
+<h4>How a bill is generated from a reading</h4>
+<p>When a new reading is saved, AquaBill can <strong>automatically generate a bill</strong> for that meter’s customer (your procedures may still require review or printing). The amounts are driven by the customer’s <strong>tariff</strong> and the reading:</p>
+<ul>
+    <li><strong>Consumption</strong> — Water used in the period, calculated from the reading and the previous index (as stored on the reading or taken from history).</li>
+    <li><strong>Usage charge</strong> — <strong>Consumption × price per unit</strong> from the tariff linked to the <strong>customer</strong>. If no tariff is set on the customer, the system may use your configured <strong>default active tariff</strong>.</li>
+    <li><strong>Fixed charge</strong> — The tariff’s <strong>fixed charge</strong> (flat amount your organisation defines for that price scheme), added to the bill as part of the total.</li>
+    <li><strong>Previous balance</strong> — Any amount still <strong>outstanding</strong> on earlier <strong>pending</strong> or <strong>partially paid</strong> bills for the same customer can be rolled into the new bill so the customer sees one total to pay.</li>
+</ul>
+<p>The bill stores snapshots of the <strong>unit price</strong> and <strong>fixed charge</strong> used at generation time, so later tariff edits do not rewrite old bills without a deliberate recalculation process.</p>
+<table>
+    <tr><th>Screen</th><th>Core functionality</th></tr>
+    <tr><td>Readings list</td><td>Browse <strong>meter readings</strong> in date order; supports the <strong>billing cycle</strong> (readings drive consumption and therefore bills).</td></tr>
+    <tr><td>Reading detail</td><td>Inspect <strong>one reading</strong>: date, previous and current index, notes, optional image, and links to the meter and customer where configured.</td></tr>
+    <tr><td>Edit reading</td><td><strong>Correct</strong> a wrong reading when your procedures allow (often restricted to supervisors or ledger staff). If a bill was already generated from that reading, amounts may be <strong>recalculated</strong> to stay consistent.</td></tr>
+</table>
+<h3>Typical tasks</h3>
+<ul>
+    <li>On the <strong>meters</strong> side: confirm a meter is <strong>assigned</strong> to the right customer before accepting readings or disputing a bill.</li>
+    <li>On the <strong>readings</strong> side: find the latest reading before explaining consumption on a bill; if web and app both capture readings, use one consistent process so the same visit is not entered twice.</li>
+    <li>When a customer questions a total, open the <strong>bill</strong> and confirm <strong>tariff</strong> (price per unit and fixed charge), <strong>consumption</strong>, and any <strong>previous balance</strong> line.</li>
+    <li>Correct erroneous readings only according to your utility’s policy (a paper trail outside the system may still be required).</li>
+</ul>
+<p><strong>Tip:</strong> Accurate <strong>reading dates</strong> and <strong>indexes</strong> reduce billing disputes and rework; keeping the customer on the correct <strong>tariff</strong> and meter <strong>assignment</strong> up to date ensures usage and fixed charges match your rules.</p>
+
+<h2>5. Zones, tariffs, and service charges (reference data)</h2>
+<p>These areas hold <strong>reference data</strong> and <strong>fee rules</strong> that billing depends on: <strong>zones</strong> describe <em>where</em> supply happens geographically; <strong>tariffs</strong> describe <em>how much</em> to charge for <strong>metered water</strong> (price per unit and fixed charge per scheme). <strong>Service charges</strong> (§5.3) are different: they are <strong>one-off fees</strong> for specific events or services and are <strong>not</strong> worked out from the customer’s tariff the way a routine water bill is.</p>
+
+<h3>5.1 Zones</h3>
+<p><strong>Zones</strong> are supply or administrative areas (neighbourhoods, districts, branches). Customers are linked to a zone so routing, reporting, maps, and sometimes billing stay aligned with geography. Zone maintenance is usually separate from day-to-day reading entry.</p>
+<table>
+    <tr><th>Screen</th><th>Core functionality</th></tr>
+    <tr><td>Zones</td><td>Define and maintain <strong>supply areas</strong>; align customers, operations, GIS, and reports with a consistent map of your network.</td></tr>
+</table>
+
+<h3>5.2 Tariffs (pricing schemes)</h3>
+<p>A <strong>tariff</strong> is a named <strong>pricing scheme</strong>. In practice it means:</p>
+<ul>
+    <li>It defines the <strong>price per unit</strong> of water (the usage rate) and the <strong>fixed charge</strong> (a flat amount per bill or period—your organisation decides how that is applied).</li>
+    <li>Each <strong>customer</strong> is linked to one tariff; when a bill is generated, the system uses that tariff’s rates, or a configured <strong>default</strong> active tariff if none is assigned to the customer.</li>
+    <li>Each bill stores a <strong>snapshot</strong> of the unit price and fixed charge at generation time, so old invoices stay interpretable even after you change a tariff for the future.</li>
+</ul>
+
+<h4>Tariff history</h4>
+<p>Whenever an authorised user <strong>updates</strong> and saves a tariff, AquaBill appends a row to <strong>tariff history</strong> capturing the <strong>previous</strong> name, price per unit, and fixed charge (with date and, where recorded, who made the change). That gives supervisors and auditors a clear trail of <strong>how rates changed over time</strong> without guessing from old bills alone. The <strong>tariff detail</strong> screen lists these rows—newest first—next to the live numbers.</p>
+<h3>Typical tasks</h3>
+<ul>
+    <li>Confirm a customer’s <strong>zone</strong> and <strong>tariff</strong> when a bill looks wrong before blaming the meter reading.</li>
+    <li>Before a regulated price change, plan the new tariff values, apply them in the system, then use <strong>tariff history</strong> to show what the old and new rates were.</li>
+</ul>
+<p><strong>Tip:</strong> Changing a tariff affects <strong>new</strong> bills generated after the change; existing bills keep the amounts they were created with unless your team runs a controlled recalculation process.</p>
+
+<h3>5.3 Service charges (fees outside normal water bills)</h3>
+<p>A <strong>routine bill</strong> (section 6) is built from <strong>meter readings</strong> and the customer’s <strong>tariff</strong>. A <strong>service charge</strong> is a <strong>separate invoice line or fee record</strong> for something that is not “this month’s water usage”—for example <strong>reconnection</strong> after a disconnection, <strong>penalties</strong>, <strong>new connection</strong> costs, or <strong>administrative</strong> handling. The customer can still receive normal water bills while also owing one or more service charges; they are tracked in parallel so finance can report <strong>usage revenue</strong> separately from <strong>fee income</strong>.</p>
+<p>Administrators define <strong>service charge types</strong> in the admin area (name, default amount, and similar)—in the same spirit as maintaining <strong>tariffs</strong>, but for <strong>named products</strong> rather than price-per-unit of water. When staff create a charge, they choose the correct <strong>type</strong> so reports by category stay trustworthy.</p>
+<h4>What you can do</h4>
+<ul>
+    <li><strong>Service charges list</strong> — Browse every charge: which <strong>customer</strong> it belongs to, the <strong>amount</strong>, the <strong>type</strong>, and whether it is <strong>unpaid</strong>, <strong>partially paid</strong>, or <strong>settled</strong>. Search or filter depending on your role.</li>
+    <li><strong>Service charge detail</strong> — Open one charge for notes, dates, and status; when permitted, <strong>confirm payment</strong> (or update status) so the balance matches cash or bank receipts—often using the same <strong>collection station</strong> conventions as bill payments.</li>
+    <li><strong>From the customer profile</strong> — Start a <strong>new service charge</strong> while viewing the customer so the fee is clearly tied to the right account.</li>
+</ul>
+<h4>Typical tasks</h4>
+<ul>
+    <li>After a field job (e.g. reconnection), raise the matching charge type and later confirm payment when the customer pays.</li>
+    <li>When investigating “extra” amounts, compare <strong>service charge detail</strong> to <strong>bill detail</strong>—two different mechanisms in one system.</li>
+</ul>
+<p><strong>Tip:</strong> Picking the wrong <strong>charge type</strong> makes monthly fee reports misleading; if unsure, ask a supervisor which type your procedure requires.</p>
+
+<h2>6. Bills and printing</h2>
+<p>The <strong>bills</strong> area is where you work with <strong>invoices</strong> for water usage: find them, understand what the customer owes, <strong>record payments</strong>, and produce <strong>paper or PDF</strong> copies. A bill ties together a <strong>reading period</strong>, <strong>consumption</strong>, <strong>tariff-based charges</strong>, and any <strong>previous balance</strong> that was rolled forward—see section 4 for how those amounts are built.</p>
+
+<h3>What you can do in each place</h3>
+<table>
+    <tr><th>Screen</th><th>Core functionality</th></tr>
+    <tr><td>Bills (main list)</td><td>Central list of invoices. Filter by <strong>status</strong> (for example pending, partial, paid, overdue) for collections, cashiering, or audits. Open any row for detail, <strong>record a payment</strong> when money is received, and jump to <strong>print</strong> or <strong>export</strong> where your role allows.</td></tr>
+    <tr><td>Bill detail</td><td>One invoice end-to-end: line items and totals, <strong>consumption</strong>, <strong>unit price</strong> and <strong>fixed charge</strong> as stored on the bill, <strong>due date</strong>, current <strong>status</strong>, and <strong>payment history</strong> (partial payments and who recorded them).</td></tr>
+    <tr><td>Overdue bills</td><td>Focused work queue for accounts <strong>past the due date</strong>—collections follow-up without scanning the full list.</td></tr>
+    <tr><td>Printing list</td><td>Prepare or select many bills for a <strong>batch</strong> (e.g. meter-reading round or postal run) before opening the print layout.</td></tr>
+    <tr><td>Print one bill</td><td><strong>Print-friendly</strong> page for a <strong>single</strong> invoice; use the browser’s <strong>Print</strong> or <strong>Save as PDF</strong>.</td></tr>
+    <tr><td>Print several bills</td><td><strong>Print-friendly</strong> layout for <strong>multiple</strong> invoices—bulk mail, field agents, or counter handouts.</td></tr>
+</table>
+
+<h3>Payments and bill status</h3>
+<ul>
+    <li><strong>Full payment</strong> — When the amount received covers the bill total, the bill moves to a <strong>paid</strong> (or equivalent) state so it no longer appears as money owed.</li>
+    <li><strong>Partial payments</strong> — A payment that is <strong>less than</strong> the remaining balance reduces what is owed but often leaves the bill in a <strong>partial</strong> state until the rest is collected. Always open <strong>bill detail</strong> to see the <strong>remainder</strong> and the list of payments applied.</li>
+    <li><strong>Recording payments</strong> — Usually done from the bill list or bill detail; your organisation may also ask for a <strong>collection station</strong> and date for audit and revenue reports.</li>
+</ul>
+
+<h3>Typical tasks</h3>
+<ul>
+    <li>Record <strong>cash</strong> or <strong>bank</strong> payments against a bill when the customer pays at the desk or the transfer clears.</li>
+    <li>Print bills for a <strong>delivery round</strong> or when a customer asks for a <strong>paper copy</strong>.</li>
+    <li>Use filters to prepare a list of <strong>overdue</strong> accounts before a collection campaign.</li>
+</ul>
+<p><strong>Exports:</strong> Some roles can <strong>download</strong> bill or reading data as a spreadsheet (Excel/CSV) from the relevant list—the file may download directly without opening a separate “page.”</p>
+
+<h2>7. Disconnections and connection management</h2>
+<p><strong>Disconnections</strong> gives an operational view of the pipeline (notified, disconnected, due for action). Many steps are <strong>actions</strong> on a customer record, not separate pages—follow your organisation’s legal procedure.</p>
+
+<h2>8. Reports and analytics</h2>
+<p>Reports turn day-to-day entries in AquaBill—<strong>bills</strong>, <strong>payments</strong>, <strong>readings</strong>, and <strong>service charges</strong>—into <strong>summaries</strong> for finance, operations, and management. They differ in <strong>grain</strong>: the <strong>revenue and collections</strong> screen is mainly <strong>aggregated</strong> by date ranges and filters; the <strong>station payment log</strong> is a <strong>line-by-line</strong> list for one collection desk when you need to match slips or tills.</p>
+<table>
+    <tr><th>Screen</th><th>Core functionality</th></tr>
+    <tr><td>Revenue and collections</td><td>Broad <strong>financial picture</strong>: compare what was <strong>billed</strong> in a chosen <strong>bill period</strong> with what was <strong>collected</strong> in a chosen <strong>payment period</strong>, view <strong>charts</strong> and an <strong>overdue</strong> snapshot, optionally narrow by <strong>collection station</strong>, browse a <strong>stations list</strong> with links into detailed logs, <strong>export collections</strong> as CSV, and <strong>print</strong> the report for meetings or auditors. The <strong>Period summary</strong> breaks the bill-period slice into the categories in the table below; <strong>summary cards</strong> above it also show how many bills are <strong>paid</strong>, <strong>pending</strong> (including partial), <strong>forwarded</strong>, and the <strong>collection rate</strong> as a quick KPI.</td></tr>
+    <tr><td>Water usage</td><td><strong>Consumption</strong> over time and by area (for example by zone)—helps operations, loss-and-leakage (<strong>NRW</strong>) discussions, and planning without opening every customer one by one.</td></tr>
+    <tr><td>Station payment log</td><td>Every <strong>payment line</strong> linked to <strong>bills</strong> and to <strong>service charges</strong> for <strong>one collection desk</strong> at a time, with a <strong>date range</strong> and <strong>customer search</strong>—intended for <strong>cashier reconciliation</strong>, branch audits, and proving what was taken at a given window.</td></tr>
+</table>
+
+<h3>Revenue report: how amounts are categorised (Period summary)</h3>
+<p>For the bills that fall in your selected <strong>bill period</strong> (and search), the <strong>Period summary</strong> table groups figures so finance can read them in one glance. <strong>Previous balance</strong> rolled into individual invoices is <strong>not</strong> split out here: the summary focuses on <strong>water usage charges</strong> and <strong>fixed tariff</strong> components on those bills; open a <strong>bill detail</strong> for the full invoice total if arrears are large.</p>
+<table>
+    <tr><th>Category (as shown)</th><th>Meaning</th></tr>
+    <tr><td>Water revenue</td><td>Sum of <strong>usage-based</strong> charges on bills in scope (consumption × unit price as stored on each bill’s <strong>current charge</strong> line).</td></tr>
+    <tr><td>Fixed charges</td><td>Sum of the <strong>fixed tariff</strong> component (<strong>fixed charge</strong> snapshot) on those same bills.</td></tr>
+    <tr><td>Total revenue</td><td><strong>Water revenue + fixed charges</strong> for bills in the period—this is the billed “core” used with the figures below (not the same as every bill’s grand total if <strong>previous balance</strong> was added on the invoice).</td></tr>
+    <tr><td>Collected</td><td>Labeled <strong>Collected</strong> on screen: money recorded as <strong>received</strong> (payments against the bills in view, plus <strong>paid service charges</strong> that match the same filters where the report includes them).</td></tr>
+    <tr><td>Collection rate</td><td>Shown as a <strong>percentage (%)</strong>—collected amounts compared to <strong>total revenue</strong> (water + fixed) for that summary, rounded for display.</td></tr>
+    <tr><td>Outstanding</td><td>What is still <strong>owed</strong>: remaining balance on bills in scope, plus relevant <strong>unpaid service charges</strong> under the same filters.</td></tr>
+</table>
+
+<h3>Understanding bill period vs payment period</h3>
+<p>These two filters answer <strong>different questions</strong> on purpose; mixing them up is the most common source of confusion on the revenue report.</p>
+<ul>
+    <li><strong>Bill period</strong> — “What did we <strong>raise as invoices</strong> (or date bills) in this window?” Tied to <strong>bill dates</strong> and the billing cycle, not necessarily when money arrived.</li>
+    <li><strong>Payment period</strong> — “What <strong>money was recorded</strong> in this window?” Tied to <strong>payment dates</strong> (and station filters when used)—cash and transfers that hit the ledger in that range.</li>
+    <li><strong>Why both matter</strong> — You can legitimately analyse <strong>bills dated January–March</strong> alongside <strong>payments received in April</strong>; finance sees lag between invoicing and collection, while customer care can explain balances using the same report.</li>
+</ul>
+<p><strong>Example:</strong> Management asks “how much did we bill last quarter?” versus “how much cash did we bank this month?”—set bill period for the first question and payment period for the second; the report is designed to support both.</p>
+
+<h3>Typical tasks</h3>
+<ul>
+    <li>Finance: export <strong>collections</strong> for a month and reconcile with the bank statement.</li>
+    <li>Supervisors: review <strong>overdue</strong> counts or charts before a collections meeting.</li>
+    <li>Cashiers: open the <strong>station payment log</strong> for their desk and today’s (or week’s) date range to tick off physical cash or card batches.</li>
+</ul>
+<p><strong>Tip:</strong> Use the <strong>station</strong> filter on the revenue report for <strong>high-level</strong> analytics limited to one desk; open the <strong>station payment log</strong> when you need <strong>every individual payment row</strong> for that desk.</p>
+
+<h2>9. GIS (maps and network assets)</h2>
+<table>
+    <tr><th>Screen</th><th>Core functionality</th></tr>
+    <tr><td>GIS home / Map</td><td>Entry and spatial exploration of the network.</td></tr>
+    <tr><td>Zone boundaries</td><td>Draw or edit supply zone outlines.</td></tr>
+    <tr><td>Water point types / Water points</td><td>Catalogue and edit point assets.</td></tr>
+    <tr><td>Pipes / Valves</td><td>Edit linear and valve assets.</td></tr>
+</table>
+
+<h2>10. Administration</h2>
+<p>Reserved for <strong>administrators</strong>. They <strong>create and maintain users</strong>, assign <strong>departments</strong>, open <strong>system settings</strong> (and related catalogues such as service charge types), define <strong>collection stations</strong>, and manage <strong>roles</strong> so <strong>permissions</strong> and menu access stay correct for each job.</p>
+<table>
+    <tr><th>Screen</th><th>Core functionality</th></tr>
+    <tr><td>Admin home</td><td>Shortcuts to <strong>users</strong>, <strong>stations</strong>, <strong>settings</strong>, and other admin tools.</td></tr>
+    <tr><td>Users (list, create, show, edit)</td><td>Create staff logins, set <strong>department</strong>, link <strong>roles</strong>, and adjust profile fields so access matches responsibility.</td></tr>
+    <tr><td>Collection stations</td><td>Define desks/branches for payment capture and reporting.</td></tr>
+    <tr><td>System settings / Service charge types</td><td><strong>System settings</strong> hub and catalogues (e.g. service charge <strong>types</strong>) that shape how other teams work.</td></tr>
+    <tr><td>Roles</td><td>Define <strong>roles</strong> that bundle <strong>permissions</strong>; users inherit access through the role assigned to them.</td></tr>
+</table>
+
+<h2>11. Human resources (HR)</h2>
+<p>For HR users: departments, staff list/create/show, attendance, leave, payroll (placeholders or full per deployment), documents, HR reports, training programs and training reports.</p>
+
+<h2>12. Personal settings</h2>
+<p><strong>Profile</strong> (your details), <strong>Password</strong> (change login), <strong>Appearance</strong> (theme if offered).</p>
+
+<h2>13. Common workflows (summary)</h2>
+<p><strong>A. Monthly billing:</strong> readings checked → bills generated/delivered → payments recorded → revenue report for management.</p>
+<p><strong>B. “Bill too high”:</strong> customer profile → tariff/zone → readings → bill detail → service charges if relevant.</p>
+<p><strong>C. Cashier reconciliation:</strong> set payment dates → filter by station if used → compare to cash/card slips → export if needed.</p>
+<p><strong>D. New connection:</strong> new customer + meter + initial reading → bills follow your calendar.</p>
+
+<h2>14. Quick glossary</h2>
+<table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td>Customer / account</td><td>Connected consumer with unique account reference.</td></tr>
+    <tr><td>Meter reading</td><td>Index on a date; drives consumption.</td></tr>
+    <tr><td>Bill</td><td>Invoice for a period from usage and tariff rules.</td></tr>
+    <tr><td>Payment</td><td>Money recorded against a bill or charge, with date and often station.</td></tr>
+    <tr><td>Partial payment</td><td>Payment that leaves a remaining balance.</td></tr>
+    <tr><td>Outstanding</td><td>Amount still owed.</td></tr>
+    <tr><td>Collection rate</td><td>How much billed revenue was collected in the chosen scope.</td></tr>
+    <tr><td>Service charge</td><td>Fee outside normal monthly usage.</td></tr>
+    <tr><td>Tariff</td><td>Pricing scheme for a customer.</td></tr>
+    <tr><td>Zone</td><td>Supply or administrative area.</td></tr>
+    <tr><td>Station</td><td>Collection desk for payments—reporting and audit.</td></tr>
+</table>
+
+<p class="note">For the <strong>full</strong> narrative (including extended tips and tables), use the Markdown source <strong>SYSTEM_ORIENTATION.md</strong> in the same folder. This HTML is optimised for opening in Microsoft Word and saving as .docx.</p>
+
+</body>
+</html>

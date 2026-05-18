@@ -18,6 +18,7 @@ class Payment extends Model
         'reference_number',
         'notes',
         'recorded_by',
+        'station_id',
     ];
 
     /**
@@ -46,5 +47,13 @@ class Payment extends Model
     public function recorder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    /**
+     * @return BelongsTo<Station, Payment>
+     */
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(Station::class);
     }
 }

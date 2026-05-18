@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen, CircleDot, GitBranch, Globe2, Droplets, Map, Users } from 'lucide-react';
+import { BookOpen, CircleDot, GitBranch, Globe2, Droplets, Map, MapPin, Users } from 'lucide-react';
 
 export default function GisDashboard() {
     const breadcrumbs = [{ title: 'GIS', href: route('gis.dashboard') }];
@@ -13,6 +13,12 @@ export default function GisDashboard() {
             description: 'Satellite view of water points, customers, pipes, and valves with filters.',
             href: route('gis.map'),
             icon: Map,
+        },
+        {
+            title: 'Zone boundaries',
+            description: 'Draw billing zone polygons (GeoJSON) on the map and save them to a zone.',
+            href: route('gis.zone-boundaries'),
+            icon: MapPin,
         },
         {
             title: 'Water point types',

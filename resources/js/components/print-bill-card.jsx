@@ -156,7 +156,7 @@ export default function PrintBillCard({ bill }) {
                             value={formatCurrency(previousBalance)}
                         />
                         <PrintLabelValue
-                            label="Fixed Charges"
+                            label="Service Fee"
                             value={formatCurrency(fixedCharges)}
                         />
                         <PrintLabelValue

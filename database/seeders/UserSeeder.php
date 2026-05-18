@@ -22,6 +22,9 @@ class UserSeeder extends Seeder
         $hrDept = Department::where('name', 'hr')->first();
         $customerCareDept = Department::where('name', 'customer_care')->first();
         $distributionDept = Department::where('name', 'distribution')->first();
+        $waterQualityDept = Department::where('name', 'water_quality')->first();
+        $waterPurificationDept = Department::where('name', 'water_purification')->first();
+        $storesDept = Department::where('name', 'stores')->first();
 
         // 1. Admin User
         $admin = User::create([
@@ -43,7 +46,9 @@ class UserSeeder extends Seeder
             'status' => 'active',
             'email_verified_at' => now(),
         ]);
-        $finance->roles()->attach(Role::where('name', 'Accountant')->first()->id);
+        $finance->roles()->attach(
+            Role::where('name', 'Finance Manager')->where('department_id', $financeDept->id)->first()->id
+        );
 
         // 3. Ledger User
         $ledger = User::create([
@@ -89,6 +94,45 @@ class UserSeeder extends Seeder
         ]);
         $distribution->roles()->attach(
             Role::where('name', 'Distribution Officer')->where('department_id', $distributionDept->id)->first()->id
+        );
+
+        // 7. Water quality
+        $waterQuality = User::create([
+            'name' => 'Wendy Quality',
+            'email' => 'waterquality@gmail.com',
+            'password' => '123',
+            'department_id' => $waterQualityDept->id,
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+        $waterQuality->roles()->attach(
+            Role::where('name', 'Quality Manager')->where('department_id', $waterQualityDept->id)->first()->id
+        );
+
+        // 8. Water purification
+        $waterPurification = User::create([
+            'name' => 'Walter Purification',
+            'email' => 'waterpurification@gmail.com',
+            'password' => '123',
+            'department_id' => $waterPurificationDept->id,
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+        $waterPurification->roles()->attach(
+            Role::where('name', 'Plant Manager')->where('department_id', $waterPurificationDept->id)->first()->id
+        );
+
+        // 9. Stores
+        $stores = User::create([
+            'name' => 'Sam Stores',
+            'email' => 'stores@gmail.com',
+            'password' => '123',
+            'department_id' => $storesDept->id,
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+        $stores->roles()->attach(
+            Role::where('name', 'Stores Manager')->where('department_id', $storesDept->id)->first()->id
         );
     }
 }

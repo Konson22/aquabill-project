@@ -6,8 +6,13 @@ use App\Models\Disconnection;
 use App\Models\Tariff;
 use App\Models\User;
 use App\Models\Zone;
+use Database\Seeders\AppSettingSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('admin dashboard includes disconnection summary stats', function () {
+    $this->seed(AppSettingSeeder::class);
     $adminDept = Department::query()->create([
         'name' => 'admin',
         'description' => 'Admin',
@@ -72,7 +77,12 @@ test('admin dashboard includes disconnection summary stats', function () {
         ->has('notifiedCustomers', 1)
         ->where('notifiedCustomers.0.customer_name', 'Test Customer')
         ->has('disconnectedCustomers', 1)
-        ->where('disconnectedCustomers.0.customer_name', 'Test Customer'));
+        ->where('disconnectedCustomers.0.customer_name', 'Test Customer')
+        ->has('chartData', 12)
+        ->has('zoneRevenueComparison')
+        ->has('billingCycle.period_start')
+        ->has('billingCycle.period_end')
+        ->where('billingCycle.billing_cycle_day', 27));
 });
 
 test('non-admin cannot access admin dashboard', function () {

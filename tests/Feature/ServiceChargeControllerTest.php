@@ -19,7 +19,7 @@ function createZoneAndTariffForServiceChargeTest(): array
     ]);
     $zone = Zone::query()->create([
         'name' => 'Z-'.uniqid(),
-        'supply_day' => 'Monday',
+        'supply_day_id' => supplyDayId('Monday'),
         'supply_time' => '08:00:00',
     ]);
 
@@ -82,7 +82,6 @@ test('can create service charge for customer', function () {
         route('customers.service-charges.store', ['customer' => $customer->id]),
         [
             'service_charge_type_id' => $chargeType->id,
-            'amount' => 100.00,
             'issued_date' => now()->toDateString(),
             'notes' => 'Test charge',
         ]
@@ -91,14 +90,14 @@ test('can create service charge for customer', function () {
     $response->assertStatus(201);
     $response->assertJsonPath('charge.customer_id', $customer->id);
     $response->assertJsonPath('charge.service_charge_type_id', $chargeType->id);
-    $response->assertJsonPath('charge.amount', '100.00');
+    $response->assertJsonPath('charge.amount', '10.00');
     $response->assertJsonPath('charge.status', 'unpaid');
     $response->assertJsonPath('charge.issued_by', $user->id);
 
     $this->assertDatabaseHas('service_charges', [
         'customer_id' => $customer->id,
         'service_charge_type_id' => $chargeType->id,
-        'amount' => '100.00',
+        'amount' => '10.00',
         'status' => 'unpaid',
     ]);
 });
@@ -117,29 +116,58 @@ test('validates required fields when creating service charge', function () {
     $response->assertStatus(422);
     $response->assertJsonValidationErrors([
         'service_charge_type_id',
-        'amount',
         'issued_date',
     ]);
 });
 
-test('validates amount is positive when creating service charge', function () {
+test('can create service charge with other charges added to type amount', function () {
     $user = User::factory()->create();
     $customer = createCustomerForServiceChargeTest();
     $chargeType = createServiceChargeTypeForTest();
 
+    $response = $this->actingAs($user)->post(
+        route('customers.service-charges.store', ['customer' => $customer->id]),
+        [
+            'service_charge_type_id' => $chargeType->id,
+            'other_charges' => 25.5,
+            'issued_date' => now()->toDateString(),
+        ],
+    );
+
+    $response->assertStatus(201);
+    $response->assertJsonPath('charge.amount', '10.00');
+    $response->assertJsonPath('charge.other_charges', '25.50');
+    $response->assertJsonPath('charge.total_due', '35.50');
+
+    $this->assertDatabaseHas('service_charges', [
+        'customer_id' => $customer->id,
+        'service_charge_type_id' => $chargeType->id,
+        'amount' => '10.00',
+        'other_charges' => '25.50',
+    ]);
+});
+
+test('rejects service charge type with zero amount when creating service charge', function () {
+    $user = User::factory()->create();
+    $customer = createCustomerForServiceChargeTest();
+    $chargeType = ServiceChargeType::query()->create([
+        'name' => 'Zero charge',
+        'code' => 'ZERO'.uniqid(),
+        'amount' => 0,
+    ]);
+
     $response = $this->actingAs($user)
-        ->withHeader('Accept', 'application/json')
+        ->withHeader('X-Inertia', 'true')
         ->post(
             route('customers.service-charges.store', ['customer' => $customer->id]),
             [
                 'service_charge_type_id' => $chargeType->id,
-                'amount' => -50.00,
                 'issued_date' => now()->toDateString(),
-            ]
+            ],
         );
 
-    $response->assertStatus(422);
-    $response->assertJsonValidationErrors(['amount']);
+    $response->assertSessionHasErrors('service_charge_type_id');
+    $this->assertDatabaseCount('service_charges', 0);
 });
 
 test('validates service charge type exists', function () {
@@ -152,7 +180,6 @@ test('validates service charge type exists', function () {
             route('customers.service-charges.store', ['customer' => $customer->id]),
             [
                 'service_charge_type_id' => 99999,
-                'amount' => 100.00,
                 'issued_date' => now()->toDateString(),
             ]
         );
@@ -172,7 +199,6 @@ test('creating service charge via inertia redirects to service charges index', f
             route('customers.service-charges.store', ['customer' => $customer->id]),
             [
                 'service_charge_type_id' => $chargeType->id,
-                'amount' => 100.00,
                 'issued_date' => now()->toDateString(),
                 'notes' => 'From Inertia',
             ],
@@ -220,8 +246,8 @@ test('creating customer with initial service charge stores unpaid status', funct
         'phone' => '5551234567',
         'email' => null,
         'national_id' => null,
-        'address' => '123 Test Street',
-        'plot_no' => null,
+        'address' => null,
+        'plot_no' => '12A',
         'customer_type' => 'residential',
         'status' => 'active',
         'zone_id' => $zone->id,

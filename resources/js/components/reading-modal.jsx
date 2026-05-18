@@ -11,7 +11,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
     Select,
@@ -101,7 +100,7 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
                             )}
                         </div>
 
-                        {/* Previous reading (from meter snapshot; editable if needed) */}
+                        {/* Previous reading (from meter snapshot; not editable) */}
                         {selectedMeter && (
                             <div className="grid gap-2">
                                 <Label htmlFor="previous_reading" className="flex items-center gap-2">
@@ -114,7 +113,8 @@ export default function ReadingModal({ customer, isOpen, onClose }) {
                                     step="0.01"
                                     min="0"
                                     value={data.previous_reading}
-                                    onChange={(e) => setData('previous_reading', e.target.value)}
+                                    disabled
+                                    className="bg-muted/60 text-muted-foreground"
                                     placeholder="Last recorded index"
                                 />
                                 {errors.previous_reading && (
