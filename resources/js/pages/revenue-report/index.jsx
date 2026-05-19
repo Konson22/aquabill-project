@@ -163,7 +163,7 @@ export default function RevenueReport({
                             className="h-9 min-w-0 bg-background"
                         />
                     </div>
-                    
+                    {/* Station filter */}
                     <Select value={stationId} onValueChange={setStationId}>
                         <SelectTrigger id="payment-station" className="h-9 min-w-0 bg-background">
                             <SelectValue placeholder="All stations" />
