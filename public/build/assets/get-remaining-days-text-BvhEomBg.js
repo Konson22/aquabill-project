@@ -1,0 +1,1 @@
+function f(t){if(!t)return"";const n=new Date(t);n.setHours(0,0,0,0);const r=new Date;r.setHours(0,0,0,0);const s=n.getTime()-r.getTime(),e=Math.round(s/(1e3*60*60*24));return e<0?"Overdue":e===0?"Ends today":e===1?"1 day left":`${e} days left`}export{f as getRemainingDaysText};

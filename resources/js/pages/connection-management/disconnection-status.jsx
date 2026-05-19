@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, MapPin, PowerOff, Printer, User } from 'lucide-react';
-import DisconnectionStatusContent from './components/disconnection-status-content';
+import DisconnectionStatusContent from '@/pages/customers/components/disconnection-status-content';
 
 const SUMMARY_BADGE_CLASS = {
     disconnected: 'border-rose-200/50 bg-rose-500/40 text-white',

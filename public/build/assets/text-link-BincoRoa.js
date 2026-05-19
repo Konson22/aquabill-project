@@ -1,1 +1,0 @@
-import{j as t,$ as n}from"./app-BvcbtHZ4.js";import{c as s}from"./utils-BJCfTd35.js";function u({className:r="",children:e,...o}){return t.jsx(n,{className:s("text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current!",r),...o,children:e})}export{u as T};
