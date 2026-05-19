@@ -10,6 +10,7 @@ use App\Models\Meter;
 use App\Models\MeterReading;
 use App\Models\ServiceCharge;
 use App\Models\ServiceChargeType;
+use App\Models\Station;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Illuminate\Database\Eloquent\Builder;
@@ -183,7 +184,19 @@ class CustomerController extends Controller
             'zone',
             'tariff',
             'meters',
-            'bills' => fn ($query) => $query->withSum('payments', 'amount')->latest()->limit(50),
+            'bills' => fn ($query) => $query
+                ->with([
+                    'customer:id,name,account_number',
+                    'reading.recorder:id,name',
+                    'payments' => fn ($paymentQuery) => $paymentQuery
+                        ->select(['id', 'payable_type', 'payable_id', 'payment_date'])
+                        ->orderByDesc('payment_date')
+                        ->orderByDesc('id')
+                        ->limit(1),
+                ])
+                ->withSum('payments', 'amount')
+                ->latest()
+                ->limit(50),
             'readings' => fn ($query) => $query->latest()->limit(50),
             'serviceCharges' => fn ($query) => $query->latest()->limit(50),
             'meterHistories' => fn ($query) => $query->with(['meter', 'replacedBy'])->latest(),
@@ -193,6 +206,9 @@ class CustomerController extends Controller
 
         return Inertia::render('customers/show', [
             'customer' => $customer,
+            'stations' => Station::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'zone_id', 'accountant_id']),
             'unassignedMeters' => Meter::whereNull('customer_id')->where('status', 'active')->get(['id', 'meter_number', 'last_reading']),
         ]);
     }

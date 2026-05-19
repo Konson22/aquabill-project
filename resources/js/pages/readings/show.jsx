@@ -1,256 +1,295 @@
-import AppLayout from '@/layouts/app-layout';
-import { formatCurrency } from '@/lib/utils';
-import { Head, Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    ChevronLeft,
-    Printer,
-    MapPin,
-    ArrowUpRight,
-    Camera,
-    Info,
-    CreditCard,
-    Droplets,
-    User,
-    Phone,
-    Calendar,
-    Pencil,
-} from 'lucide-react';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
+import { cn, formatCurrency } from '@/lib/utils';
+import { Head, Link } from '@inertiajs/react';
+import { ArrowLeft, ArrowUpRight, Camera, Pencil, Printer, User } from 'lucide-react';
 
-const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Intl.DateTimeFormat('en-US', {
-        dateStyle: 'full',
-    }).format(new Date(dateString));
-};
+function formatDisplayDate(value) {
+    if (!value) {
+        return '—';
+    }
 
-const formatDateTime = (dateString) => {
-    if (!dateString) return '';
-    return new Intl.DateTimeFormat('en-US', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(new Date(dateString));
-};
+    try {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return String(value);
+        }
+
+        return date.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
+    } catch {
+        return String(value);
+    }
+}
+
+function billLabel(bill) {
+    const raw = bill?.bill_no ?? bill?.id;
+
+    return `#${String(raw).padStart(6, '0')}`;
+}
+
+function statusVariant(status) {
+    if (status === 'paid') {
+        return 'success';
+    }
+
+    if (status === 'pending') {
+        return 'destructive';
+    }
+
+    return 'outline';
+}
+
+function DetailTable({ title, rows }) {
+    return (
+        <div className="overflow-hidden rounded-md border bg-card">
+            {title ? (
+                <div className="border-b bg-muted/40 px-4 py-2.5">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</h2>
+                </div>
+            ) : null}
+            <Table>
+                <TableBody>
+                    {rows.map((row) => (
+                        <TableRow key={row.label}>
+                            <TableCell className="w-[38%] bg-muted/20 py-3 text-sm font-medium text-muted-foreground">
+                                {row.label}
+                            </TableCell>
+                            <TableCell className="py-3 text-sm text-foreground">{row.value}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
+    );
+}
 
 export default function Show({ reading }) {
+    const customer = reading?.meter?.customer;
+    const bill = reading?.bill;
+    const consumption =
+        reading?.consumption ?? Math.max(0, Number(reading?.current_reading ?? 0) - Number(reading?.previous_reading ?? 0));
+
     const breadcrumbs = [
-        { title: 'Meter Readings', href: '/readings' },
-        { title: `Reading #${reading.id}`, href: `/readings/${reading.id}` },
+        { title: 'Meter readings', href: route('readings.index') },
+        { title: `Reading #${reading.id}`, href: route('readings.show', reading.id) },
     ];
 
+    const readingRows = [
+        { label: 'Reading ID', value: <span className="font-mono">#{reading.id}</span> },
+        { label: 'Reading date', value: formatDisplayDate(reading.reading_date) },
+        { label: 'Meter number', value: <span className="font-mono">{reading.meter?.meter_number ?? '—'}</span> },
+        { label: 'Recorded by', value: reading.recorder?.name ?? 'System' },
+        { label: 'Previous reading', value: <span className="font-mono tabular-nums">{reading.previous_reading ?? 0} m³</span> },
+        { label: 'Current reading', value: <span className="font-mono tabular-nums">{reading.current_reading ?? 0} m³</span> },
+        { label: 'Consumption', value: <span className="font-mono font-semibold tabular-nums">{consumption} m³</span> },
+    ];
+
+    if (reading.notes) {
+        readingRows.push({ label: 'Notes', value: reading.notes });
+    }
+
+    const customerRows = [
+        {
+            label: 'Customer',
+            value: customer?.id ? (
+                <Link href={route('customers.show', customer.id)} className="font-medium underline-offset-4 hover:underline">
+                    {customer.name}
+                </Link>
+            ) : (
+                '—'
+            ),
+        },
+        { label: 'Account', value: <span className="font-mono">{customer?.account_number ?? '—'}</span> },
+        { label: 'Zone', value: customer?.zone?.name ?? '—' },
+        { label: 'Tariff', value: customer?.tariff?.name ?? '—' },
+    ];
+
+    const unitPrice = Number(bill?.unit_price ?? customer?.tariff?.price_per_unit ?? 0);
+    const billConsumption = Number(bill?.consumption ?? consumption);
+    const tariffAmount = billConsumption * unitPrice;
+
+    const billRows = bill
+        ? [
+              { label: 'Bill', value: <span className="font-mono">{billLabel(bill)}</span> },
+              {
+                  label: 'Status',
+                  value: (
+                      <Badge variant={statusVariant(bill.status)} className="h-5 capitalize">
+                          {bill.status}
+                      </Badge>
+                  ),
+              },
+              {
+                  label: 'Tariff amount',
+                  value: (
+                      <span className="font-mono tabular-nums">
+                          {formatCurrency(tariffAmount)}
+                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                            ({formatCurrency(unitPrice)}/m³ × {billConsumption} m³)
+                          </span>
+                      </span>
+                  ),
+              },
+              { label: 'Usage charge', value: <span className="font-mono tabular-nums">{formatCurrency(bill.current_charge)}</span> },
+              { label: 'Fixed charge', value: <span className="font-mono tabular-nums">{formatCurrency(bill.fixed_charge)}</span> },
+              {
+                  label: 'Arrears',
+                  value: (
+                      <span
+                          className={cn(
+                              'font-mono tabular-nums',
+                              Number(bill.previous_balance) > 0 && 'font-semibold text-destructive',
+                          )}
+                      >
+                          {formatCurrency(bill.previous_balance)}
+                      </span>
+                  ),
+              },
+              {
+                  label: 'Total due',
+                  value: <span className="font-mono font-semibold tabular-nums">{formatCurrency(bill.total_amount)}</span>,
+              },
+              {
+                  label: 'Actions',
+                  value: (
+                      <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" size="sm" asChild>
+                              <Link href={route('bills.show', bill.id)}>
+                                  View bill
+                                  <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
+                              </Link>
+                          </Button>
+                          <Button variant="outline" size="sm" asChild>
+                              <a href={route('bills.print', bill.id)} target="_blank" rel="noopener noreferrer">
+                                  <Printer className="mr-1.5 h-3.5 w-3.5" />
+                                  Print
+                              </a>
+                          </Button>
+                      </div>
+                  ),
+              },
+          ]
+        : [{ label: 'Bill', value: <span className="text-muted-foreground">Not generated</span> }];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Reading - ${reading.meter.meter_number}`} />
+            <Head title={`Reading · ${reading.meter?.meter_number ?? reading.id}`} />
 
-            <div className="p-6 max-w-5xl mx-auto space-y-6 animate-in fade-in duration-500">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link href="/readings">
-                            <Button variant="outline" size="icon" className="rounded-full">
-                                <ChevronLeft className="h-4 w-4" />
-                            </Button>
+            <div className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-2 text-muted-foreground" asChild>
+                        <Link href={route('readings.index')}>
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to readings
                         </Link>
-                        <div>
-                            <h1 className="text-2xl font-bold">{reading.meter.customer.name}</h1>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <MapPin className="h-3 w-3" />
-                                <span>{reading.meter.customer.zone.name}</span>
-                                <span>•</span>
-                                <span className="font-mono">{reading.meter.meter_number}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
+                    </Button>
+                    <div className="flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" asChild>
                             <Link href={route('readings.edit', reading.id)}>
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Edit reading
                             </Link>
                         </Button>
-                        {reading.bill && (
-                            <Button variant="outline" asChild size="sm">
-                                <Link href={`/bills/${reading.bill.id}/print`} target="_blank">
-                                    <Printer className="mr-2 h-4 w-4" />
-                                    Print Bill
+                        {customer?.id ? (
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={route('customers.show', customer.id)}>
+                                    <User className="mr-2 h-4 w-4" />
+                                    View customer
                                 </Link>
                             </Button>
-                        )}
-                        <Button variant="default" size="sm" asChild>
-                            <Link href={`/customers/${reading.meter.customer_id}`}>
-                                View Customer
-                            </Link>
-                        </Button>
+                        ) : null}
                     </div>
                 </div>
 
-                <Card className="border-border shadow-sm overflow-hidden flex flex-col divide-y">
-                    {/* Top Section: Data & Details */}
-                    <div className="p-6 md:p-8 space-y-8 bg-card">
-                        
-                        {/* Customer Details Section */}
-                        <section>
-                            <h3 className="text-xs font-bold text-primary tracking-widest uppercase mb-4 flex items-center gap-2">
-                                <User className="h-4 w-4" /> Customer Information
-                            </h3>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-6">
-                                <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Customer Name</p>
-                                    <p className="font-medium text-foreground">{reading.meter.customer.name}</p>
-                                </div>
-                                {reading.meter.customer.phone && (
-                                    <div>
-                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Phone Number</p>
-                                        <p className="font-medium flex items-center gap-1.5 text-foreground">
-                                            <Phone className="h-3 w-3 text-muted-foreground" />
-                                            {reading.meter.customer.phone}
-                                        </p>
-                                    </div>
-                                )}
-                                <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Location / Zone</p>
-                                    <p className="font-medium flex items-center gap-1.5 text-foreground">
-                                        <MapPin className="h-3 w-3 text-muted-foreground" />
-                                        {reading.meter.customer.zone?.name || 'Unassigned'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Meter Number</p>
-                                    <p className="font-mono bg-muted/50 px-2 py-0.5 rounded text-sm text-foreground inline-flex">
-                                        {reading.meter.meter_number}
-                                    </p>
-                                </div>
+                <Card className="overflow-hidden border-border/60 shadow-sm">
+                    <CardHeader className="border-b pb-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-1">
+                                <CardTitle className="text-xl">{customer?.name ?? 'Meter reading'}</CardTitle>
+                                <p className="text-sm font-normal text-muted-foreground">
+                                    Reading #{reading.id}
+                                    <span className="font-mono"> · {reading.meter?.meter_number}</span>
+                                </p>
                             </div>
-                        </section>
-
-                        <Separator />
-
-                        {/* Reading Details Section */}
-                        <section>
-                            <h3 className="text-xs font-bold text-blue-500 tracking-widest uppercase mb-4 flex items-center gap-2">
-                                <Droplets className="h-4 w-4" /> Reading Data
-                            </h3>
-                            
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                                <div className="bg-muted/20 p-4 rounded-xl border">
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Previous</p>
-                                    <p className="font-mono text-lg">{reading.previous_reading} <span className="text-xs text-muted-foreground">m³</span></p>
-                                </div>
-                                <div className="bg-muted/20 p-4 rounded-xl border">
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Current</p>
-                                    <p className="font-mono text-lg font-bold">{reading.current_reading} <span className="text-xs text-muted-foreground">m³</span></p>
-                                </div>
-                                <div className="bg-primary/5 p-4 rounded-xl border border-primary/20">
-                                    <p className="text-[10px] text-primary uppercase tracking-wider font-bold mb-1">Consumption</p>
-                                    <p className="font-mono text-2xl font-black text-primary">{reading.consumption} <span className="text-sm font-medium">m³</span></p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Reading Date</p>
-                                    <p className="font-medium text-sm text-foreground flex items-center gap-1.5">
-                                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                                        {formatDate(reading.reading_date)}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Recorded By</p>
-                                    <p className="font-medium text-sm text-foreground">
-                                        {reading.recorder?.name || 'System'}
-                                    </p>
-                                </div>
-                            </div>
-                        </section>
-
-                        {reading.bill && (
-                            <>
-                                <Separator />
-                                {/* Billing Summary Section */}
-                                <section>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-xs font-bold text-emerald-500 tracking-widest uppercase flex items-center gap-2">
-                                            <CreditCard className="h-4 w-4" /> Billing Summary
-                                        </h3>
-                                        <Badge variant={reading.bill.status === 'paid' ? 'success' : 'destructive'} className="capitalize">
-                                            {reading.bill.status}
-                                        </Badge>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Usage Charge</p>
-                                            <p className="font-mono text-sm font-bold">
-                                                {formatCurrency(reading.bill.current_charge)}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Fixed Charge</p>
-                                            <p className="font-mono text-sm font-bold">
-                                                {formatCurrency(reading.bill.fixed_charge)}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1">Arrears</p>
-                                            <p className="font-mono text-sm font-bold text-red-500">
-                                                {formatCurrency(reading.bill.previous_balance)}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-primary uppercase tracking-wider font-bold mb-1">Total Due</p>
-                                            <p className="font-mono text-base font-black text-primary">
-                                                {formatCurrency(reading.bill.total_amount)}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <Button asChild variant="outline" size="sm" className="w-full">
-                                        <Link href={`/bills/${reading.bill.id}`}>
-                                            View Full Bill Details
-                                            <ArrowUpRight className="ml-2 h-4 w-4" />
-                                        </Link>
-                                    </Button>
-                                </section>
-                            </>
-                        )}
-
-                        {/* Notes Section */}
-                        {reading.notes && (
-                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 flex gap-3 mt-6">
-                                <Info className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                                <div className="text-sm">
-                                    <p className="font-bold text-amber-800 uppercase text-[10px] tracking-widest mb-1">Notes</p>
-                                    <p className="text-amber-900 leading-relaxed italic">{reading.notes}</p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Bottom Section: Image */}
-                    <div className="bg-muted/10 p-6 md:p-8 flex flex-col">
-                        <h3 className="text-xs font-bold text-muted-foreground tracking-widest uppercase mb-4 flex items-center gap-2">
-                            <Camera className="h-4 w-4" /> Reading Proof
-                        </h3>
-                        <div className="w-full flex-1 rounded-xl overflow-hidden border shadow-sm bg-background flex items-center justify-center min-h-[400px]">
-                            {reading.image_url ? (
-                                <img src={reading.image_url} alt="Reading proof" className="w-full h-full object-cover" />
+                            {bill ? (
+                                <Badge variant={statusVariant(bill.status)} className="h-6 shrink-0 capitalize">
+                                    Bill {bill.status}
+                                </Badge>
                             ) : (
-                                <div className="flex flex-col items-center gap-3 text-muted-foreground/40 p-8 text-center">
-                                    <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                                        <Camera className="h-8 w-8" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-foreground">No Image Provided</p>
-                                        <p className="text-xs mt-1">A photo of the meter reading was not uploaded.</p>
-                                    </div>
-                                </div>
+                                <Badge variant="outline" className="h-6 shrink-0">
+                                    No bill
+                                </Badge>
                             )}
                         </div>
-                    </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-6">
+                        <div className="overflow-hidden rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Previous</TableHead>
+                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Current</TableHead>
+                                    <TableHead className="text-xs font-bold uppercase tracking-wider">Consumption</TableHead>
+                                    <TableHead className="text-right text-xs font-bold uppercase tracking-wider">Total due</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow>
+                                    <TableCell className="font-mono text-base font-medium tabular-nums">
+                                        {reading.previous_reading ?? 0} m³
+                                    </TableCell>
+                                    <TableCell className="font-mono text-base font-medium tabular-nums">
+                                        {reading.current_reading ?? 0} m³
+                                    </TableCell>
+                                    <TableCell className="font-mono text-base font-semibold tabular-nums">{consumption} m³</TableCell>
+                                    <TableCell className="text-right font-mono text-base font-semibold tabular-nums">
+                                        {bill ? formatCurrency(bill.total_amount) : '—'}
+                                    </TableCell>
+                                </TableRow>
+                            </TableBody>
+                            </Table>
+                        </div>
+
+                        <DetailTable title="Reading details" rows={readingRows} />
+                        <DetailTable title="Customer" rows={customerRows} />
+                        <DetailTable title="Billing" rows={billRows} />
+                    </CardContent>
+                </Card>
+
+                <Card className="overflow-hidden border-border/60 shadow-sm">
+                    <CardHeader className="border-b pb-3">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                            Reading proof
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex min-h-[240px] items-center justify-center bg-muted/10 p-4 pt-6">
+                        {reading.image_url ? (
+                            <img
+                                src={reading.image_url}
+                                alt="Meter reading proof"
+                                className="max-h-[400px] w-full object-contain"
+                            />
+                        ) : (
+                            <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
+                                <Camera className="h-8 w-8 opacity-40" />
+                                <p className="text-sm">No image uploaded</p>
+                            </div>
+                        )}
+                    </CardContent>
                 </Card>
             </div>
         </AppLayout>

@@ -67,6 +67,21 @@ function seedReadingEditScenario(): array
     return compact('reading', 'bill');
 }
 
+test('reading show page displays reading and linked bill', function () {
+    $user = User::factory()->create();
+    ['reading' => $reading, 'bill' => $bill] = seedReadingEditScenario();
+
+    $this->actingAs($user)
+        ->get(route('readings.show', $reading))
+        ->assertSuccessful()
+        ->assertInertia(fn ($page) => $page
+            ->component('readings/show')
+            ->where('reading.id', $reading->id)
+            ->where('reading.bill.id', $bill->id)
+            ->has('reading.meter.customer.name')
+        );
+});
+
 test('reading edit page is shown for authenticated users', function () {
     $user = User::factory()->create();
     ['reading' => $reading] = seedReadingEditScenario();

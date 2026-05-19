@@ -2,6 +2,7 @@
 
 use App\Models\Customer;
 use App\Models\Meter;
+use App\Models\Station;
 use App\Models\Subzone;
 use App\Models\Tariff;
 use App\Models\User;
@@ -317,4 +318,42 @@ test('customer seeder suffixes duplicate plot numbers from json', function () {
 
     expect(Customer::query()->where('plot_no', '90')->count())->toBe(1);
     expect(Customer::query()->where('plot_no', '90-2310000002')->count())->toBe(1);
+});
+
+test('customer show includes stations for bill payment recording', function () {
+    $user = User::factory()->create();
+
+    $tariff = Tariff::create([
+        'name' => 'Residential',
+        'price_per_unit' => 50,
+        'fixed_charge' => 500,
+    ]);
+
+    $zone = Zone::create([
+        'name' => 'Show Zone',
+        'supply_day_id' => supplyDayId('Monday'),
+        'supply_time' => '08:00:00',
+    ]);
+
+    $customer = Customer::create([
+        'customer_type' => 'residential',
+        'name' => 'Show Customer',
+        'phone' => '555000111',
+        'address' => '1 Test Rd',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+
+    $station = Station::factory()->create(['name' => 'Main branch']);
+
+    $this->actingAs($user)
+        ->get(route('customers.show', $customer))
+        ->assertSuccessful()
+        ->assertInertia(fn ($page) => $page
+            ->component('customers/show')
+            ->has('stations', 1)
+            ->where('stations.0.id', $station->id)
+            ->where('stations.0.name', 'Main branch')
+        );
 });

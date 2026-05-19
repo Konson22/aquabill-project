@@ -1,5 +1,6 @@
 <?php
 
+use App\Exports\RevenueSummaryExport;
 use App\Models\Bill;
 use App\Models\Customer;
 use App\Models\Meter;
@@ -459,4 +460,65 @@ test('revenue report chart monthly collection rate uses billed vs collected in t
             ->where('monthlyBreakdown.1.amount_expected', 50)
             ->where('monthlyBreakdown.1.payments_amount', 50)
             ->where('monthlyBreakdown.1.bills_count', 1));
+});
+
+test('revenue export includes monthly payments breakdown sheet', function () {
+    $export = new RevenueSummaryExport(
+        summary: [
+            'total_revenue' => 100,
+            'fixed_charge_revenue' => 0,
+            'service_charges_revenue' => 0,
+            'service_charges_paid' => 0,
+            'service_charges_unpaid' => 0,
+            'total_billed_revenue' => 100,
+            'total_paid' => 50,
+            'total_outstanding' => 50,
+            'collection_rate_percent' => 50,
+        ],
+        filters: [
+            'from' => '2026-01-01',
+            'to' => '2026-12-31',
+        ],
+        bills: [],
+        monthlyBreakdown: [
+            [
+                'month' => '2026-01',
+                'label' => 'Jan 2026',
+                'amount_expected' => 0,
+                'payments_amount' => 0,
+            ],
+            [
+                'month' => '2026-02',
+                'label' => 'Feb 2026',
+                'amount_expected' => 50,
+                'payments_amount' => 50,
+            ],
+        ],
+        monthlyBreakdownYear: 2026,
+    );
+
+    $monthlySheet = collect($export->sheets())->first(
+        fn ($sheet) => $sheet->title() === 'Payments by month',
+    );
+
+    expect($monthlySheet)->not->toBeNull();
+    expect($monthlySheet->array())->toBe([
+        ['Jan 2026', 0.0, 0.0, 0.0, '—'],
+        ['Feb 2026', 50.0, 50.0, 100.0, '—'],
+        ['Total', 50.0, 50.0, 100.0, ''],
+    ]);
+});
+
+test('authenticated user can export revenue report as xlsx', function () {
+    $user = User::factory()->create();
+    $year = (int) now()->year;
+
+    $this->actingAs($user)
+        ->get(route('revenue-report.export', [
+            'from' => "{$year}-01-01",
+            'to' => "{$year}-12-31",
+        ]))
+        ->assertOk();
+
+    expect(true)->toBeTrue();
 });

@@ -118,9 +118,7 @@ function PaymentLogTable({ payments, emptyMessage }) {
                         <TableHead>Date</TableHead>
                         <TableHead>Reference</TableHead>
                         <TableHead>Customer</TableHead>
-                        <TableHead>Zone</TableHead>
                         <TableHead>Tariff</TableHead>
-                        <TableHead>Method</TableHead>
                         <TableHead>Station</TableHead>
                         <TableHead>Recorded by</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
@@ -136,17 +134,15 @@ function PaymentLogTable({ payments, emptyMessage }) {
                     ) : (
                         rows.map((row) => (
                             <TableRow key={row.id}>
-                                <TableCell className="whitespace-nowrap tabular-nums">
+                                <TableCell className="py-2">
                                     {row.payment_date ?? 'â€”'}
                                 </TableCell>
-                                <TableCell className="font-mono text-xs">{row.reference}</TableCell>
+                                <TableCell className="py-2">{row.reference}</TableCell>
                                 <TableCell>{row.customer_name ?? 'â€”'}</TableCell>
-                                <TableCell>{row.zone_name ?? 'â€”'}</TableCell>
                                 <TableCell>{row.tariff_name ?? 'â€”'}</TableCell>
-                                <TableCell>{formatMethod(row.payment_method)}</TableCell>
                                 <TableCell>{row.station_name ?? 'â€”'}</TableCell>
                                 <TableCell>{row.recorder_name ?? 'â€”'}</TableCell>
-                                <TableCell className="text-right font-medium tabular-nums">
+                                <TableCell className="text-right ">
                                     {formatCurrency(row.amount)}
                                 </TableCell>
                             </TableRow>

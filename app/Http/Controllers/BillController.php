@@ -152,12 +152,21 @@ class BillController extends Controller
     public function show(Bill $bill): Response
     {
         $bill->load([
-            'customer.zone', 'customer.tariff', 'meter', 'reading',
+            'customer.zone',
+            'customer.tariff',
+            'meter',
+            'reading.recorder:id,name',
+            'payments' => fn ($query) => $query
+                ->orderByDesc('payment_date')
+                ->orderByDesc('id'),
         ]);
         $bill->loadSum('payments', 'amount');
 
         return Inertia::render('bills/show', [
             'bill' => $bill,
+            'stations' => Station::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'zone_id', 'accountant_id']),
         ]);
     }
 

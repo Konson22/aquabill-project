@@ -376,9 +376,18 @@ class ReportController extends Controller
             'to' => $to,
         ];
 
+        $chartYear = (int) ($from
+            ? Carbon::parse($from)->year
+            : ($to ? Carbon::parse($to)->year : now()->year));
+
+        $monthlyBreakdown = $this->revenueMonthlyBreakdown($chartYear, $search);
+
         $filename = 'revenue_report_'.now()->format('Y-m-d_His').'.xlsx';
 
-        return Excel::download(new RevenueSummaryExport($summary, $filters, $bills), $filename);
+        return Excel::download(
+            new RevenueSummaryExport($summary, $filters, $bills, $monthlyBreakdown, $chartYear),
+            $filename,
+        );
     }
 
     /**

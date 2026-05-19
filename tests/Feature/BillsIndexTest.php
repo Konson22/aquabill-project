@@ -4,6 +4,7 @@ use App\Models\Bill;
 use App\Models\Customer;
 use App\Models\Meter;
 use App\Models\MeterReading;
+use App\Models\Station;
 use App\Models\Tariff;
 use App\Models\User;
 use App\Models\Zone;
@@ -279,4 +280,71 @@ test('bill payment store rejects partial paid forwarded statuses', function () {
         'payment_date' => now()->toDateString(),
         'payment_method' => 'cash',
     ])->assertStatus(422);
+});
+
+test('bill show includes stations and payment totals', function () {
+    $user = User::factory()->create();
+    $station = Station::factory()->create(['name' => 'Main branch']);
+
+    $tariff = Tariff::query()->create([
+        'name' => 'DOMESTIC',
+        'price_per_unit' => 50,
+        'fixed_charge' => 100,
+    ]);
+
+    $zone = Zone::query()->create([
+        'name' => 'Show Bill Zone',
+        'supply_day_id' => supplyDayId('Monday'),
+        'supply_time' => '08:00:00',
+    ]);
+
+    $customer = Customer::query()->create([
+        'customer_type' => 'residential',
+        'name' => 'Show Bill Customer',
+        'phone' => '999888777',
+        'address' => '1 St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+
+    $meter = Meter::query()->create([
+        'customer_id' => $customer->id,
+        'meter_number' => 'MTR-SHOW-01',
+        'status' => 'active',
+    ]);
+
+    $reading = MeterReading::query()->create([
+        'meter_id' => $meter->id,
+        'reading_date' => now()->toDateString(),
+        'previous_reading' => 5,
+        'current_reading' => 15,
+        'notes' => 'Test',
+    ]);
+
+    $bill = Bill::query()->create([
+        'customer_id' => $customer->id,
+        'meter_id' => $meter->id,
+        'reading_id' => $reading->id,
+        'consumption' => 10,
+        'unit_price' => 50,
+        'fixed_charge' => 100,
+        'current_charge' => 600,
+        'previous_balance' => 0,
+        'total_amount' => 600,
+        'status' => 'pending',
+        'due_date' => now()->addDays(14)->toDateString(),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('bills.show', $bill))
+        ->assertSuccessful()
+        ->assertInertia(fn ($page) => $page
+            ->component('bills/show')
+            ->has('stations', 1)
+            ->where('stations.0.id', $station->id)
+            ->where('bill.id', $bill->id)
+            ->where('bill.amount_paid', '0.00')
+            ->where('bill.total_amount', '600.00')
+        );
 });

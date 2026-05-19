@@ -14,23 +14,19 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class RevenueSummaryExport implements WithMultipleSheets
 {
-    protected $summary;
-
-    protected $filters;
-
-    protected $bills;
-
-    public function __construct($summary, $filters, $bills = [])
-    {
-        $this->summary = $summary;
-        $this->filters = $filters;
-        $this->bills = $bills;
-    }
+    public function __construct(
+        protected array $summary,
+        protected array $filters,
+        protected array $bills = [],
+        protected array $monthlyBreakdown = [],
+        protected ?int $monthlyBreakdownYear = null,
+    ) {}
 
     public function sheets(): array
     {
         return [
             new RevenueSummarySheet($this->summary, $this->filters),
+            new RevenueMonthlySheet($this->monthlyBreakdown, $this->monthlyBreakdownYear),
             new RevenueBillsSheet($this->bills, $this->filters),
         ];
     }
@@ -111,6 +107,149 @@ class RevenueSummarySheet implements FromArray, ShouldAutoSize, WithHeadings, Wi
                 ],
             ],
         ];
+    }
+}
+
+class RevenueMonthlySheet implements FromArray, ShouldAutoSize, WithHeadings, WithStyles, WithTitle
+{
+    /**
+     * @param  list<array{
+     *     month: string,
+     *     label: string,
+     *     amount_expected: float,
+     *     payments_amount: float,
+     *     bills_count?: int
+     * }>  $monthlyBreakdown
+     */
+    public function __construct(
+        private array $monthlyBreakdown,
+        private ?int $year = null,
+    ) {}
+
+    public function title(): string
+    {
+        return 'Payments by month';
+    }
+
+    public function headings(): array
+    {
+        $year = $this->year ?? now()->year;
+
+        return [
+            ['Payments and bills by month'],
+            ['Year:', (string) $year],
+            ['Generated:', now()->format('M d, Y H:i:s')],
+            [],
+            [
+                'Month',
+                'Amount of bills generated (SSP)',
+                'Payments collected (SSP)',
+                'Collection rate (%)',
+                'vs last month (payments)',
+            ],
+        ];
+    }
+
+    public function array(): array
+    {
+        $rows = [];
+        $totalExpected = 0.0;
+        $totalPayments = 0.0;
+
+        foreach ($this->monthlyBreakdown as $index => $row) {
+            $expected = (float) ($row['amount_expected'] ?? 0);
+            $payments = (float) ($row['payments_amount'] ?? 0);
+            $previous = $index > 0 ? $this->monthlyBreakdown[$index - 1] : null;
+            $previousPayments = $previous ? (float) ($previous['payments_amount'] ?? 0) : null;
+
+            $totalExpected += $expected;
+            $totalPayments += $payments;
+
+            $rows[] = [
+                $row['label'] ?? '',
+                $expected,
+                $payments,
+                $this->collectionRatePercent($payments, $expected),
+                $this->formatPaymentsChangePercent(
+                    $this->monthOverMonthPercentChange($payments, $previousPayments),
+                    $previous !== null,
+                ),
+            ];
+        }
+
+        if ($rows !== []) {
+            $rows[] = [
+                'Total',
+                round($totalExpected, 2),
+                round($totalPayments, 2),
+                $this->collectionRatePercent($totalPayments, $totalExpected),
+                '',
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function collectionRatePercent(float $payments, float $expected): float
+    {
+        if ($expected <= 0) {
+            return 0.0;
+        }
+
+        return min(100.0, round(($payments / $expected) * 100, 1));
+    }
+
+    private function monthOverMonthPercentChange(float $current, ?float $previous): ?float
+    {
+        if ($previous === null) {
+            return null;
+        }
+
+        if ($previous == 0.0) {
+            return $current == 0.0 ? 0.0 : null;
+        }
+
+        return (($current - $previous) / $previous) * 100;
+    }
+
+    private function formatPaymentsChangePercent(?float $percent, bool $hasPrevious): string
+    {
+        if (! $hasPrevious || $percent === null) {
+            return '—';
+        }
+
+        $rounded = round($percent, 1);
+        $sign = $rounded > 0 ? '+' : '';
+
+        return $sign.number_format($rounded, 1).'%';
+    }
+
+    /**
+     * @return array<int|string, array<string, mixed>>
+     */
+    public function styles(Worksheet $sheet): array
+    {
+        $headerRow = 5;
+        $lastRow = count($this->monthlyBreakdown) + $headerRow;
+
+        $styles = [
+            1 => ['font' => ['bold' => true, 'size' => 14]],
+            2 => ['font' => ['italic' => true, 'color' => ['argb' => 'FF555555']]],
+            3 => ['font' => ['italic' => true, 'color' => ['argb' => 'FF555555'], 'size' => 9]],
+            $headerRow => [
+                'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['argb' => 'FF0284C7'],
+                ],
+            ],
+        ];
+
+        if ($this->monthlyBreakdown !== []) {
+            $styles[$lastRow] = ['font' => ['bold' => true]];
+        }
+
+        return $styles;
     }
 }
 

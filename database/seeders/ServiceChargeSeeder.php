@@ -10,34 +10,50 @@ use Illuminate\Database\Seeder;
 
 class ServiceChargeSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        $customers = Customer::all();
-        $types = ServiceChargeType::all();
-        $users = User::all();
+        if (ServiceCharge::query()->exists()) {
+            $this->command?->warn('Service charges already exist. Skipping ServiceChargeSeeder.');
 
-        if ($customers->isEmpty() || $types->isEmpty()) {
             return;
         }
 
-        foreach ($customers->random(min(10, $customers->count())) as $customer) {
-            // Apply 1-3 random service charges per selected customer
-            for ($i = 0; $i < rand(1, 3); $i++) {
+        $customers = Customer::query()->where('status', 'active')->get();
+        $types = ServiceChargeType::query()->get();
+        $issuer = User::query()->orderBy('id')->first();
+
+        if ($customers->isEmpty() || $types->isEmpty() || $issuer === null) {
+            $this->command?->warn('Missing customers, charge types, or users. Skipping ServiceChargeSeeder.');
+
+            return;
+        }
+
+        $created = 0;
+        $sampleSize = min(15, $customers->count());
+
+        foreach ($customers->random($sampleSize) as $customer) {
+            $chargeCount = 2;
+
+            for ($i = 0; $i < $chargeCount; $i++) {
                 $type = $types->random();
-                ServiceCharge::create([
+                $issuedDate = now()->subDays(fake()->numberBetween(5, 90));
+
+                ServiceCharge::query()->create([
                     'customer_id' => $customer->id,
                     'service_charge_type_id' => $type->id,
                     'amount' => $type->amount,
-                    'issued_by' => $users->random()->id,
-                    'issued_date' => now()->subDays(rand(1, 60)),
-                    'due_date' => now()->addDays(rand(1, 15)),
-                    'status' => rand(0, 1) ? 'paid' : 'unpaid',
-                    'notes' => 'Sample service charge for '.$type->name,
+                    'other_charges' => fake()->randomElement([0, 0, 5, 10]),
+                    'issued_by' => $issuer->id,
+                    'issued_date' => $issuedDate,
+                    'due_date' => $issuedDate->copy()->addDays(30),
+                    'status' => 'unpaid',
+                    'notes' => "Seeded {$type->name} for {$customer->name}",
                 ]);
+
+                $created++;
             }
         }
+
+        $this->command?->info("Seeded {$created} service charge(s).");
     }
 }

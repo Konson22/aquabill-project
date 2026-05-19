@@ -1,253 +1,420 @@
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+import PaymentModal from '@/components/payment-modal';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import AppLayout from '@/layouts/app-layout';
+import { cn, formatCurrency } from '@/lib/utils';
+import { Head, Link } from '@inertiajs/react';
 import {
-    Printer,
-    Download,
-    CreditCard,
-    ArrowLeft,
-    Droplet,
-    Calendar,
-    User,
-    MapPin,
     Activity,
-    ChevronRight,
-    AlertCircle,
-    CheckCircle2,
-    Clock
+    ArrowLeft,
+    Calendar,
+    DollarSign,
+    Droplets,
+    Gauge,
+    MapPin,
+    Printer,
+    Receipt,
+    User,
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { useMemo, useState } from 'react';
 
-export default function Show({ bill }) {
-    const breadcrumbs = [
-        { title: 'Billing', href: '/bills' },
-        { title: `Invoice #${String(bill.id).padStart(6, '0')}`, href: `/bills/${bill.id}` },
-    ];
+function formatDisplayDate(value) {
+    if (!value) {
+        return '—';
+    }
 
-    const statusConfig = {
-        pending: { color: 'text-red-600 bg-red-50 border-red-200', icon: AlertCircle, label: 'Pending' },
-        paid: { color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: CheckCircle2, label: 'Paid' },
-        partial: { color: 'text-amber-600 bg-amber-50 border-amber-200', icon: Clock, label: 'Partial' },
-        forwarded: { color: 'text-indigo-700 bg-indigo-50 border-indigo-200', icon: Clock, label: 'Forwarded' },
+    try {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return String(value);
+        }
+
+        return date.toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+        });
+    } catch {
+        return String(value);
+    }
+}
+
+function billLabel(bill) {
+    const raw = bill?.bill_no ?? bill?.id;
+
+    return `#${String(raw).padStart(6, '0')}`;
+}
+
+function statusVariant(status) {
+    if (status === 'paid') {
+        return 'success';
+    }
+
+    if (status === 'pending') {
+        return 'destructive';
+    }
+
+    return 'outline';
+}
+
+function canRecordPayment(status) {
+    return status === 'pending';
+}
+
+function SummaryStat({ label, value, subValue, icon: Icon, tone = 'sky' }) {
+    const tones = {
+        sky: {
+            card: 'border-sky-100 bg-sky-50/80',
+            icon: 'bg-sky-100 text-sky-700',
+            value: 'text-sky-950',
+        },
+        emerald: {
+            card: 'border-emerald-100 bg-emerald-50/80',
+            icon: 'bg-emerald-100 text-emerald-700',
+            value: 'text-emerald-950',
+        },
+        amber: {
+            card: 'border-amber-100 bg-amber-50/80',
+            icon: 'bg-amber-100 text-amber-700',
+            value: 'text-amber-950',
+        },
+        slate: {
+            card: 'border-slate-200 bg-slate-50/80',
+            icon: 'bg-slate-100 text-slate-700',
+            value: 'text-slate-950',
+        },
     };
 
-    const currentStatus = statusConfig[bill.status] || statusConfig.pending;
-    const StatusIcon = currentStatus.icon;
+    const styles = tones[tone] ?? tones.sky;
+
+    return (
+        <div className={cn('rounded-xl border p-4 shadow-sm', styles.card)}>
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+                    <p className={cn('mt-1 truncate font-mono text-lg font-bold tabular-nums', styles.value)}>{value}</p>
+                    {subValue ? <p className="mt-0.5 text-xs text-muted-foreground">{subValue}</p> : null}
+                </div>
+                <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', styles.icon)}>
+                    <Icon className="h-5 w-5" strokeWidth={2} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function DetailRow({ label, children, className }) {
+    return (
+        <div className={cn('flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4', className)}>
+            <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+            <dd className="text-sm font-medium text-foreground sm:text-right">{children}</dd>
+        </div>
+    );
+}
+
+export default function Show({ bill, stations = [] }) {
+    const [paymentOpen, setPaymentOpen] = useState(false);
+
+    const breadcrumbs = [
+        { title: 'Billing & invoices', href: route('bills.index') },
+        { title: billLabel(bill), href: route('bills.show', bill.id) },
+    ];
+
+    const totalAmount = Number(bill?.total_amount ?? 0);
+    const amountPaid = Number(bill?.amount_paid ?? 0);
+    const balanceDue = Math.max(0, totalAmount - amountPaid);
+    const consumptionCharge = Number(bill?.consumption ?? 0) * Number(bill?.unit_price ?? 0);
+    const payments = Array.isArray(bill?.payments) ? bill.payments : [];
+
+    const isOverdue = useMemo(() => {
+        if (!['pending', 'partial'].includes(bill?.status) || !bill?.due_date) {
+            return false;
+        }
+
+        const due = new Date(bill.due_date);
+        due.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        return due < today;
+    }, [bill?.status, bill?.due_date]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Invoice #${String(bill.id).padStart(6, '0')}`} />
+            <Head title={`Bill ${billLabel(bill)}`} />
 
-            <div className="max-w-5xl mx-auto p-6 space-y-8 animate-in fade-in duration-500">
-                {/* Actions Header */}
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between no-print">
-                    <Link href="/bills" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Billing List
-                    </Link>
-                    <div className="flex items-center gap-2">
+            <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-6">
+                <div className="no-print flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-2 text-muted-foreground" asChild>
+                        <Link href={route('bills.index')}>
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to billing
+                        </Link>
+                    </Button>
+                    <div className="flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" asChild>
                             <a href={route('bills.print', bill.id)} target="_blank" rel="noopener noreferrer">
                                 <Printer className="mr-2 h-4 w-4" />
-                                Print Invoice
+                                Print invoice
                             </a>
                         </Button>
-                        <Button variant="outline" size="sm">
-                            <Download className="mr-2 h-4 w-4" />
-                            Download PDF
-                        </Button>
-                        {bill.status === 'pending' && (
-                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                                <CreditCard className="mr-2 h-4 w-4" />
-                                Record Payment
+                        {canRecordPayment(bill.status) && (
+                            <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700" onClick={() => setPaymentOpen(true)}>
+                                <DollarSign className="h-4 w-4" />
+                                Record payment
                             </Button>
                         )}
                     </div>
                 </div>
 
-                {/* Main Invoice Card */}
-                <div className="bg-card border shadow-xl rounded-2xl overflow-hidden print:shadow-none print:border-none">
-                    {/* Invoice Header Stripe */}
-                    <div className="h-2 bg-blue-600 w-full" />
-
-                    <div className="p-8 md:p-12 space-y-12">
-                        {/* Company & Invoice Identity */}
-                        <div className="flex flex-col md:flex-row justify-between gap-8">
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                                        <Droplet className="h-7 w-7" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-2xl font-black tracking-tight text-blue-900">AquaBill <span className="text-blue-500">Pro</span></h2>
-                                        <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Water Utility Management</p>
-                                    </div>
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    <p>123 Utility Avenue, Aqua City</p>
-                                    <p>Contact: +254 700 000 000</p>
-                                    <p>Email: billing@aquabill.com</p>
-                                </div>
+                <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                    <div className="border-b bg-sky-800 px-5 py-5 text-white sm:px-6">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0 space-y-1">
+                                <p className="text-xs font-semibold uppercase tracking-wider text-sky-100/90">Water bill</p>
+                                <h1 className="font-mono text-2xl font-bold tracking-tight sm:text-3xl">{billLabel(bill)}</h1>
+                                <p className="text-sm text-sky-100/90">
+                                    Issued {formatDisplayDate(bill.created_at)}
+                                    {bill.reading?.recorder?.name ? (
+                                        <span> · by {bill.reading.recorder.name}</span>
+                                    ) : null}
+                                </p>
                             </div>
-
-                            <div className="text-right space-y-2">
-                                <h1 className="text-4xl font-black text-foreground tracking-tighter uppercase">Invoice</h1>
-                                <div className="flex flex-col items-end">
-                                    <span className="text-lg font-mono font-bold text-blue-600">#{String(bill.id).padStart(6, '0')}</span>
-                                    <Badge variant="outline" className={`mt-2 px-3 py-1 uppercase text-[10px] font-black tracking-widest ${currentStatus.color}`}>
-                                        <StatusIcon className="mr-1.5 h-3 w-3" />
-                                        {currentStatus.label}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant={statusVariant(bill.status)} className="h-6 capitalize">
+                                    {bill.status}
+                                </Badge>
+                                {isOverdue ? (
+                                    <Badge variant="destructive" className="h-6 uppercase text-[10px] tracking-wide">
+                                        Overdue
                                     </Badge>
-                                </div>
+                                ) : null}
                             </div>
                         </div>
+                    </div>
 
-                        {/* Customer & Dates Info */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-8 border-y border-dashed border-muted">
-                            <div className="space-y-4">
-                                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                    <User className="h-3 w-3" /> Bill To
-                                </h3>
-                                <div className="space-y-1">
-                                    <p className="text-xl font-bold text-foreground">{bill.customer?.name}</p>
-                                    <p className="text-sm text-muted-foreground font-mono">Account: {bill.customer?.account_number}</p>
-                                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-2">
-                                        <MapPin className="h-3.5 w-3.5" />
-                                        <span>Zone: {bill.customer?.zone?.name}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 md:text-right">
-                                <div className="space-y-1">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Date Issued</h4>
-                                    <p className="text-sm font-bold">{new Date(bill.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Due Date</h4>
-                                    <p className="text-sm font-bold text-red-600">{new Date(bill.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                </div>
-                                <div className="space-y-1 col-span-2">
-                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Meter Details</h4>
-                                    <p className="text-sm font-bold">{bill.meter?.meter_number} ({bill.meter?.meter_type})</p>
-                                </div>
-                            </div>
+                    <div className="space-y-6 p-5 sm:p-6">
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            <SummaryStat
+                                label="Total due"
+                                value={formatCurrency(totalAmount)}
+                                subValue={`Due ${formatDisplayDate(bill.due_date)}`}
+                                icon={Receipt}
+                                tone="sky"
+                            />
+                            <SummaryStat
+                                label="Paid"
+                                value={formatCurrency(amountPaid)}
+                                subValue={payments.length ? `${payments.length} payment(s)` : 'No payments yet'}
+                                icon={DollarSign}
+                                tone="emerald"
+                            />
+                            <SummaryStat
+                                label="Balance"
+                                value={formatCurrency(balanceDue)}
+                                subValue={balanceDue > 0 ? 'Outstanding' : 'Settled'}
+                                icon={Activity}
+                                tone={balanceDue > 0 ? 'amber' : 'emerald'}
+                            />
+                            <SummaryStat
+                                label="Consumption"
+                                value={`${bill.consumption ?? 0} m³`}
+                                subValue={bill.meter?.meter_number ? `Meter ${bill.meter.meter_number}` : null}
+                                icon={Droplets}
+                                tone="slate"
+                            />
                         </div>
 
-                        {/* Consumption Details */}
-                        <div className="space-y-4">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                <Activity className="h-3 w-3" /> Consumption Breakdown
-                            </h3>
-                            <div className="bg-muted/30 rounded-xl p-6 grid grid-cols-1 md:grid-cols-3 gap-8 text-center border">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Previous Reading</p>
-                                    <p className="text-2xl font-mono font-bold">{bill.reading?.previous_reading} <span className="text-xs font-normal">m³</span></p>
-                                </div>
-                                <div className="flex items-center justify-center">
-                                    <div className="h-px w-8 bg-muted hidden md:block" />
-                                    <ChevronRight className="h-5 w-5 text-muted-foreground mx-4" />
-                                    <div className="h-px w-8 bg-muted hidden md:block" />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground">Current Reading</p>
-                                    <p className="text-2xl font-mono font-bold text-blue-600">{bill.reading?.current_reading} <span className="text-xs font-normal">m³</span></p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Financial Table */}
-                        <div className="space-y-6">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                        <th className="py-3 text-left">Description</th>
-                                        <th className="py-3 text-center">Qty / Value</th>
-                                        <th className="py-3 text-right">Unit Price</th>
-                                        <th className="py-3 text-right">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-muted/50 font-medium">
-                                    <tr>
-                                        <td className="py-5">
-                                            <p className="font-bold">Water Consumption</p>
-                                            <p className="text-[10px] text-muted-foreground tracking-tight italic">Measured usage for the period</p>
-                                        </td>
-                                        <td className="py-5 text-center font-mono">{bill.consumption} m³</td>
-                                        <td className="py-5 text-right font-mono">
-                                            {formatCurrency(bill.unit_price)}
-                                        </td>
-                                        <td className="py-5 text-right font-bold font-mono">
-                                            {formatCurrency(
-                                                bill.consumption *
-                                                    bill.unit_price,
-                                            )}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-5">
-                                            <p className="font-bold">Fixed Service Charge</p>
-                                            <p className="text-[10px] text-muted-foreground tracking-tight italic">Standard monthly infrastructure maintenance</p>
-                                        </td>
-                                        <td className="py-5 text-center font-mono">1 Units</td>
-                                        <td className="py-5 text-right font-mono">
-                                            {formatCurrency(bill.fixed_charge)}
-                                        </td>
-                                        <td className="py-5 text-right font-bold font-mono">
-                                            {formatCurrency(bill.fixed_charge)}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            {/* Summary Section */}
-                            <div className="flex justify-end">
-                                <div className="w-full md:w-80 space-y-3">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Current Charges</span>
-                                        <span className="font-bold font-mono">
-                                            {formatCurrency(bill.current_charge)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Previous Balance (Arrears)</span>
-                                        <span
-                                            className={`font-bold font-mono ${parseFloat(bill.previous_balance) > 0 ? 'text-red-500' : ''}`}
-                                        >
-                                            {formatCurrency(
-                                                bill.previous_balance,
-                                            )}
-                                        </span>
-                                    </div>
-                                    <div className="pt-4 border-t-2 border-foreground flex justify-between items-end">
-                                        <div className="space-y-1">
-                                            <span className="text-xs font-black uppercase tracking-tighter text-foreground">Total Amount Due</span>
-                                            <p className="text-[8px] text-muted-foreground italic leading-none">Inclusive of all taxes and fees</p>
+                        <div className="grid gap-6 lg:grid-cols-5">
+                            <div className="space-y-6 lg:col-span-2">
+                                <Card className="border-border/60 shadow-none">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                                            <User className="h-4 w-4 text-sky-600" />
+                                            Customer
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3 pt-0">
+                                        <div>
+                                            <Link
+                                                href={route('customers.show', bill.customer_id)}
+                                                className="text-base font-semibold text-foreground underline-offset-4 hover:underline"
+                                            >
+                                                {bill.customer?.name ?? '—'}
+                                            </Link>
+                                            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                                                {bill.customer?.account_number ?? '—'}
+                                            </p>
                                         </div>
-                                        <span className="text-3xl font-black text-foreground tracking-tighter font-mono">
-                                            {formatCurrency(bill.total_amount)}
-                                        </span>
-                                    </div>
-                                </div>
+                                        {bill.customer?.zone?.name ? (
+                                            <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                                {bill.customer.zone.name}
+                                            </p>
+                                        ) : null}
+                                        {bill.customer?.tariff?.name ? (
+                                            <p className="text-sm text-muted-foreground">
+                                                Tariff: <span className="font-medium text-foreground">{bill.customer.tariff.name}</span>
+                                            </p>
+                                        ) : null}
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="border-border/60 shadow-none">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                                            <Gauge className="h-4 w-4 text-sky-600" />
+                                            Meter & reading
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3 pt-0 text-sm">
+                                        <DetailRow label="Meter">{bill.meter?.meter_number ?? bill.meter_number ?? '—'}</DetailRow>
+                                        {bill.meter?.meter_type ? (
+                                            <DetailRow label="Type">{bill.meter.meter_type}</DetailRow>
+                                        ) : null}
+                                        <DetailRow label="Previous">{bill.reading?.previous_reading ?? '—'} m³</DetailRow>
+                                        <DetailRow label="Current">{bill.reading?.current_reading ?? '—'} m³</DetailRow>
+                                        <DetailRow label="Reading date">{formatDisplayDate(bill.reading?.reading_date)}</DetailRow>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="border-border/60 shadow-none">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                                            <Calendar className="h-4 w-4 text-sky-600" />
+                                            Dates
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3 pt-0 text-sm">
+                                        <DetailRow label="Issued">{formatDisplayDate(bill.created_at)}</DetailRow>
+                                        <DetailRow label="Due">
+                                            <span className={cn(isOverdue && 'font-semibold text-destructive')}>
+                                                {formatDisplayDate(bill.due_date)}
+                                            </span>
+                                        </DetailRow>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            <div className="lg:col-span-3">
+                                <Card className="h-full border-border/60 shadow-none">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm font-semibold">Charge breakdown</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="pt-0">
+                                        <div className="overflow-x-auto rounded-lg border">
+                                            <table className="w-full text-sm">
+                                                <thead>
+                                                    <tr className="border-b bg-muted/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                        <th className="px-4 py-3">Description</th>
+                                                        <th className="px-4 py-3 text-right">Qty</th>
+                                                        <th className="px-4 py-3 text-right">Rate</th>
+                                                        <th className="px-4 py-3 text-right">Amount</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y">
+                                                    <tr>
+                                                        <td className="px-4 py-3">
+                                                            <p className="font-medium">Water consumption</p>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono tabular-nums">{bill.consumption} m³</td>
+                                                        <td className="px-4 py-3 text-right font-mono tabular-nums">
+                                                            {formatCurrency(bill.unit_price)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums">
+                                                            {formatCurrency(consumptionCharge)}
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="px-4 py-3">
+                                                            <p className="font-medium">Fixed service charge</p>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono tabular-nums">1</td>
+                                                        <td className="px-4 py-3 text-right font-mono tabular-nums">
+                                                            {formatCurrency(bill.fixed_charge)}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums">
+                                                            {formatCurrency(bill.fixed_charge)}
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <dl className="mt-6 space-y-2 border-t pt-4 text-sm">
+                                            <DetailRow label="Current charges">{formatCurrency(bill.current_charge)}</DetailRow>
+                                            <DetailRow label="Previous balance (arrears)">
+                                                <span
+                                                    className={cn(
+                                                        'font-mono tabular-nums',
+                                                        Number(bill.previous_balance) > 0 && 'text-destructive',
+                                                    )}
+                                                >
+                                                    {formatCurrency(bill.previous_balance)}
+                                                </span>
+                                            </DetailRow>
+                                            <div className="flex items-end justify-between gap-4 border-t border-foreground/20 pt-4">
+                                                <div>
+                                                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                                        Total amount due
+                                                    </p>
+                                                </div>
+                                                <p className="font-mono text-2xl font-bold tabular-nums tracking-tight">
+                                                    {formatCurrency(totalAmount)}
+                                                </p>
+                                            </div>
+                                        </dl>
+                                    </CardContent>
+                                </Card>
                             </div>
                         </div>
 
-                        {/* Footer Notes */}
-                        <div className="pt-12 border-t text-center space-y-2">
-                            <p className="text-xs text-muted-foreground font-medium italic">Thank you for being a valued customer. Please pay by the due date to avoid service interruption.</p>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Generated by AquaBill Cloud Service</p>
-                        </div>
+                        {payments.length > 0 ? (
+                            <Card className="border-border/60 shadow-none">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-sm font-semibold">Payment history</CardTitle>
+                                </CardHeader>
+                                <CardContent className="pt-0">
+                                    <div className="overflow-x-auto rounded-lg border">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b bg-muted/40 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                    <th className="px-4 py-3">Date</th>
+                                                    <th className="px-4 py-3">Method</th>
+                                                    <th className="px-4 py-3 text-right">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {payments.map((payment) => (
+                                                    <tr key={payment.id}>
+                                                        <td className="px-4 py-3 whitespace-nowrap tabular-nums">
+                                                            {formatDisplayDate(payment.payment_date)}
+                                                        </td>
+                                                        <td className="px-4 py-3 capitalize">{payment.payment_method?.replace('_', ' ') ?? '—'}</td>
+                                                        <td className="px-4 py-3 text-right font-mono font-semibold tabular-nums">
+                                                            {formatCurrency(payment.amount)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ) : null}
                     </div>
                 </div>
             </div>
 
-            <style dangerouslySetInnerHTML={{ __html: `
+            <PaymentModal open={paymentOpen} onOpenChange={setPaymentOpen} bill={bill} stations={stations} />
+
+            <style>{`
                 @media print {
                     .no-print { display: none !important; }
                     body { background: white !important; }
-                    .animate-in { animation: none !important; }
                 }
-            ` }} />
+            `}</style>
         </AppLayout>
     );
 }

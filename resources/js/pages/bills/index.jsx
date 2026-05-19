@@ -61,6 +61,16 @@ function latestPayment(bill) {
     return bill?.payments?.[0] ?? null;
 }
 
+function customerDisplayName(name) {
+    const raw = name?.trim();
+
+    if (!raw) {
+        return '—';
+    }
+
+    return raw.split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
+}
+
 export default function Bills({ bills, stations = [], filters = {} }) {
     const { auth } = usePage().props;
     /** Align with sidebar: admin department may edit or remove recorded payments. */
@@ -217,27 +227,27 @@ export default function Bills({ bills, stations = [], filters = {} }) {
                                 ) : (
                                     bills.data.map((bill) => (
                                         <TableRow key={bill.bill_no} className="group hover:bg-blue-50/40 transition-colors duration-200 text-sm font-normal">
-                                            <TableCell className="px-6 py-4 ">
-                                                <span className="font-mono text-muted-foreground">#{String(bill.bill_no).padStart(6, '0')}</span>
+                                            <TableCell className="px-4 ">
+                                                <span className="">#{String(bill.bill_no).padStart(6, '0')}</span>
                                             </TableCell>
-                                            <TableCell className="px-6 py-4">
-                                                {bill.customer?.name}
+                                            <TableCell className="max-w-[200px] truncate px-4" title={bill.customer?.name}>
+                                                {customerDisplayName(bill.customer?.name)}
                                             </TableCell>
 
-                                            <TableCell className="px-6 py-4 ">
-                                                {bill.consumption} <span className="text-muted-foreground">m³</span>
+                                            <TableCell className="px-4">
+                                                {bill.consumption} m³
                                             </TableCell>
-                                            <TableCell className="px-6 py-4 ">
+                                            <TableCell className="px-4">
                                                 {formatCurrency(bill.previous_balance)}
                                             </TableCell>
-                                            <TableCell className="px-6 py-4 ">
+                                            <TableCell className="px-4">
                                                 {formatCurrency(bill.current_charge)}
                                             </TableCell>
-                                            <TableCell className="px-6 py-4  text-foreground">
+                                            <TableCell className="px-4">
                                                 {formatCurrency(bill.total_amount)}
                                             </TableCell>
 
-                                            <TableCell className="px-6 py-4 text-center ">
+                                            <TableCell className="px-4 text-center ">
                                                 <Badge
                                                     variant="outline"
                                                     className={cn(
@@ -252,7 +262,7 @@ export default function Bills({ bills, stations = [], filters = {} }) {
                                                     {bill.status}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="px-6 py-4 text-right ">
+                                            <TableCell className="px-4 text-right ">
                                                 <div className="flex justify-end opacity-80 transition-opacity group-hover:opacity-100">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>

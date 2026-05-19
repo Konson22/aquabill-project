@@ -28,8 +28,9 @@ class DatabaseSeeder extends Seeder
             CustomerSeeder::class,
             MeterSeeder::class,
             ServiceChargeTypeSeeder::class,
-            // ServiceChargeSeeder::class,
-            // MeterReadingSeeder::class,
+            MeterReadingSeeder::class,
+            ServiceChargeSeeder::class,
+            PaymentSeeder::class,
         ]);
     }
 }

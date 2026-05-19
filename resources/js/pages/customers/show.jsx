@@ -27,9 +27,8 @@ import { useMemo, useState } from 'react';
 import MeterStatusModal from './components/meter-status-modal';
 import ReplaceMeterModal from './components/replace-meter-modal';
 import BillsTab from './tabs/bills-tab';
-import ChargesTab from './tabs/charges-tab';
 import MetersTab from './tabs/meters-tab';
-import PaymentsTab from './tabs/payments-tab';
+import PaymentsChargesTab from './tabs/payments-charges-tab';
 import ProfileTab from './tabs/profile-tab';
 import ReadingsTab from './tabs/readings-tab';
 
@@ -38,8 +37,7 @@ const CUSTOMER_TABS = [
     { id: 'bills', label: 'Bills', icon: Receipt, countKey: 'bills' },
     { id: 'readings', label: 'Readings', icon: Droplet, countKey: 'readings' },
     { id: 'meters', label: 'Meters', icon: Gauge, countKey: 'meters' },
-    { id: 'payments', label: 'Payments', icon: CreditCard, countKey: 'payments' },
-    { id: 'charges', label: 'Charges', icon: Wrench, countKey: 'charges' },
+    { id: 'payments-charges', label: 'Payments & charges', icon: CreditCard, countKey: 'paymentsCharges' },
 ];
 
 function formatDate(value) {
@@ -59,20 +57,22 @@ function formatDate(value) {
 }
 
 function tabCounts(customer, bills, meters, unpaidBills) {
-    const paymentsActivity = bills.filter((bill) => Number(bill?.payments_sum_amount ?? 0) > 0).length;
+    const paymentsActivity = bills.filter(
+        (bill) => bill.status !== 'pending' && Number(bill?.payments_sum_amount ?? 0) > 0,
+    ).length;
 
     return {
         profile: null,
         bills: bills.length,
         readings: customer?.readings?.length ?? 0,
         meters: meters.length,
-        payments: paymentsActivity,
-        charges: customer?.serviceCharges?.length ?? customer?.service_charges?.length ?? 0,
+        paymentsCharges:
+            paymentsActivity + (customer?.serviceCharges?.length ?? customer?.service_charges?.length ?? 0),
         unpaidBills: unpaidBills.length,
     };
 }
 
-export default function Show({ customer, unassignedMeters = [] }) {
+export default function Show({ customer, stations = [], unassignedMeters = [] }) {
     const [selectedMeter, setSelectedMeter] = useState(null);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false);
@@ -252,7 +252,13 @@ export default function Show({ customer, unassignedMeters = [] }) {
                             />
                         </TabsContent>
                         <TabsContent value="bills" className="m-0 mt-0 border-none p-0 outline-none">
-                            <BillsTab bills={customer?.bills} customerId={customer?.id} />
+                            <BillsTab
+                                bills={customer?.bills}
+                                customerId={customer?.id}
+                                customerName={customer?.name}
+                                accountNumber={customer?.account_number}
+                                stations={stations}
+                            />
                         </TabsContent>
                         <TabsContent value="readings" className="m-0 mt-0 border-none p-0 outline-none">
                             <ReadingsTab readings={customer?.readings} customerId={customer?.id} />
@@ -272,11 +278,12 @@ export default function Show({ customer, unassignedMeters = [] }) {
                                 }}
                             />
                         </TabsContent>
-                        <TabsContent value="payments" className="m-0 mt-0 border-none p-0 outline-none">
-                            <PaymentsTab bills={customer?.bills} customerId={customer?.id} />
-                        </TabsContent>
-                        <TabsContent value="charges" className="m-0 mt-0 border-none p-0 outline-none">
-                            <ChargesTab serviceCharges={customer?.serviceCharges} customerId={customer?.id} />
+                        <TabsContent value="payments-charges" className="m-0 mt-0 border-none p-0 outline-none">
+                            <PaymentsChargesTab
+                                bills={customer?.bills}
+                                serviceCharges={customer?.serviceCharges}
+                                customerId={customer?.id}
+                            />
                         </TabsContent>
                 </div>
                 </Tabs>
