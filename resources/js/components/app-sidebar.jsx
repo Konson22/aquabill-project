@@ -38,16 +38,16 @@ const getNavItems = (user) => {
     if (isAdmin) {
         return [
             ...items,
-            { title: 'Revenue report', url: route('revenue-report.index'), icon: PieChart },
-            { title: 'Payments', url: route('payments-report.index'), icon: CreditCard },
-            { title: 'Water report', url: route('water-report.index'), icon: Droplets },
             { title: 'Customers', url: route('customers.index'), icon: Users },
-            { title: 'Connection requests', url: route('connection-requests.index'), icon: FilePlus2 },
-            { title: 'Meter Readings', url: route('readings.index'), icon: MapPin },
             { title: 'Bills', url: route('bills.index'), icon: FileText },
             { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard },
+            { title: 'Revenue report', url: route('revenue-report.index'), icon: PieChart },
+            { title: 'Meter Readings', url: route('readings.index'), icon: MapPin },
+            { title: 'Payments', url: route('payments-report.index'), icon: CreditCard },
+            { title: 'Connection requests', url: route('connection-requests.index'), icon: FilePlus2 },
             { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
             { title: 'Meters', url: route('meters.index'), icon: MapPin },
+            { title: 'Water report', url: route('water-report.index'), icon: Droplets },
             { title: 'Zones', url: route('zones.index'), icon: MapPin },
             { title: 'GIS', url: route('gis.dashboard'), icon: Globe2 },
             { title: 'System Settings', url: route('admin.settings'), icon: Settings }
@@ -68,15 +68,17 @@ const getNavItems = (user) => {
         );
     } else if (department === 'finance') {
         items.push(
-            { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
+            { title: 'Bills', url: route('bills.index'), icon: FileText },
             { title: 'Revenue report', url: route('revenue-report.index'), icon: BarChart3 },
             { title: 'Payments', url: route('payments-report.index'), icon: CreditCard },
-            { title: 'Bills', url: route('bills.index'), icon: FileText },
             { title: 'Service Charges', url: route('service-charges.index'), icon: CreditCard },
+            { title: 'Tariffs', url: route('tariffs.index'), icon: BookOpen },
 
         );
     } else if (department === 'ledger') {
         items.push(
+            { title: 'Bills', url: route('bills.index'), icon: FileText },
+
             { title: 'Customers', url: route('customers.index'), icon: Users },
             { title: 'Meters', url: route('meters.index'), icon: MapPin },
             { title: 'Meter Readings', url: route('readings.index'), icon: MapPin },

@@ -123,4 +123,15 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Revenue collection target (%)
+    |--------------------------------------------------------------------------
+    |
+    | Shown on the revenue report as the collection rate benchmark.
+    |
+    */
+
+    'collection_target_percent' => (float) env('COLLECTION_TARGET_PERCENT', 90),
+
 ];

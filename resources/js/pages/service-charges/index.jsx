@@ -1,7 +1,17 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { useState, useMemo } from 'react';
+import ConfirmPaymentModal from './components/confirm-payment-modal';
+import { RevenueStatCard } from '@/components/reports/revenue-stat-card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import {
     Table,
     TableBody,
@@ -10,37 +20,41 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { 
-    CreditCard, 
-    Search, 
-    Plus, 
-    MoreHorizontal, 
-    CheckCircle2, 
-    Clock, 
-    User,
-    ArrowUpRight,
-    FileText,
-    Calendar,
-    Filter,
-    X,
-    TrendingUp,
-    AlertCircle,
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn, formatCurrency } from '@/lib/utils';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    ChevronLeft,
+    ChevronRight,
+    CircleCheck,
+    Clock,
+    CreditCard,
+    DollarSign,
     Eye,
-    EyeOff,
-    Info
+    MoreHorizontal,
+    Plus,
+    Printer,
+    Receipt,
+    Search,
+    Users,
 } from 'lucide-react';
-import { 
-    DropdownMenu, 
-    DropdownMenuContent, 
-    DropdownMenuItem, 
-    DropdownMenuLabel, 
-    DropdownMenuSeparator, 
-    DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { formatCurrency } from '@/lib/utils';
-import ConfirmPaymentModal from './components/confirm-payment-modal';
+import { useEffect, useState } from 'react';
+
+const breadcrumbs = [
+    {
+        title: 'Service charges',
+        href: route('service-charges.index'),
+    },
+];
+
+const EMPTY_SUMMARY = {
+    total_count: 0,
+    total_amount: 0,
+    unpaid_count: 0,
+    unpaid_amount: 0,
+    paid_count: 0,
+    paid_amount: 0,
+};
 
 /**
  * @param {string | null | undefined} value
@@ -49,6 +63,7 @@ function formatIssuedDate(value) {
     if (!value) {
         return '—';
     }
+
     try {
         const d = new Date(value);
         if (Number.isNaN(d.getTime())) {
@@ -65,368 +80,376 @@ function formatIssuedDate(value) {
     }
 }
 
-export default function ServiceChargesIndex({ charges, stations = [] }) {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
-    const [dateFilter, setDateFilter] = useState('all');
-    const [showFilters, setShowFilters] = useState(false);
+/**
+ * @param {string | undefined} status
+ */
+function StatusBadge({ status }) {
+    if (status === 'paid') {
+        return (
+            <Badge
+                variant="outline"
+                className="border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-black tracking-widest text-emerald-700 uppercase hover:bg-emerald-50"
+            >
+                Paid
+            </Badge>
+        );
+    }
 
-    // Modal state
+    if (status === 'unpaid') {
+        return (
+            <Badge
+                variant="outline"
+                className="border-amber-200 bg-amber-50 px-2 py-0.5 text-[9px] font-black tracking-widest text-amber-700 uppercase hover:bg-amber-50"
+            >
+                Unpaid
+            </Badge>
+        );
+    }
+
+    return (
+        <Badge variant="secondary" className="px-2 py-0.5 text-[9px] font-black tracking-widest uppercase">
+            {status ?? '—'}
+        </Badge>
+    );
+}
+
+export default function ServiceChargesIndex({
+    charges,
+    stations = [],
+    filters = {},
+    statusCounts = {},
+    summary,
+}) {
+    const safeCharges = charges ?? { data: [], links: [], from: 0, to: 0, total: 0 };
+    const rows = safeCharges.data ?? [];
+    const safeSummary = summary ?? EMPTY_SUMMARY;
+
+    const [search, setSearch] = useState(filters?.search ?? '');
+    const [status, setStatus] = useState(filters?.status ?? 'all');
     const [selectedCharge, setSelectedCharge] = useState(null);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-    const breadcrumbs = [
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Service Charges', href: '/service-charges' },
-    ];
-
-    // Calculate statistics
-    const stats = useMemo(() => {
-        const data = charges.data || [];
-        return {
-            total: charges.total || 0,
-            totalAmount: data.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0),
-            unpaid: data.filter(c => c.status === 'unpaid').length,
-            unpaidAmount: data.filter(c => c.status === 'unpaid').reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0),
-            paid: data.filter(c => c.status === 'paid').length,
-            paidAmount: data.filter(c => c.status === 'paid').reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0),
-        };
-    }, [charges]);
-
-    // Filter charges based on search and filters
-    const filteredCharges = useMemo(() => {
-        let filtered = charges.data || [];
-
-        if (searchTerm) {
-            const term = searchTerm.toLowerCase();
-            filtered = filtered.filter(c => 
-                c.customer?.name?.toLowerCase().includes(term) ||
-                c.customer?.account_number?.toLowerCase().includes(term) ||
-                c.service_charge_type?.name?.toLowerCase().includes(term)
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            router.get(
+                route('service-charges.index'),
+                {
+                    search: search || undefined,
+                    status: status !== 'all' ? status : undefined,
+                },
+                {
+                    preserveScroll: true,
+                    preserveState: true,
+                    replace: true,
+                    only: ['charges', 'filters', 'statusCounts', 'summary'],
+                },
             );
-        }
+        }, 300);
 
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(c => c.status === statusFilter);
-        }
+        return () => clearTimeout(timeout);
+    }, [search, status]);
 
-        return filtered;
-    }, [charges.data, searchTerm, statusFilter]);
-
-    const getStatusBadge = (status) => {
-        switch (status) {
-            case 'paid':
-                return <Badge className="bg-emerald-500 hover:bg-emerald-600 rounded-full px-3 py-1 border-none shadow-sm shadow-emerald-200 font-bold tracking-tight text-xs">Paid</Badge>;
-            case 'unpaid':
-                return <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 rounded-full px-3 py-1 font-bold tracking-tight text-xs">Unpaid</Badge>;
-            default:
-                return <Badge variant="secondary" className="rounded-full px-3 py-1 font-bold text-xs">{status}</Badge>;
-        }
+    const openConfirmPayment = (charge) => {
+        setSelectedCharge(charge);
+        setIsPaymentModalOpen(true);
     };
-
-    const hasActiveFilters = searchTerm || statusFilter !== 'all' || dateFilter !== 'all';
-
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Customer Service Charges" />
+            <Head title="Service charges" />
 
-            <div className="p-6 md:p-10 max-w-[1600px] mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                
-                {/* Page Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-3 text-primary">
-                            <div className="p-2 bg-primary/10 rounded-lg">
-                                <CreditCard className="h-5 w-5" />
-                            </div>
-                            <span className="text-xs font-black uppercase tracking-[0.2em] text-primary">Billing Operations</span>
-                        </div>
-                        <h1 className="text-3xl md:text-4xl font-black tracking-tight">Service Charges</h1>
-                        <p className="text-sm text-muted-foreground">Manage and track operational fees applied to customer accounts</p>
-                    </div>
-
-                    <Button className="rounded-xl h-11 px-5 shadow-lg shadow-primary/20 gap-2 font-bold group w-full md:w-auto">
-                        <Plus className="h-5 w-5 group-hover:rotate-90 transition-transform duration-300" />
-                        Issue Charge
-                    </Button>
-                </div>
-
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Total Charges */}
-                    <div className="bg-card rounded-xl border shadow-sm p-6 group hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1">Total Charges</p>
-                                <p className="text-2xl font-black tracking-tight">{stats.total}</p>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                    {formatCurrency(stats.totalAmount)}
-                                </p>
-                            </div>
-                            <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors">
-                                <CreditCard className="h-5 w-5 text-blue-600" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Unpaid Charges */}
-                    <div className="bg-card rounded-xl border shadow-sm p-6 group hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1">Unpaid</p>
-                                <p className="text-2xl font-black tracking-tight text-amber-600">{stats.unpaid}</p>
-                                <p className="text-xs text-amber-600/70 mt-2">
-                                    {formatCurrency(stats.unpaidAmount)}
-                                </p>
-                            </div>
-                            <div className="p-2 bg-amber-500/10 rounded-lg group-hover:bg-amber-500/20 transition-colors">
-                                <Clock className="h-5 w-5 text-amber-600" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Paid charges */}
-                    <div className="bg-card rounded-xl border shadow-sm p-6 group hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between">
-                            <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1">Paid</p>
-                                <p className="text-2xl font-black tracking-tight text-emerald-600">{stats.paid}</p>
-                                <p className="text-xs text-emerald-600/70 mt-2">
-                                    {formatCurrency(stats.paidAmount)}
-                                </p>
-                            </div>
-                            <div className="p-2 bg-emerald-500/10 rounded-lg group-hover:bg-emerald-500/20 transition-colors">
-                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Quick Actions */}
-                    <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl border border-primary/20 shadow-sm p-6">
-                        <div className="flex flex-col h-full justify-between">
-                            <div>
-                                <p className="text-xs font-bold text-primary uppercase tracking-wide mb-1">Quick Actions</p>
-                                <p className="text-xs text-muted-foreground">Export data or view reports</p>
-                            </div>
-                            <Button variant="ghost" size="sm" className="gap-2 text-primary hover:bg-primary/10 w-full justify-start">
-                                <ArrowUpRight className="h-4 w-4" />
-                                <span className="text-xs font-bold">View Reports</span>
-                            </Button>
-                        </div>
+            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Service charges</h1>
+                        <p className="text-sm text-muted-foreground">
+                            One-off fees issued to customers — confirm payment or open a customer to issue a new charge.
+                        </p>
                     </div>
                 </div>
 
-                {/* Search & Filters Section */}
-                <div className="bg-card rounded-xl border shadow-sm p-4 md:p-6 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="font-bold text-sm md:text-base">Filters & Search</h2>
-                        {hasActiveFilters && (
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                                onClick={() => {
-                                    setSearchTerm('');
-                                    setStatusFilter('all');
-                                    setDateFilter('all');
-                                }}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <RevenueStatCard title="Total charges" valueClassName="text-primary">
+                        {safeSummary.total_count.toLocaleString()}
+                        <span className="mt-1 block text-sm font-normal text-muted-foreground">
+                            {formatCurrency(safeSummary.total_amount)}
+                        </span>
+                    </RevenueStatCard>
+                    <RevenueStatCard title="Unpaid" valueClassName="text-amber-600 dark:text-amber-400">
+                        {safeSummary.unpaid_count.toLocaleString()}
+                        <span className="mt-1 block text-sm font-normal text-muted-foreground">
+                            {formatCurrency(safeSummary.unpaid_amount)}
+                        </span>
+                    </RevenueStatCard>
+                    <RevenueStatCard title="Paid" valueClassName="text-emerald-600 dark:text-emerald-400">
+                        {safeSummary.paid_count.toLocaleString()}
+                        <span className="mt-1 block text-sm font-normal text-muted-foreground">
+                            {formatCurrency(safeSummary.paid_amount)}
+                        </span>
+                    </RevenueStatCard>
+                </div>
+
+                <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <div className="flex flex-col justify-between gap-4 bg-sky-800 px-4 pt-4 sm:px-6 md:flex-row md:items-end">
+                        <Tabs value={status} onValueChange={setStatus} className="-mb-px w-full overflow-hidden md:w-auto">
+                            <TabsList className="hide-scrollbar flex h-auto w-full gap-1 overflow-x-auto bg-transparent p-0 md:w-auto">
+                                <TabsTrigger
+                                    value="all"
+                                    className="flex items-center gap-2 rounded-t-lg rounded-b-none border-0 px-4 py-2.5 text-[13px] font-bold whitespace-nowrap text-white/70 transition-colors hover:bg-white/20 hover:text-white data-[state=active]:bg-card data-[state=active]:text-sky-800 data-[state=active]:shadow-none data-[state=inactive]:bg-white/10"
+                                >
+                                    <CreditCard className="h-3.5 w-3.5" />
+                                    All
+                                    <span
+                                        className={cn(
+                                            'inline-flex h-4 min-w-[1rem] items-center justify-center rounded-sm px-1 text-[9px] font-black tabular-nums',
+                                            status === 'all' ? 'bg-sky-800/10 text-sky-800' : 'bg-black/10 text-white',
+                                        )}
+                                    >
+                                        {statusCounts.all ?? 0}
+                                    </span>
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="unpaid"
+                                    className="flex items-center gap-2 rounded-t-lg rounded-b-none border-0 px-4 py-2.5 text-[13px] font-bold whitespace-nowrap text-white/70 transition-colors hover:bg-white/20 hover:text-white data-[state=active]:bg-card data-[state=active]:text-sky-800 data-[state=active]:shadow-none data-[state=inactive]:bg-white/10"
+                                >
+                                    <Clock className="h-3.5 w-3.5" />
+                                    Unpaid
+                                    <span
+                                        className={cn(
+                                            'inline-flex h-4 min-w-[1rem] items-center justify-center rounded-sm px-1 text-[9px] font-black tabular-nums',
+                                            status === 'unpaid' ? 'bg-sky-800/10 text-sky-800' : 'bg-black/10 text-white',
+                                        )}
+                                    >
+                                        {statusCounts.unpaid ?? 0}
+                                    </span>
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="paid"
+                                    className="flex items-center gap-2 rounded-t-lg rounded-b-none border-0 px-4 py-2.5 text-[13px] font-bold whitespace-nowrap text-white/70 transition-colors hover:bg-white/20 hover:text-white data-[state=active]:bg-card data-[state=active]:text-sky-800 data-[state=active]:shadow-none data-[state=inactive]:bg-white/10"
+                                >
+                                    <CircleCheck className="h-3.5 w-3.5" />
+                                    Paid
+                                    <span
+                                        className={cn(
+                                            'inline-flex h-4 min-w-[1rem] items-center justify-center rounded-sm px-1 text-[9px] font-black tabular-nums',
+                                            status === 'paid' ? 'bg-sky-800/10 text-sky-800' : 'bg-black/10 text-white',
+                                        )}
+                                    >
+                                        {statusCounts.paid ?? 0}
+                                    </span>
+                                </TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+
+                        <div className="flex items-center gap-3 pb-3">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 gap-2 rounded-lg border-white/20 bg-white/10 text-white shadow-sm hover:bg-white/20 hover:text-white"
+                                asChild
                             >
-                                <X className="h-3 w-3" />
-                                Clear all
+                                <Link
+                                    href={route('payments-report.index', { payment_type: 'service_charge' })}
+                                >
+                                    <Receipt className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Payment log</span>
+                                </Link>
                             </Button>
-                        )}
+                            <Button
+                                size="sm"
+                                className="h-9 gap-2 rounded-lg bg-white font-semibold text-sky-800 shadow-sm hover:bg-white/90"
+                                asChild
+                            >
+                                <Link href={route('customers.index')}>
+                                    <Plus className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Issue charge</span>
+                                </Link>
+                            </Button>
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {/* Search */}
-                        <div className="relative group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                            <Input 
-                                placeholder="Search by customer, account..." 
-                                className="pl-10 h-10 rounded-lg border bg-muted/30 focus:bg-background"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                    <div className="flex items-center border-b p-4">
+                        <div className="relative flex-1 md:max-w-md">
+                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                placeholder="Search customer, account, or charge type..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="h-10 rounded-xl border-gray-300/70 bg-background pl-9 transition-all focus-visible:border-primary/30 focus-visible:bg-background"
                             />
                         </div>
-
-                        {/* Status Filter */}
-                        <select 
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="h-10 rounded-lg border border-input bg-muted/30 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-background"
-                        >
-                            <option value="all">All Statuses</option>
-                            <option value="paid">Paid</option>
-                            <option value="unpaid">Unpaid</option>
-                        </select>
-
-                        {/* Date Filter */}
-                        <select 
-                            value={dateFilter}
-                            onChange={(e) => setDateFilter(e.target.value)}
-                            className="h-10 rounded-lg border border-input bg-muted/30 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-background"
-                        >
-                            <option value="all">All Time</option>
-                            <option value="today">Today</option>
-                            <option value="week">This Week</option>
-                            <option value="month">This Month</option>
-                        </select>
                     </div>
 
-                    {hasActiveFilters && (
-                        <p className="text-xs text-muted-foreground">
-                            Showing <span className="font-bold text-foreground">{filteredCharges.length}</span> of <span className="font-bold text-foreground">{charges.data?.length || 0}</span> records
-                        </p>
-                    )}
-                </div>
-
-                {/* Data Table */}
-                <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-                    {filteredCharges.length === 0 ? (
-                        <div className="p-12 text-center">
-                            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-muted mb-3">
-                                <AlertCircle className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                            <p className="font-bold text-foreground mb-1">No charges found</p>
-                            <p className="text-sm text-muted-foreground">Try adjusting your search or filters</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/40 hover:bg-muted/40 border-b">
-                                        <TableHead className="font-bold h-12 pl-6 text-muted-foreground text-xs uppercase tracking-wide">Customer</TableHead>
-                                        <TableHead className="font-bold h-12 text-muted-foreground text-xs uppercase tracking-wide">Service Type</TableHead>
-                                        <TableHead className="font-bold h-12 text-muted-foreground text-xs uppercase tracking-wide">Amount</TableHead>
-                                        <TableHead className="font-bold h-12 text-muted-foreground text-xs uppercase tracking-wide">Issued</TableHead>
-                                        <TableHead className="font-bold h-12 text-muted-foreground text-xs uppercase tracking-wide">Status</TableHead>
-                                        <TableHead className="font-bold h-12 pr-6 text-right text-muted-foreground text-xs uppercase tracking-wide">Actions</TableHead>
+                    <div className="flex-1 overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="border-y bg-muted text-[10px] font-black tracking-widest text-muted-foreground uppercase hover:bg-muted/30">
+                                    <TableHead className="px-6 py-4">Customer</TableHead>
+                                    <TableHead className="px-6 py-4">Charge type</TableHead>
+                                    <TableHead className="px-6 py-4 text-right">Amount</TableHead>
+                                    <TableHead className="px-6 py-4">Issued</TableHead>
+                                    <TableHead className="px-6 py-4 text-center">Status</TableHead>
+                                    <TableHead className="px-6 py-4 text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rows.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={6}
+                                            className="px-6 py-12 text-center text-muted-foreground"
+                                        >
+                                            <Users className="mx-auto mb-3 h-8 w-8 opacity-40" />
+                                            <p className="font-medium text-foreground">No service charges found</p>
+                                            <p className="mt-1 text-sm">Try another search or status filter.</p>
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredCharges.map((charge) => (
-                                        <TableRow key={charge.id} className="group hover:bg-muted/30 border-b transition-colors">
-                                            <TableCell className="py-4 pl-6">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
-                                                        <User className="h-5 w-5" />
-                                                    </div>
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="font-bold text-sm truncate group-hover:text-primary transition-colors">{charge.customer?.name}</span>
-                                                        <span className="text-xs text-muted-foreground font-mono">#{charge.customer?.account_number || 'N/A'}</span>
-                                                    </div>
+                                ) : (
+                                    rows.map((charge) => (
+                                        <TableRow
+                                            key={charge.id}
+                                            className="group text-sm transition-colors duration-200 hover:bg-blue-50/40"
+                                        >
+                                            <TableCell className="px-6 py-4">
+                                                <div className="min-w-0">
+                                                    <p className="truncate font-medium">{charge.customer?.name ?? '—'}</p>
+                                                    <p className="font-mono text-xs text-muted-foreground">
+                                                        #{charge.customer?.account_number ?? '—'}
+                                                    </p>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-sm">{charge.service_charge_type?.name}</span>
-                                                    <span className="text-xs text-muted-foreground">{charge.service_charge_type?.code}</span>
-                                                </div>
+                                            <TableCell className="px-6 py-4">
+                                                <p className="font-medium">{charge.service_charge_type?.name ?? '—'}</p>
+                                                {charge.service_charge_type?.code ? (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {charge.service_charge_type.code}
+                                                    </p>
+                                                ) : null}
                                             </TableCell>
-                                            <TableCell className="py-4">
-                                                <div className="flex flex-col">
-                                                    <span className="font-black text-base text-primary">
-                                                        {formatCurrency(charge.total_due ?? charge.amount)}
-                                                    </span>
-                                                </div>
+                                            <TableCell className="px-6 py-4 text-right font-semibold tabular-nums">
+                                                {formatCurrency(charge.total_due ?? charge.amount)}
                                             </TableCell>
-                                            <TableCell className="py-4 text-muted-foreground text-sm">
+                                            <TableCell className="px-6 py-4 text-muted-foreground">
                                                 {formatIssuedDate(charge.issued_date)}
                                             </TableCell>
-                                            <TableCell className="py-4">
-                                                {getStatusBadge(charge.status)}
+                                            <TableCell className="px-6 py-4 text-center">
+                                                <StatusBadge status={charge.status} />
                                             </TableCell>
-                                            <TableCell className="py-4 pr-6 text-right">
-                                                <DropdownMenu>
+                                            <TableCell className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 w-8 rounded-lg p-0 shadow-sm"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={route('service-charges.print', charge.id)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            title="Print receipt"
+                                                        >
+                                                            <Printer className="h-4 w-4" />
+                                                            <span className="sr-only">Print</span>
+                                                        </Link>
+                                                    </Button>
+                                                    <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-8 w-8 rounded-lg p-0 shadow-sm"
+                                                        >
                                                             <MoreHorizontal className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-48 rounded-lg p-1 shadow-lg border">
-                                                        <DropdownMenuLabel className="px-3 py-2 text-xs font-bold text-muted-foreground">Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem asChild>
-                                                            <Link
-                                                                href={route('service-charges.show', charge.id)}
-                                                                className="flex cursor-pointer items-center rounded-md py-2 px-3 text-sm font-bold"
-                                                            >
-                                                                <ArrowUpRight className="mr-2 h-4 w-4" />
-                                                                View Details
+                                                    <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-md">
+                                                        <DropdownMenuLabel className="text-xs text-muted-foreground">
+                                                            Actions
+                                                        </DropdownMenuLabel>
+                                                        <DropdownMenuItem asChild className="cursor-pointer gap-2 py-2">
+                                                            <Link href={route('service-charges.show', charge.id)}>
+                                                                <Eye className="h-4 w-4 text-blue-500" />
+                                                                View details
                                                             </Link>
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem className="rounded-md py-2 px-3 text-sm font-bold cursor-pointer">
-                                                            <FileText className="mr-2 h-4 w-4" />
-                                                            Print Receipt
+                                                        <DropdownMenuItem asChild className="cursor-pointer gap-2 py-2">
+                                                            <Link
+                                                                href={route('service-charges.print', charge.id)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                            >
+                                                                <Printer className="h-4 w-4 text-muted-foreground" />
+                                                                Print receipt
+                                                            </Link>
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuSeparator className="my-1" />
-                                                        <DropdownMenuItem 
-                                                            className="rounded-md py-2 px-3 text-sm font-bold cursor-pointer text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                                            onSelect={() => {
-                                                                setSelectedCharge(charge);
-                                                                setIsPaymentModalOpen(true);
-                                                            }}
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            className="cursor-pointer gap-2 py-2 text-emerald-600 focus:text-emerald-600"
                                                             disabled={charge.status === 'paid'}
+                                                            onSelect={() => openConfirmPayment(charge)}
                                                         >
-                                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                                            Confirm Payment
+                                                            <DollarSign className="h-4 w-4" />
+                                                            Confirm payment
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
 
-                    {/* Table Footer */}
-                    {filteredCharges.length > 0 && (
-                        <div className="p-4 md:p-6 border-t bg-muted/20 flex flex-col md:flex-row items-center justify-between gap-4">
-                            <p className="text-xs md:text-sm text-muted-foreground font-bold">
-                                Showing <span className="text-foreground">{filteredCharges.length}</span> of <span className="text-foreground">{charges.total}</span> records
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" disabled size="sm" className="h-9 px-3 text-xs font-bold rounded-lg">
-                                    Previous
-                                </Button>
-                                <Button size="sm" className="h-9 w-9 p-0 text-xs font-bold rounded-lg shadow-sm shadow-primary/20">1</Button>
-                                <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-xs font-bold rounded-lg">2</Button>
-                                <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-xs font-bold rounded-lg">3</Button>
-                                <Button variant="outline" size="sm" className="h-9 px-3 text-xs font-bold rounded-lg">
-                                    Next
-                                </Button>
+                    {safeCharges.links?.length > 3 ? (
+                        <div className="flex flex-col items-center justify-between gap-3 border-t bg-muted/10 px-6 py-4 sm:flex-row">
+                            <span className="text-xs font-medium text-muted-foreground">
+                                Showing <span className="font-bold text-foreground">{safeCharges.from}</span> to{' '}
+                                <span className="font-bold text-foreground">{safeCharges.to}</span> of{' '}
+                                <span className="font-bold text-foreground">{safeCharges.total}</span> charges
+                            </span>
+                            <div className="flex items-center gap-1">
+                                {safeCharges.links.map((link, index) => (
+                                    <Button
+                                        key={index}
+                                        variant={link.active ? 'default' : 'outline'}
+                                        size="sm"
+                                        disabled={!link.url}
+                                        className="h-8 min-w-8 rounded-lg px-2 shadow-sm"
+                                        asChild={!!link.url}
+                                    >
+                                        {link.url ? (
+                                            <Link href={link.url} preserveScroll>
+                                                {link.label === '&laquo; Previous' ? (
+                                                    <ChevronLeft className="h-4 w-4" />
+                                                ) : link.label === 'Next &raquo;' ? (
+                                                    <ChevronRight className="h-4 w-4" />
+                                                ) : (
+                                                    link.label
+                                                )}
+                                            </Link>
+                                        ) : (
+                                            <span>
+                                                {link.label === '&laquo; Previous' ? (
+                                                    <ChevronLeft className="h-4 w-4" />
+                                                ) : link.label === 'Next &raquo;' ? (
+                                                    <ChevronRight className="h-4 w-4" />
+                                                ) : (
+                                                    link.label
+                                                )}
+                                            </span>
+                                        )}
+                                    </Button>
+                                ))}
                             </div>
                         </div>
-                    )}
-                </div>
-
-                {/* Info Cards */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 flex gap-4 items-start">
-                        <div className="p-3 bg-amber-100 rounded-lg shrink-0">
-                            <AlertCircle className="h-5 w-5 text-amber-700" />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-amber-900 mb-1">Billing Synchronization</h4>
-                            <p className="text-sm text-amber-800">Invoiced charges are linked to monthly bills. Payments should be processed via the main billing interface for consistency.</p>
-                        </div>
-                    </div>
-
-                    <div className="bg-primary/5 border border-primary/20 rounded-xl p-6 flex gap-4 items-start">
-                        <div className="p-3 bg-primary/10 rounded-lg shrink-0">
-                            <CheckCircle2 className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-primary mb-1">Standalone Charges</h4>
-                            <p className="text-sm text-primary/80">One-off service charges can be issued independently. These are not tied to bills and can be paid directly from the row menu.</p>
-                        </div>
-                    </div>
+                    ) : null}
                 </div>
             </div>
 
-            <ConfirmPaymentModal 
+            <ConfirmPaymentModal
                 charge={selectedCharge}
                 stations={stations}
                 isOpen={isPaymentModalOpen}

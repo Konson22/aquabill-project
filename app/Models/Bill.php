@@ -31,7 +31,7 @@ class Bill extends Model
         'consumption',
         'unit_price',
         'fixed_charge',
-        'current_charge', // This-cycle charge; revenue report sums this (not total_amount, which may include previous_balance)
+        'current_charge', // This-cycle usage charge; revenue report water stream and total billed sum this (+ fixed_charge)
         'previous_balance',
         'total_amount',
         'status',

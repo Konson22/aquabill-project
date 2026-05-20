@@ -9,7 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { cn, formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency, formatCurrencyCompact } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowUpRight, FileSpreadsheet } from 'lucide-react';
 import { useMemo } from 'react';
@@ -186,19 +186,19 @@ export default function FinanceDashboard({
                     <section aria-label="Key metrics" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                         <Scorecard
                             label="Total revenue collected"
-                            value={formatCurrency(summary.total_revenue_collected ?? 0)}
+                            value={formatCurrencyCompact(summary.total_revenue_collected ?? 0)}
                             accent={LOOKER.green}
                             sub="All-time bill & service payments"
                         />
                         <Scorecard
                             label="Outstanding receivables"
-                            value={formatCurrency(summary.outstanding_bills ?? 0)}
+                            value={formatCurrencyCompact(summary.outstanding_bills ?? 0)}
                             accent={LOOKER.red}
                             sub="Pending & partial balances"
                         />
                         <Scorecard
                             label="Collected this month"
-                            value={formatCurrency(summary.this_month_collected ?? 0)}
+                            value={formatCurrencyCompact(summary.this_month_collected ?? 0)}
                             accent={LOOKER.blue}
                             sub={new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
                         />

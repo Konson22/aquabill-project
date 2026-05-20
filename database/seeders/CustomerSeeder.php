@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Customer;
 use App\Models\Meter;
 use App\Models\Subzone;
-use App\Models\SupplyDay;
 use App\Models\Tariff;
 use App\Models\Zone;
 use Carbon\Carbon;
@@ -47,12 +46,12 @@ class CustomerSeeder extends Seeder
         $zone = Zone::updateOrCreate(
             ['name' => 'Jebel'],
             [
-                'supply_day_id' => SupplyDay::query()->where('name', 'Monday')->where('status', 'active')->value('id'),
-                'supply_time' => '08:00:00',
                 'description' => 'Default zone for all customers.',
                 'status' => 'active',
             ],
         );
+
+        $this->call(SupplyScheduleSeeder::class);
 
         Subzone::updateOrCreate(
             [

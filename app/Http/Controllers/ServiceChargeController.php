@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\ServiceCharge;
 use App\Models\ServiceChargeType;
 use App\Models\Station;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -17,14 +18,48 @@ class ServiceChargeController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request): Response
     {
-        $charges = ServiceCharge::with(['customer', 'serviceChargeType', 'issuer'])
+        $search = $request->string('search')->trim()->toString();
+        $status = $request->input('status', 'all');
+        if (! in_array($status, ['all', 'paid', 'unpaid'], true)) {
+            $status = 'all';
+        }
+
+        $baseQuery = ServiceCharge::query()
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $inner) use ($search): void {
+                    $inner->whereHas('customer', function (Builder $customerQuery) use ($search): void {
+                        $customerQuery->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('account_number', 'like', '%'.$search.'%');
+                    })->orWhereHas('serviceChargeType', function (Builder $typeQuery) use ($search): void {
+                        $typeQuery->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('code', 'like', '%'.$search.'%');
+                    });
+                });
+            });
+
+        $filteredQuery = (clone $baseQuery)
+            ->when($status !== 'all', fn (Builder $query) => $query->where('status', $status));
+
+        $charges = (clone $filteredQuery)
+            ->with(['customer', 'serviceChargeType', 'issuer'])
             ->latest('issued_date')
-            ->paginate(15);
+            ->paginate(15)
+            ->withQueryString();
 
         return Inertia::render('service-charges/index', [
             'charges' => $charges,
+            'filters' => [
+                'search' => $search !== '' ? $search : null,
+                'status' => $status,
+            ],
+            'statusCounts' => [
+                'all' => (int) (clone $baseQuery)->count(),
+                'unpaid' => (int) (clone $baseQuery)->where('status', 'unpaid')->count(),
+                'paid' => (int) (clone $baseQuery)->where('status', 'paid')->count(),
+            ],
+            'summary' => $this->serviceChargesIndexSummary($filteredQuery),
             'stations' => Station::query()
                 ->with(['accountant:id,name,email'])
                 ->orderBy('name')
@@ -38,6 +73,32 @@ class ServiceChargeController extends Controller
                     'coordinate',
                 ]),
         ]);
+    }
+
+    /**
+     * @param  Builder<ServiceCharge>  $query
+     * @return array{
+     *     total_count: int,
+     *     total_amount: float,
+     *     unpaid_count: int,
+     *     unpaid_amount: float,
+     *     paid_count: int,
+     *     paid_amount: float
+     * }
+     */
+    private function serviceChargesIndexSummary(Builder $query): array
+    {
+        $unpaidQuery = (clone $query)->where('status', 'unpaid');
+        $paidQuery = (clone $query)->where('status', 'paid');
+
+        return [
+            'total_count' => (int) (clone $query)->count(),
+            'total_amount' => ServiceCharge::sumTotalDue(clone $query),
+            'unpaid_count' => (int) $unpaidQuery->count(),
+            'unpaid_amount' => ServiceCharge::sumTotalDue($unpaidQuery),
+            'paid_count' => (int) $paidQuery->count(),
+            'paid_amount' => ServiceCharge::sumTotalDue($paidQuery),
+        ];
     }
 
     /**
@@ -117,6 +178,7 @@ class ServiceChargeController extends Controller
             'customer.zone',
             'serviceChargeType',
             'issuer:id,name,email',
+            'payments' => fn ($query) => $query->orderByDesc('payment_date')->orderByDesc('id'),
         ]);
 
         return Inertia::render('service-charges/show', [
@@ -133,6 +195,23 @@ class ServiceChargeController extends Controller
                     'manager_phone',
                     'coordinate',
                 ]),
+        ]);
+    }
+
+    /**
+     * Printer-friendly service charge receipt.
+     */
+    public function print(ServiceCharge $serviceCharge): Response
+    {
+        $serviceCharge->load([
+            'customer.zone',
+            'serviceChargeType',
+            'issuer:id,name,email',
+            'payments' => fn ($query) => $query->orderByDesc('payment_date')->orderByDesc('id'),
+        ]);
+
+        return Inertia::render('service-charges/print', [
+            'charge' => $serviceCharge,
         ]);
     }
 

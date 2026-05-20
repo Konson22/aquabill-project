@@ -137,8 +137,7 @@ test('finance reports route redirects to unified revenue report', function () {
     $this->actingAs($financeUser)
         ->get('/finance/reports?from=2026-01-01&to=2026-12-31')
         ->assertRedirect(route('revenue-report.index', [
-            'pf_from' => '2026-01-01',
-            'pf_to' => '2026-12-31',
+            'month' => '2026-01',
         ]));
 });
 

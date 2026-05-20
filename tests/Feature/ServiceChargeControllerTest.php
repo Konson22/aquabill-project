@@ -211,6 +211,68 @@ test('creating service charge via inertia redirects to service charges index', f
     ]);
 });
 
+test('service charges index filters by status and search', function () {
+    $user = User::factory()->create();
+    $customer = createCustomerForServiceChargeTest();
+    $chargeType = createServiceChargeTypeForTest();
+
+    ServiceCharge::query()->create([
+        'customer_id' => $customer->id,
+        'service_charge_type_id' => $chargeType->id,
+        'amount' => 40,
+        'issued_by' => $user->id,
+        'issued_date' => now()->toDateString(),
+        'status' => 'unpaid',
+    ]);
+
+    ServiceCharge::query()->create([
+        'customer_id' => $customer->id,
+        'service_charge_type_id' => $chargeType->id,
+        'amount' => 60,
+        'issued_by' => $user->id,
+        'issued_date' => now()->toDateString(),
+        'status' => 'paid',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('service-charges.index', ['status' => 'unpaid']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('summary.unpaid_count', 1)
+            ->where('summary.paid_count', 0)
+            ->has('charges.data', 1));
+
+    $this->actingAs($user)
+        ->get(route('service-charges.index', ['search' => 'Test Customer']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('charges.data', 2)
+            ->where('statusCounts.all', 2));
+});
+
+test('authenticated user can open service charge print page', function () {
+    $user = User::factory()->create();
+    $customer = createCustomerForServiceChargeTest();
+    $chargeType = createServiceChargeTypeForTest();
+
+    $charge = ServiceCharge::query()->create([
+        'customer_id' => $customer->id,
+        'service_charge_type_id' => $chargeType->id,
+        'amount' => 25,
+        'issued_by' => $user->id,
+        'issued_date' => now()->toDateString(),
+        'status' => 'unpaid',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('service-charges.print', $charge))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('service-charges/print')
+            ->has('charge')
+            ->where('charge.id', $charge->id));
+});
+
 test('authenticated user can view service charge show page', function () {
     $user = User::factory()->create();
     $customer = createCustomerForServiceChargeTest();

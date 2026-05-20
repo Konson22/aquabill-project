@@ -33,9 +33,15 @@ class ReportController extends Controller
      */
     public function revenue(Request $request)
     {
+        $period = $this->resolveRevenuePeriodFilters($request);
+        $request->merge([
+            'pf_from' => $period['from'],
+            'pf_to' => $period['to'],
+        ]);
+
         $search = $request->input('search');
-        $from = $request->input('from');
-        $to = $request->input('to');
+        $from = $period['from'];
+        $to = $period['to'];
 
         $billsInScope = Bill::query()
             ->when($from, fn ($q) => $q->whereDate('created_at', '>=', $from))
@@ -60,16 +66,13 @@ class ReportController extends Controller
         /*
          * Water revenue (summary.total_revenue): sum of bill current_charge (consumption × unit price; usage only).
          * Fixed charge revenue: sum of fixed_charge snapshots (tariff fixed fees on bills).
-         * Total billed revenue: water + fixed on bills + service charges issued in scope (excludes previous_balance / arrears).
+         * Total billed revenue: sum of bill current_charge + fixed_charge (this-cycle usage and fees; excludes arrears / total_amount).
          */
         $totalRevenue = (float) (clone $billsInScope)->sum('current_charge');
         $fixedChargeRevenue = (float) (clone $billsInScope)->sum('fixed_charge');
         $serviceChargesRevenue = ServiceCharge::sumTotalDue($chargesInScope);
-        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue + $serviceChargesRevenue;
-        $totalPaid = (float) Payment::query()
-            ->where('payable_type', Bill::class)
-            ->whereIn('payable_id', $billsInScope->clone()->select('id'))
-            ->sum('amount');
+        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue;
+        $billPaymentsInPeriod = (float) $this->revenueBillPaymentsInPeriodQuery($from, $to, $search)->sum('amount');
 
         $paidChargesQuery = ServiceCharge::where('status', 'paid')
             ->when($from, fn ($q) => $q->whereDate('issued_date', '>=', $from))
@@ -83,12 +86,7 @@ class ReportController extends Controller
 
         $paidChargesSum = ServiceCharge::sumTotalDue($paidChargesQuery);
 
-        $actualTotalPaid = $totalPaid + $paidChargesSum;
-
         $billsWithPayments = (clone $billsInScope)->withSum('payments', 'amount')->get();
-
-        $billOutstanding = (float) $billsWithPayments
-            ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
 
         $billRevenueBreakdown = $this->billRevenuePaidUnpaidBreakdown(
             $billsWithPayments,
@@ -109,7 +107,7 @@ class ReportController extends Controller
                 }),
         );
 
-        $totalOutstanding = $billOutstanding + $chargeOutstanding;
+        $totalOutstanding = max(0.0, round($totalBilledRevenue - $billPaymentsInPeriod, 2));
 
         $paymentsCount = (clone $billsInScope)->whereHas('payments')->count() + $paidChargesQuery->count();
 
@@ -143,9 +141,9 @@ class ReportController extends Controller
         $chartRangeStart = $from ? Carbon::parse($from)->startOfDay() : now()->subMonths(11)->startOfMonth()->startOfDay();
         $chartRangeEnd = $to ? Carbon::parse($to)->endOfDay() : now()->endOfDay();
 
-        $chartYear = (int) ($from
-            ? Carbon::parse($from)->year
-            : ($to ? Carbon::parse($to)->year : now()->year));
+        $chartYear = $period['month'] === 'all'
+            ? (int) Carbon::parse($from)->year
+            : (int) substr($period['month'], 0, 4);
 
         $chartData = [];
         for ($month = 1; $month <= 12; $month++) {
@@ -154,6 +152,9 @@ class ReportController extends Controller
 
             $clipStart = $monthStart->gt($chartRangeStart) ? $monthStart : $chartRangeStart->copy();
             $clipEnd = $monthEnd->lt($chartRangeEnd) ? $monthEnd : $chartRangeEnd->copy();
+
+            $monthBilled = 0.0;
+            $monthCollected = 0.0;
 
             if ($clipStart->gt($clipEnd)) {
                 $monthCollectionRatePercent = 0.0;
@@ -195,13 +196,16 @@ class ReportController extends Controller
             }
 
             $chartData[] = [
-                'date' => $monthStart->format('M Y'),
+                'date' => $monthStart->format('M'),
+                'date_label' => $monthStart->format('M Y'),
                 'collection_rate_percent' => $monthCollectionRatePercent,
+                'payments_collected' => round($monthCollected, 2),
+                'billed_amount' => round($monthBilled, 2),
             ];
         }
 
         $collectionRatePercent = $totalBilledRevenue > 0.00001
-            ? round(($actualTotalPaid / $totalBilledRevenue) * 100, 1)
+            ? round(($billPaymentsInPeriod / $totalBilledRevenue) * 100, 1)
             : 0.0;
 
         $totalBillsGenerated = (int) (clone $billsInScope)->count();
@@ -225,7 +229,7 @@ class ReportController extends Controller
                 'service_charges_paid' => (float) $paidChargesSum,
                 'service_charges_unpaid' => (float) $chargeOutstanding,
                 'total_billed_revenue' => (float) $totalBilledRevenue,
-                'total_paid' => (float) $actualTotalPaid,
+                'total_paid' => (float) $billPaymentsInPeriod,
                 'total_outstanding' => (float) $totalOutstanding,
                 'collection_rate_percent' => (float) $collectionRatePercent,
                 'payments_count' => $paymentsCount,
@@ -246,11 +250,13 @@ class ReportController extends Controller
             ]),
             'filters' => [
                 'search' => $search,
+                'month' => $period['month'],
                 'from' => $from,
                 'to' => $to,
             ],
             'monthlyBreakdown' => $revenueMonthlyBreakdown,
             'monthlyBreakdownYear' => $chartYear,
+            'collectionTargetPercent' => (float) config('app.collection_target_percent', 90),
             ...$finance,
         ]);
     }
@@ -260,9 +266,10 @@ class ReportController extends Controller
      */
     public function exportRevenue(Request $request)
     {
+        $period = $this->resolveRevenuePeriodFilters($request);
         $search = $request->input('search');
-        $from = $request->input('from');
-        $to = $request->input('to');
+        $from = $period['from'];
+        $to = $period['to'];
 
         // This is a simplified version of the logic in revenue()
         // In a real app, you'd extract this to a service class
@@ -289,11 +296,8 @@ class ReportController extends Controller
         $totalRevenue = (float) (clone $billsInScope)->sum('current_charge');
         $fixedChargeRevenue = (float) (clone $billsInScope)->sum('fixed_charge');
         $serviceChargesRevenue = ServiceCharge::sumTotalDue($chargesInScope);
-        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue + $serviceChargesRevenue;
-        $totalPaid = (float) Payment::query()
-            ->where('payable_type', Bill::class)
-            ->whereIn('payable_id', $billsInScope->clone()->select('id'))
-            ->sum('amount');
+        $totalBilledRevenue = $totalRevenue + $fixedChargeRevenue;
+        $billPaymentsInPeriod = (float) $this->revenueBillPaymentsInPeriodQuery($from, $to, $search)->sum('amount');
 
         $paidChargesSum = ServiceCharge::sumTotalDue(
             ServiceCharge::where('status', 'paid')
@@ -307,12 +311,7 @@ class ReportController extends Controller
                 }),
         );
 
-        $actualTotalPaid = $totalPaid + $paidChargesSum;
-
         $billsWithPayments = (clone $billsInScope)->withSum('payments', 'amount')->get();
-
-        $billOutstanding = (float) $billsWithPayments
-            ->sum(fn (Bill $bill): float => max(0.0, (float) $bill->total_amount - (float) ($bill->payments_sum_amount ?? 0)));
 
         $billRevenueBreakdown = $this->billRevenuePaidUnpaidBreakdown(
             $billsWithPayments,
@@ -333,10 +332,10 @@ class ReportController extends Controller
                 }),
         );
 
-        $totalOutstanding = $billOutstanding + $chargeOutstanding;
+        $totalOutstanding = max(0.0, round($totalBilledRevenue - $billPaymentsInPeriod, 2));
 
         $collectionRatePercent = $totalBilledRevenue > 0.00001
-            ? round(($actualTotalPaid / $totalBilledRevenue) * 100, 1)
+            ? round(($billPaymentsInPeriod / $totalBilledRevenue) * 100, 1)
             : 0.0;
 
         $summary = [
@@ -350,7 +349,7 @@ class ReportController extends Controller
             'service_charges_paid' => $paidChargesSum,
             'service_charges_unpaid' => $chargeOutstanding,
             'total_billed_revenue' => $totalBilledRevenue,
-            'total_paid' => $actualTotalPaid,
+            'total_paid' => $billPaymentsInPeriod,
             'total_outstanding' => $totalOutstanding,
             'collection_rate_percent' => $collectionRatePercent,
         ];
@@ -376,9 +375,9 @@ class ReportController extends Controller
             'to' => $to,
         ];
 
-        $chartYear = (int) ($from
-            ? Carbon::parse($from)->year
-            : ($to ? Carbon::parse($to)->year : now()->year));
+        $chartYear = $period['month'] === 'all'
+            ? (int) Carbon::parse($from)->year
+            : (int) substr($period['month'], 0, 4);
 
         $monthlyBreakdown = $this->revenueMonthlyBreakdown($chartYear, $search);
 
@@ -564,6 +563,59 @@ class ReportController extends Controller
             new PaymentsReportExport($payload['rows'], $payload['filters'], $payload['summary']),
             $filename
         );
+    }
+
+    /**
+     * @return array{
+     *     month: string,
+     *     start: Carbon,
+     *     end: Carbon,
+     *     from: string,
+     *     to: string,
+     * }
+     */
+    private function resolveRevenuePeriodFilters(Request $request): array
+    {
+        $monthInput = $request->string('month')->toString();
+
+        if ($monthInput === '' && $request->filled('from') && $request->filled('to')) {
+            $legacyFrom = Carbon::parse((string) $request->input('from'))->startOfDay();
+            $legacyTo = Carbon::parse((string) $request->input('to'))->endOfDay();
+
+            if (
+                $legacyFrom->year === $legacyTo->year
+                && $legacyFrom->equalTo($legacyFrom->copy()->startOfYear()->startOfDay())
+                && $legacyTo->equalTo($legacyTo->copy()->endOfYear()->endOfDay())
+            ) {
+                $monthInput = 'all';
+            } elseif ($legacyFrom->format('Y-m') === $legacyTo->format('Y-m')) {
+                $monthInput = $legacyFrom->format('Y-m');
+            }
+        } elseif ($monthInput === '' && $request->filled('from')) {
+            $monthInput = Carbon::parse((string) $request->input('from'))->format('Y-m');
+        }
+
+        $allMonths = $monthInput === '' || $monthInput === 'all';
+
+        if ($allMonths) {
+            $start = now()->startOfYear()->startOfDay();
+            $end = now()->endOfYear()->endOfDay();
+            $month = 'all';
+        } else {
+            $month = preg_match('/^\d{4}-\d{2}$/', $monthInput)
+                ? $monthInput
+                : now()->format('Y-m');
+            $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->startOfDay();
+            $end = $start->copy()->endOfMonth()->endOfDay();
+        }
+
+        return [
+            'month' => $month,
+            'start' => $start,
+            'end' => $end,
+            'from' => $start->toDateString(),
+            'to' => $end->toDateString(),
+        ];
     }
 
     /**
@@ -865,5 +917,24 @@ class ReportController extends Controller
             'sqlite' => "strftime('%Y-%m', meter_readings.reading_date)",
             default => "DATE_FORMAT(meter_readings.reading_date, '%Y-%m')",
         };
+    }
+
+    /**
+     * Bill payments in the revenue report period (by payment_date), optionally filtered by customer search.
+     */
+    private function revenueBillPaymentsInPeriodQuery(?string $from, ?string $to, ?string $search): Builder
+    {
+        return Payment::query()
+            ->where('payable_type', Bill::class)
+            ->when($from, fn (Builder $q) => $q->whereDate('payment_date', '>=', $from))
+            ->when($to, fn (Builder $q) => $q->whereDate('payment_date', '<=', $to))
+            ->when(filled($search), function (Builder $q) use ($search): void {
+                $q->whereHasMorph('payable', [Bill::class], function (Builder $bq) use ($search): void {
+                    $bq->whereHas('customer', function (Builder $c) use ($search): void {
+                        $c->where('name', 'like', '%'.$search.'%')
+                            ->orWhere('account_number', 'like', '%'.$search.'%');
+                    });
+                });
+            });
     }
 }

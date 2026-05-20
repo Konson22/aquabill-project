@@ -115,7 +115,7 @@ test('revenue report total revenue sums current charges without double counting 
             ->where('summary.service_charges_revenue', 999)
             ->where('summary.service_charges_paid', 0)
             ->where('summary.service_charges_unpaid', 999)
-            ->where('summary.total_billed_revenue', 1139)
+            ->where('summary.total_billed_revenue', 140)
             ->where('summary.collection_rate_percent', 0)
             ->where('summary.total_bills_generated', 2)
             ->where('summary.bills_paid_count', 0)
@@ -438,11 +438,8 @@ test('revenue report chart monthly collection rate uses billed vs collected in t
         'payment_method' => 'cash',
     ]);
 
-    $from = sprintf('%d-01-01', $year);
-    $to = sprintf('%d-12-31', $year);
-
     $this->actingAs($user)
-        ->get('/revenue-report?'.http_build_query(['from' => $from, 'to' => $to]))
+        ->get('/revenue-report?'.http_build_query(['month' => 'all']))
         ->assertOk()
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('revenue-report/index')

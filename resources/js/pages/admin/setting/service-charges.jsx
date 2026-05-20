@@ -1,7 +1,18 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import InputError from '@/components/input-error';
+import { RevenueStatCard } from '@/components/reports/revenue-stat-card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Table,
     TableBody,
@@ -10,35 +21,118 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { 
-    Plus, 
-    Pencil, 
-    Trash2, 
-    CreditCard, 
-    Search,
-    Info,
-    AlertCircle,
-    ChevronLeft
-} from 'lucide-react';
-import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { ArrowLeft, CreditCard, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-export default function ServiceCharges({ types }) {
+const breadcrumbs = [
+    { title: 'Dashboard', href: route('dashboard') },
+    { title: 'Settings', href: route('admin.settings') },
+    { title: 'Service charge types', href: route('admin.service-charges.index') },
+];
+
+/**
+ * @param {{
+ *   open: boolean,
+ *   onOpenChange: (open: boolean) => void,
+ *   editingType: object | null,
+ *   data: object,
+ *   setData: import('@inertiajs/react').InertiaFormProps['setData'],
+ *   errors: Record<string, string>,
+ *   processing: boolean,
+ *   onSubmit: (e: React.FormEvent) => void,
+ * }} props
+ */
+function ServiceChargeTypeDialog({
+    open,
+    onOpenChange,
+    editingType,
+    data,
+    setData,
+    errors,
+    processing,
+    onSubmit,
+}) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <form onSubmit={onSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>{editingType ? 'Edit fee type' : 'New fee type'}</DialogTitle>
+                        <DialogDescription>
+                            Name, unique code, and default amount used when issuing service charges to customers.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="sc-name">Name</Label>
+                            <Input
+                                id="sc-name"
+                                placeholder="e.g. Reconnection fee"
+                                value={data.name}
+                                onChange={(e) => setData('name', e.target.value)}
+                            />
+                            <InputError message={errors.name} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="sc-code">Code</Label>
+                            <Input
+                                id="sc-code"
+                                placeholder="e.g. RECON_FEE"
+                                value={data.code}
+                                onChange={(e) => setData('code', e.target.value)}
+                                className="font-mono"
+                            />
+                            <InputError message={errors.code} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="sc-amount">Amount (SSP)</Label>
+                            <Input
+                                id="sc-amount"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                value={data.amount}
+                                onChange={(e) => setData('amount', e.target.value)}
+                                className="tabular-nums"
+                            />
+                            <InputError message={errors.amount} />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="sc-description">Description (optional)</Label>
+                            <Textarea
+                                id="sc-description"
+                                placeholder="When this fee applies..."
+                                value={data.description}
+                                onChange={(e) => setData('description', e.target.value)}
+                                rows={3}
+                            />
+                            <InputError message={errors.description} />
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={processing}>
+                            {editingType ? 'Save changes' : 'Create type'}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * @param {{ types?: Array<Record<string, unknown>> }} props
+ */
+export default function ServiceCharges({ types = [] }) {
     const [searchTerm, setSearchTerm] = useState('');
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [dialogOpen, setDialogOpen] = useState(false);
     const [editingType, setEditingType] = useState(null);
 
     const { data, setData, post, put, delete: destroy, processing, errors, reset } = useForm({
@@ -48,265 +142,225 @@ export default function ServiceCharges({ types }) {
         description: '',
     });
 
-    const filteredTypes = types.filter(type => 
-        type.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        type.code.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const breadcrumbs = [
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Settings', href: '/admin/settings' },
-        { title: 'Service Charges', href: '/admin/settings/service-charges' },
-    ];
-
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (editingType) {
-            put(route('admin.service-charges.update', editingType.id), {
-                onSuccess: () => {
-                    setIsCreateOpen(false);
-                    setEditingType(null);
-                    reset();
-                    toast.success('Service charge updated successfully');
-                },
-            });
-        } else {
-            post(route('admin.service-charges.store'), {
-                onSuccess: () => {
-                    setIsCreateOpen(false);
-                    reset();
-                    toast.success('Service charge created successfully');
-                },
-            });
+    const filteredTypes = useMemo(() => {
+        const needle = searchTerm.trim().toLowerCase();
+        if (!needle) {
+            return types;
         }
+
+        return types.filter(
+            (type) =>
+                type.name?.toLowerCase().includes(needle) || type.code?.toLowerCase().includes(needle),
+        );
+    }, [types, searchTerm]);
+
+    const closeDialog = () => {
+        setDialogOpen(false);
+        setEditingType(null);
+        reset();
     };
 
-    const handleEdit = (type) => {
+    const openCreate = () => {
+        setEditingType(null);
+        reset();
+        setDialogOpen(true);
+    };
+
+    const openEdit = (type) => {
         setEditingType(type);
         setData({
             name: type.name,
             code: type.code,
-            amount: type.amount,
+            amount: String(type.amount ?? ''),
             description: type.description || '',
         });
-        setIsCreateOpen(true);
+        setDialogOpen(true);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const options = { preserveScroll: true, onSuccess: closeDialog };
+
+        if (editingType) {
+            put(route('admin.service-charges.update', editingType.id), options);
+        } else {
+            post(route('admin.service-charges.store'), options);
+        }
     };
 
     const handleDelete = (id) => {
-        if (confirm('Are you sure you want to delete this service charge type?')) {
-            destroy(route('admin.service-charges.destroy', id), {
-                onSuccess: () => toast.success('Service charge deleted successfully'),
-            });
+        if (!confirm('Delete this service charge type? Existing issued charges keep their recorded amounts.')) {
+            return;
         }
+
+        destroy(route('admin.service-charges.destroy', id), { preserveScroll: true });
     };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Service Charge Types" />
+            <Head title="Service charge types" />
 
-            <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700">
-                
-                {/* Back Link */}
-                <Link href="/admin/settings" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors w-fit group">
-                    <ChevronLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-bold">Back to Settings</span>
-                </Link>
+            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+                <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-2 text-muted-foreground" asChild>
+                    <Link href={route('admin.settings')}>
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to settings
+                    </Link>
+                </Button>
 
-                {/* Header Section */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-rose-500">
-                            <CreditCard className="h-5 w-5" />
-                            <span className="text-xs font-black uppercase tracking-widest">Fee Configuration</span>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Service charge types</h1>
+                        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                            Default fees for connection, reconnection, and other one-off services. The amount is
+                            snapshotted when a charge is issued to a customer.
+                        </p>
+                    </div>
+                    <Button className="h-9 gap-2 shrink-0" onClick={openCreate}>
+                        <Plus className="h-4 w-4" />
+                        New fee type
+                    </Button>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <RevenueStatCard title="Fee types" valueClassName="text-foreground">
+                        {types.length.toLocaleString()}
+                    </RevenueStatCard>
+                    <RevenueStatCard title="Matching search" valueClassName="text-rose-600 dark:text-rose-400">
+                        {filteredTypes.length.toLocaleString()}
+                    </RevenueStatCard>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <div className="flex items-center border-b p-4">
+                        <div className="relative flex-1 md:max-w-sm">
+                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                placeholder="Search name or code..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="h-10 pl-9"
+                            />
                         </div>
-                        <h1 className="text-4xl font-black tracking-tight">Service Charges</h1>
-                        <p className="text-muted-foreground italic font-medium">Manage categories for installation, reconnection, and other operational fees.</p>
                     </div>
 
-                    <Dialog open={isCreateOpen} onOpenChange={(open) => {
-                        setIsCreateOpen(open);
-                        if (!open) {
-                            setEditingType(null);
-                            reset();
-                        }
-                    }}>
-                        <DialogTrigger asChild>
-                            <Button className="rounded-2xl h-12 px-6 shadow-xl shadow-rose-500/20 bg-rose-600 hover:bg-rose-700 gap-2">
-                                <Plus className="h-5 w-5" />
-                                Create New Fee
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px] rounded-[2.5rem]">
-                            <form onSubmit={handleSubmit}>
-                                <DialogHeader>
-                                    <DialogTitle className="text-2xl font-black">{editingType ? 'Edit' : 'Create'} Service Fee</DialogTitle>
-                                    <DialogDescription>
-                                        Set a name, unique code, and a fixed amount for this operational service.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="grid gap-6 py-6">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="name" className="font-bold">Service Name</Label>
-                                        <Input
-                                            id="name"
-                                            placeholder="e.g. Reconnection Fee"
-                                            value={data.name}
-                                            onChange={e => setData('name', e.target.value)}
-                                            className="rounded-xl h-11"
-                                        />
-                                        {errors.name && <p className="text-xs text-destructive font-bold">{errors.name}</p>}
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="code" className="font-bold">Unique Code</Label>
-                                        <Input
-                                            id="code"
-                                            placeholder="e.g. RECON_FEE"
-                                            value={data.code}
-                                            onChange={e => setData('code', e.target.value)}
-                                            className="rounded-xl h-11 font-mono"
-                                        />
-                                        {errors.code && <p className="text-xs text-destructive font-bold">{errors.code}</p>}
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="amount" className="font-bold">Amount (SSP)</Label>
-                                        <Input
-                                            id="amount"
-                                            type="number"
-                                            placeholder="0.00"
-                                            value={data.amount}
-                                            onChange={e => setData('amount', e.target.value)}
-                                            className="rounded-xl h-11"
-                                        />
-                                        {errors.amount && <p className="text-xs text-destructive font-bold">{errors.amount}</p>}
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="description" className="font-bold">Description</Label>
-                                        <Textarea
-                                            id="description"
-                                            placeholder="Details about this service fee..."
-                                            value={data.description}
-                                            onChange={e => setData('description', e.target.value)}
-                                            className="rounded-xl min-h-[100px]"
-                                        />
-                                        {errors.description && <p className="text-xs text-destructive font-bold">{errors.description}</p>}
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button type="submit" disabled={processing} className="w-full rounded-xl h-12 font-bold bg-rose-600 hover:bg-rose-700">
-                                        {editingType ? 'Save Changes' : 'Create Fee Type'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-
-                {/* Search Bar */}
-                <div className="bg-card rounded-2xl border shadow-sm p-3">
-                    <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            placeholder="Filter by name or code..." 
-                            className="pl-10 rounded-xl border-none bg-muted/50 focus-visible:ring-1"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                {/* Table Section */}
-                <div className="bg-card rounded-[2.5rem] border shadow-2xl shadow-muted/10 overflow-hidden">
-                    <Table>
-                        <TableHeader>
-                            <TableRow className="bg-muted/30 hover:bg-muted/30 border-none">
-                                <TableHead className="font-black h-16 pl-8">Service Category</TableHead>
-                                <TableHead className="font-black h-16">Identifier Code</TableHead>
-                                <TableHead className="font-black h-16">Standard Amount</TableHead>
-                                <TableHead className="font-black h-16">Description</TableHead>
-                                <TableHead className="font-black h-16 text-right pr-8">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredTypes.length > 0 ? (
-                                filteredTypes.map((type) => (
-                                    <TableRow key={type.id} className="group hover:bg-muted/20 border-muted/10 transition-colors">
-                                        <TableCell className="py-6 pl-8">
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-11 w-11 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600 group-hover:bg-rose-600 group-hover:text-white transition-all duration-300 shadow-sm shadow-rose-100">
-                                                    <CreditCard className="h-5 w-5" />
-                                                </div>
-                                                <span className="font-bold text-lg tracking-tight">{type.name}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className="px-3 py-1 bg-muted rounded-full text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                                {type.code}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className="font-mono font-black text-lg text-rose-600">
-                                                {formatCurrency(type.amount)}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="max-w-[350px]">
-                                            <span className="text-sm text-muted-foreground leading-relaxed italic">
-                                                {type.description || '—'}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="text-right pr-8">
-                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="icon" 
-                                                    className="rounded-xl h-10 w-10 border-muted-foreground/20 hover:border-rose-500 hover:text-rose-500"
-                                                    onClick={() => handleEdit(type)}
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/40 text-[10px] font-bold tracking-wider text-muted-foreground uppercase hover:bg-muted/40">
+                                    <TableHead className="px-6 py-3">Name</TableHead>
+                                    <TableHead className="px-6 py-3">Code</TableHead>
+                                    <TableHead className="px-6 py-3 text-right">Amount</TableHead>
+                                    <TableHead className="px-6 py-3">Description</TableHead>
+                                    <TableHead className="px-6 py-3 text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredTypes.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={5}
+                                            className="px-6 py-12 text-center text-muted-foreground"
+                                        >
+                                            <CreditCard className="mx-auto mb-3 h-8 w-8 opacity-40" />
+                                            <p className="font-medium text-foreground">
+                                                {types.length === 0
+                                                    ? 'No fee types yet'
+                                                    : 'No types match your search'}
+                                            </p>
+                                            <p className="mt-1 text-sm">
+                                                {types.length === 0
+                                                    ? 'Create a type to use when issuing service charges.'
+                                                    : 'Try a different name or code.'}
+                                            </p>
+                                            {types.length === 0 ? (
+                                                <Button
+                                                    size="sm"
+                                                    className="mt-4 gap-2"
+                                                    onClick={openCreate}
                                                 >
-                                                    <Pencil className="h-4 w-4" />
+                                                    <Plus className="h-4 w-4" />
+                                                    New fee type
                                                 </Button>
-                                                <Button 
-                                                    variant="outline" 
-                                                    size="icon" 
-                                                    className="rounded-xl h-10 w-10 border-muted-foreground/20 hover:border-destructive hover:text-destructive"
-                                                    onClick={() => handleDelete(type.id)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
+                                            ) : null}
                                         </TableCell>
                                     </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-80 text-center">
-                                        <div className="flex flex-col items-center gap-4 opacity-30">
-                                            <div className="p-6 bg-muted rounded-full">
-                                                <AlertCircle className="h-12 w-12" />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <p className="font-black text-2xl uppercase tracking-tighter">No Fee Categories</p>
-                                                <p className="text-sm italic">You haven't added any service charge types yet.</p>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-
-                {/* Info Alert */}
-                <div className="p-6 rounded-[2rem] bg-muted/30 border border-dashed flex items-start gap-4">
-                    <div className="p-2 bg-background rounded-xl shadow-sm">
-                        <Info className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="text-sm leading-relaxed">
-                        <h4 className="font-bold text-foreground">Operational Fee Management</h4>
-                        <p className="text-muted-foreground">
-                            These categories define the standard rates for non-water consumption services. When applying a charge to a customer, the system will use the amount defined here as the default, but will store a historical snapshot of the price at the time of issuance.
-                        </p>
+                                ) : (
+                                    filteredTypes.map((type) => (
+                                        <TableRow
+                                            key={type.id}
+                                            className="text-sm transition-colors hover:bg-muted/30"
+                                        >
+                                            <TableCell className="px-6 py-4 font-medium">
+                                                {type.name}
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="font-mono text-[10px] tracking-wide uppercase"
+                                                >
+                                                    {type.code}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4 text-right font-semibold tabular-nums">
+                                                {formatCurrency(type.amount)}
+                                            </TableCell>
+                                            <TableCell className="max-w-xs px-6 py-4 text-muted-foreground">
+                                                <span className="line-clamp-2">
+                                                    {type.description || '—'}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="px-6 py-4">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0"
+                                                        title="Edit"
+                                                        onClick={() => openEdit(type)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                        <span className="sr-only">Edit</span>
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                                        title="Delete"
+                                                        onClick={() => handleDelete(type.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                        <span className="sr-only">Delete</span>
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
                     </div>
                 </div>
             </div>
+
+            <ServiceChargeTypeDialog
+                open={dialogOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeDialog();
+                    } else {
+                        setDialogOpen(true);
+                    }
+                }}
+                editingType={editingType}
+                data={data}
+                setData={setData}
+                errors={errors}
+                processing={processing}
+                onSubmit={handleSubmit}
+            />
         </AppLayout>
     );
 }

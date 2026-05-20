@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\StationController as AdminStationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\AppSettingController;
 use App\Http\Controllers\BillController;
 use App\Http\Controllers\BillPaymentController;
 use App\Http\Controllers\ConnectionRequestController;
@@ -165,6 +166,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('valves', GisValveController::class);
     });
     Route::post('service-charges/{service_charge}/confirm-payment', [ServiceChargeController::class, 'confirmPayment'])->name('service-charges.confirm-payment');
+    Route::get('service-charges/{service_charge}/print', [ServiceChargeController::class, 'print'])->name('service-charges.print');
     Route::resource('service-charges', ServiceChargeController::class);
     Route::get('bills/export', [BillController::class, 'export'])->name('bills.export');
     Route::get('bills/{bill}/print', [BillController::class, 'print'])->name('bills.print');
@@ -195,6 +197,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/settings', function () {
             return Inertia\Inertia::render('admin/setting/index');
         })->name('admin.settings');
+
+        Route::get('/settings/billing-cycle', [AppSettingController::class, 'edit'])->name('admin.billing-cycle.edit');
+        Route::put('/settings/billing-cycle', [AppSettingController::class, 'update'])->name('admin.billing-cycle.update');
 
         Route::get('/stations', [AdminStationController::class, 'index'])->name('admin.stations.index');
         Route::post('/stations', [AdminStationController::class, 'store'])->name('admin.stations.store');

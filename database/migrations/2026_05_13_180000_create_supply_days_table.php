@@ -18,6 +18,7 @@ return new class extends Migration
             $table->id();
             $table->string('name')->unique();
             $table->unsignedTinyInteger('sort_order')->default(0);
+            $table->boolean('is_reserve')->default(false)->comment('When true, any zone may be resupplied on this weekday');
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
         });
@@ -34,23 +35,17 @@ return new class extends Migration
             ['Daily', 8],
         ];
 
+        $reserveDays = ['Saturday', 'Sunday'];
+
         foreach ($rows as [$name, $order]) {
             DB::table('supply_days')->insert([
                 'name' => $name,
                 'sort_order' => $order,
+                'is_reserve' => in_array($name, $reserveDays, true),
                 'status' => 'active',
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
-        }
-
-        if (Schema::hasTable('zones') && ! Schema::hasColumn('zones', 'supply_day_id')) {
-            Schema::table('zones', function (Blueprint $table) {
-                $table->foreignId('supply_day_id')
-                    ->nullable()
-                    ->after('name')
-                    ->constrained('supply_days');
-            });
         }
 
         if (Schema::hasTable('zones') && Schema::hasColumn('zones', 'supply_day')) {
@@ -75,29 +70,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        if (Schema::hasTable('zones')) {
-            if (! Schema::hasColumn('zones', 'supply_day')) {
-                Schema::table('zones', function (Blueprint $table) {
-                    $table->string('supply_day')->nullable()->after('name');
-                });
-            }
-
-            if (Schema::hasColumn('zones', 'supply_day_id')) {
-                $idToName = DB::table('supply_days')->pluck('name', 'id');
-                $zones = DB::table('zones')->select('id', 'supply_day_id')->whereNotNull('supply_day_id')->get();
-
-                foreach ($zones as $zone) {
-                    $name = $idToName[$zone->supply_day_id] ?? null;
-                    if ($name !== null) {
-                        DB::table('zones')->where('id', $zone->id)->update(['supply_day' => $name]);
-                    }
-                }
-
-                Schema::table('zones', function (Blueprint $table) {
-                    $table->dropForeign(['supply_day_id']);
-                    $table->dropColumn('supply_day_id');
-                });
-            }
+        if (Schema::hasTable('zones') && ! Schema::hasColumn('zones', 'supply_day')) {
+            Schema::table('zones', function (Blueprint $table) {
+                $table->string('supply_day')->nullable()->after('name');
+            });
         }
 
         Schema::dropIfExists('supply_days');

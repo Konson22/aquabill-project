@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             UserSeeder::class,
             ZoneSeeder::class,
+            SupplyScheduleSeeder::class,
             StationSeeder::class,
             GisDemoDataSeeder::class,
             WaterPointReadingSeeder::class,

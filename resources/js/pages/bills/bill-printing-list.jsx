@@ -99,6 +99,15 @@ export default function BillPrintingList({ bills }) {
         return new Date(dateString).toLocaleDateString();
     };
 
+    const meterNumberLastEight = (meterNumber) => {
+        const raw = String(meterNumber ?? '').trim();
+        if (!raw) {
+            return '—';
+        }
+
+        return raw.length > 8 ? raw.slice(-8) : raw;
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Pending Bills" />
@@ -205,9 +214,7 @@ export default function BillPrintingList({ bills }) {
                                             aria-label="Select all pending bills"
                                         />
                                     </TableHead>
-                                    <TableHead className="w-[140px]">
-                                        Bill ID
-                                    </TableHead>
+                                  
                                     <TableHead>Customer</TableHead>
                                     <TableHead>Meter No</TableHead>
                                     <TableHead>Billing Date</TableHead>
@@ -217,7 +224,6 @@ export default function BillPrintingList({ bills }) {
                                     <TableHead className="text-right">
                                         Balance
                                     </TableHead>
-                                    <TableHead>Status</TableHead>
                                     <TableHead className="text-right">
                                         Actions
                                     </TableHead>
@@ -246,32 +252,22 @@ export default function BillPrintingList({ bills }) {
                                                     aria-label={`Select bill #${String(bill.id).padStart(6, '0')}`}
                                                 />
                                             </TableCell>
-                                            <TableCell className="font-mono font-medium">
-                                                <Link
-                                                    href={route(
-                                                        'bills.show',
-                                                        bill.id,
-                                                    )}
-                                                    className="flex items-center gap-1 text-primary hover:underline"
-                                                >
-                                                    <FileText className="h-3 w-3" />
-                                                    #{String(bill.id).padStart(6, '0')}
-                                                </Link>
+                                            <TableCell>
+                                                {bill.customer?.name || 'Unknown'}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">
-                                                        {bill.customer?.name ||
-                                                            'Unknown'}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1 font-mono text-sm">
+                                                <div className="flex items-center gap-1 text-sm">
                                                     {bill.meter ? (
                                                         <>
                                                             <Zap className="h-3 w-3 text-amber-500" />
-                                                            {bill.meter.meter_number}
+                                                            <span
+                                                                className="font-mono tabular-nums"
+                                                                title={bill.meter.meter_number}
+                                                            >
+                                                                {meterNumberLastEight(
+                                                                    bill.meter.meter_number,
+                                                                )}
+                                                            </span>
                                                         </>
                                                     ) : (
                                                         <span className="text-muted-foreground">
@@ -283,7 +279,7 @@ export default function BillPrintingList({ bills }) {
                                             <TableCell>
                                                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                                     <Calendar className="h-3 w-3" />
-                                                    <span className="whitespace-nowrap">
+                                                    <span className="">
                                                         {formatDate(
                                                             bill.created_at,
                                                         )}
@@ -291,11 +287,9 @@ export default function BillPrintingList({ bills }) {
                                                 </div>
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <span className="font-medium">
-                                                    {formatCurrency(
-                                                        bill.total_amount,
-                                                    )}
-                                                </span>
+                                                {formatCurrency(
+                                                    bill.total_amount,
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <span className="text-sm text-muted-foreground">
@@ -304,14 +298,7 @@ export default function BillPrintingList({ bills }) {
                                                     )}
                                                 </span>
                                             </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant="destructive"
-                                                    className="capitalize"
-                                                >
-                                                    {bill.status}
-                                                </Badge>
-                                            </TableCell>
+                                                
                                             <TableCell className="text-right">
                                                 <Button
                                                     variant="outline"

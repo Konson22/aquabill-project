@@ -22,7 +22,7 @@ export default defineConfig({
         extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
     },
     server: {
-        host: '192.168.88.207',
+        host: '10.53.3.201',
         port: 5173,
         cors: true,
     }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Departments;
 
 use App\Http\Controllers\Controller;
 use App\Services\FinanceReportService;
+use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -17,13 +18,10 @@ class FinanceReportController extends Controller
     public function index(Request $request): RedirectResponse
     {
         $query = $request->query();
-        if (! array_key_exists('pf_from', $query) && array_key_exists('from', $query)) {
-            $query['pf_from'] = $query['from'];
-            unset($query['from']);
-        }
-        if (! array_key_exists('pf_to', $query) && array_key_exists('to', $query)) {
-            $query['pf_to'] = $query['to'];
-            unset($query['to']);
+
+        if (! array_key_exists('month', $query) && array_key_exists('from', $query)) {
+            $query['month'] = Carbon::parse((string) $query['from'])->format('Y-m');
+            unset($query['from'], $query['to'], $query['pf_from'], $query['pf_to']);
         }
 
         return redirect()->route('revenue-report.index', $query);

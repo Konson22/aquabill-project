@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SupplyDay;
+use App\Models\SupplyHistory;
+use App\Models\SupplySchedule;
 use App\Models\Zone;
 use App\Rules\GeoJsonPolygonBoundary;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -15,12 +17,44 @@ class ZoneController extends Controller
     public function index(): Response
     {
         $zones = Zone::query()
-            ->with(['supplyDay'])
-            ->withCount('customers')
+            ->with([
+                'supplySchedules' => fn ($query) => $query->active()->with('supplyDay'),
+            ])
+            ->withCount(['customers', 'supplyHistories'])
+            ->orderBy('name')
             ->get();
+
+        $waterSupplySchedules = SupplySchedule::query()
+            ->active()
+            ->with(['zone:id,name,status', 'supplyDay:id,name,is_reserve,sort_order'])
+            ->get()
+            ->sortBy([
+                fn (SupplySchedule $schedule): string => $schedule->zone?->name ?? '',
+                fn (SupplySchedule $schedule): int => $schedule->supplyDay?->sort_order ?? 0,
+            ])
+            ->values();
+
+        $supplyHistories = SupplyHistory::query()
+            ->with([
+                'zone:id,name',
+                'supplyDay:id,name,is_reserve',
+                'recordedBy:id,name',
+            ])
+            ->orderByDesc('supplied_on')
+            ->orderByDesc('id')
+            ->limit(100)
+            ->get();
+
+        $reserveDays = SupplyDay::query()
+            ->reserve()
+            ->orderBy('sort_order')
+            ->get(['id', 'name']);
 
         return Inertia::render('zones/index', [
             'zones' => $zones,
+            'waterSupplySchedules' => $waterSupplySchedules,
+            'supplyHistories' => $supplyHistories,
+            'reserveDays' => $reserveDays,
         ]);
     }
 
@@ -31,14 +65,12 @@ class ZoneController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:zones,name',
-            'supply_day_id' => ['nullable', Rule::exists('supply_days', 'id')->where('status', 'active')],
-            'supply_time' => 'nullable|string',
             'description' => 'nullable|string',
             'boundary_geojson' => ['nullable', 'array', new GeoJsonPolygonBoundary],
             'status' => 'required|in:active,inactive',
         ]);
 
-        Zone::create($validated);
+        Zone::query()->create($validated);
 
         return back()->with('success', 'Zone created successfully.');
     }

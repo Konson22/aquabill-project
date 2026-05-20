@@ -20,7 +20,7 @@ class PaymentsReportService
     /**
      * @return array{
      *     payments: LengthAwarePaginator<int, array<string, mixed>>,
-     *     summary: array{payments_count: int, total_amount: float},
+     *     summary: array{payments_count: int, total_amount: float, collection_rate_percent: float},
      *     filters: array<string, int|string|null>,
      *     filterOptions: array<string, mixed>
      * }
@@ -31,9 +31,12 @@ class PaymentsReportService
 
         $query = $this->baseQuery($filters);
 
+        $totalAmount = (float) (clone $query)->sum('amount');
+
         $summary = [
             'payments_count' => (int) (clone $query)->count(),
-            'total_amount' => (float) (clone $query)->sum('amount'),
+            'total_amount' => $totalAmount,
+            'collection_rate_percent' => $this->collectionRatePercent($filters, $totalAmount),
         ];
 
         $payments = $query
@@ -79,7 +82,7 @@ class PaymentsReportService
     /**
      * @return array{
      *     filters: array<string, int|string|null>,
-     *     summary: array{payments_count: int, total_amount: float},
+     *     summary: array{payments_count: int, total_amount: float, collection_rate_percent: float},
      *     rows: array<int, array<string, mixed>>
      * }
      */
@@ -88,9 +91,12 @@ class PaymentsReportService
         $filters = $this->validatedFilters($request);
         $query = $this->baseQuery($filters);
 
+        $totalAmount = (float) (clone $query)->sum('amount');
+
         $summary = [
             'payments_count' => (int) (clone $query)->count(),
-            'total_amount' => (float) (clone $query)->sum('amount'),
+            'total_amount' => $totalAmount,
+            'collection_rate_percent' => $this->collectionRatePercent($filters, $totalAmount),
         ];
 
         /** @var Collection<int, Payment> $payments */
@@ -127,6 +133,73 @@ class PaymentsReportService
             'summary' => $summary,
             'rows' => $rows,
         ];
+    }
+
+    /**
+     * Collected amount ÷ billed amount in period (bills by created_at, service charges by issued_date).
+     */
+    private function collectionRatePercent(array $filters, float $collectedAmount): float
+    {
+        $billedAmount = $filters['payment_type'] === 'service_charge'
+            ? $this->totalBilledServiceCharges($filters)
+            : $this->totalBilledBills($filters);
+
+        if ($billedAmount <= 0.00001) {
+            return 0.0;
+        }
+
+        return min(100.0, round(($collectedAmount / $billedAmount) * 100, 1));
+    }
+
+    /**
+     * @param  array<string, int|string|null>  $filters
+     */
+    private function totalBilledBills(array $filters): float
+    {
+        $query = Bill::query()
+            ->whereDate('created_at', '>=', $filters['from'])
+            ->whereDate('created_at', '<=', $filters['to']);
+
+        $this->applyCustomerFilters($query, $filters);
+
+        $waterRevenue = (float) (clone $query)->sum('current_charge');
+        $fixedChargeRevenue = (float) (clone $query)->sum('fixed_charge');
+
+        return $waterRevenue + $fixedChargeRevenue;
+    }
+
+    /**
+     * @param  array<string, int|string|null>  $filters
+     */
+    private function totalBilledServiceCharges(array $filters): float
+    {
+        $query = ServiceCharge::query()
+            ->whereDate('issued_date', '>=', $filters['from'])
+            ->whereDate('issued_date', '<=', $filters['to']);
+
+        $this->applyCustomerFilters($query, $filters);
+
+        return ServiceCharge::sumTotalDue($query);
+    }
+
+    /**
+     * @param  Builder<Bill>|Builder<ServiceCharge>  $query
+     * @param  array<string, int|string|null>  $filters
+     */
+    private function applyCustomerFilters(Builder $query, array $filters): void
+    {
+        if (! $filters['zone_id'] && ! $filters['tariff_id']) {
+            return;
+        }
+
+        $query->whereHas('customer', function (Builder $customerQuery) use ($filters): void {
+            if ($filters['zone_id']) {
+                $customerQuery->where('zone_id', $filters['zone_id']);
+            }
+            if ($filters['tariff_id']) {
+                $customerQuery->where('tariff_id', $filters['tariff_id']);
+            }
+        });
     }
 
     /**

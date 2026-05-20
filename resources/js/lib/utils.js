@@ -57,7 +57,7 @@ export function formatCurrencyCompact(value) {
     }
 
     if (n >= 1_000) {
-        return `${Math.round(n / 1_000)}k ${CURRENCY_CODE}`;
+        return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K ${CURRENCY_CODE}`;
     }
 
     return formatCurrency(n);

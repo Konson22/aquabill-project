@@ -462,5 +462,8 @@ test('service charges index inertia includes stations', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('service-charges/index')
-            ->has('stations'));
+            ->has('stations')
+            ->has('filters')
+            ->has('statusCounts')
+            ->has('summary'));
 });

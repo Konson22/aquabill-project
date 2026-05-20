@@ -97,6 +97,80 @@ test('payments report filters by date range zone tariff and recorded by user', f
             ->where('payments.data.0.recorder_name', 'Cashier Alpha'));
 });
 
+test('payments report summary includes collection rate for bill payments', function () {
+    $recorder = User::factory()->create();
+    $zone = Zone::query()->create([
+        'name' => 'Zone Collection',
+        'supply_day_id' => supplyDayId('Monday'),
+        'supply_time' => '08:00:00',
+    ]);
+    $tariff = Tariff::query()->create([
+        'name' => 'Tariff Collection',
+        'price_per_unit' => 10,
+        'fixed_charge' => 5,
+    ]);
+
+    $customer = Customer::query()->create([
+        'customer_type' => 'residential',
+        'name' => 'Collection Customer',
+        'phone' => '0900000099',
+        'address' => '1 Collection St',
+        'zone_id' => $zone->id,
+        'tariff_id' => $tariff->id,
+        'status' => 'active',
+    ]);
+
+    $meter = Meter::query()->create([
+        'customer_id' => $customer->id,
+        'meter_number' => 'MTR-COL-'.uniqid(),
+        'status' => 'active',
+    ]);
+
+    $reading = MeterReading::query()->create([
+        'meter_id' => $meter->id,
+        'reading_date' => '2026-05-01',
+        'previous_reading' => 0,
+        'current_reading' => 10,
+        'notes' => 'Test',
+    ]);
+
+    $bill = Bill::query()->create([
+        'customer_id' => $customer->id,
+        'meter_id' => $meter->id,
+        'reading_id' => $reading->id,
+        'consumption' => 10,
+        'unit_price' => 10,
+        'fixed_charge' => 5,
+        'current_charge' => 100,
+        'previous_balance' => 0,
+        'total_amount' => 105,
+        'status' => 'pending',
+        'due_date' => '2026-06-01',
+        'created_at' => '2026-05-01 10:00:00',
+    ]);
+
+    Payment::query()->create([
+        'payable_type' => Bill::class,
+        'payable_id' => $bill->id,
+        'amount' => 50,
+        'payment_date' => '2026-05-15',
+        'payment_method' => 'cash',
+        'recorded_by' => $recorder->id,
+    ]);
+
+    $this->actingAs(User::factory()->create());
+
+    $this->get(route('payments-report.index', [
+        'month' => '2026-05',
+        'payment_type' => 'bill',
+    ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('summary.payments_count', 1)
+            ->where('summary.total_amount', 50)
+            ->where('summary.collection_rate_percent', 47.6));
+});
+
 test('payments report filters by payment type tab', function () {
     $user = User::factory()->create();
 

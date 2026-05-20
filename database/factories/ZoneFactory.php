@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\SupplyDay;
+use App\Models\SupplySchedule;
 use App\Models\Zone;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -12,6 +12,17 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class ZoneFactory extends Factory
 {
     protected $model = Zone::class;
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (Zone $zone): void {
+            if ($zone->supplySchedules()->exists()) {
+                return;
+            }
+
+            SupplySchedule::factory()->for($zone)->create();
+        });
+    }
 
     /**
      * @return array<string, mixed>
@@ -25,8 +36,6 @@ class ZoneFactory extends Factory
 
         return [
             'name' => fake()->unique()->words(3, true),
-            'supply_day_id' => SupplyDay::query()->where('name', 'Monday')->where('status', 'active')->value('id'),
-            'supply_time' => '08:00:00',
             'description' => null,
             'boundary_geojson' => $withBoundary ? [
                 'type' => 'Polygon',

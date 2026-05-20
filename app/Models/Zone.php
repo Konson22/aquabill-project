@@ -5,7 +5,6 @@ namespace App\Models;
 use Database\Factories\ZoneFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
@@ -14,10 +13,51 @@ class Zone extends Model
     /** @use HasFactory<ZoneFactory> */
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::created(function (Zone $zone): void {
+            if ($zone->supplySchedules()->exists()) {
+                return;
+            }
+
+            $mondayId = SupplyDay::query()->where('name', 'Monday')->where('status', 'active')->value('id');
+
+            if ($mondayId === null) {
+                return;
+            }
+
+            $zone->supplySchedules()->create([
+                'supply_day_id' => $mondayId,
+                'start_time' => '08:00:00',
+                'effective_from' => now()->toDateString(),
+            ]);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public static function createWithSupplySchedule(array $attributes = []): static
+    {
+        $supplyDayId = $attributes['supply_day_id'] ?? SupplyDay::query()->where('name', 'Monday')->where('status', 'active')->value('id');
+        $startTime = $attributes['supply_time'] ?? '08:00:00';
+        unset($attributes['supply_day_id'], $attributes['supply_time']);
+
+        return static::withoutEvents(function () use ($attributes, $supplyDayId, $startTime): static {
+            $zone = static::query()->create($attributes);
+
+            $zone->supplySchedules()->create([
+                'supply_day_id' => $supplyDayId,
+                'start_time' => $startTime,
+                'effective_from' => now()->toDateString(),
+            ]);
+
+            return $zone->load(['supplySchedules' => fn ($query) => $query->active()->with('supplyDay')]);
+        });
+    }
+
     protected $fillable = [
         'name',
-        'supply_day_id',
-        'supply_time',
         'description',
         'boundary_geojson',
         'status',
@@ -34,11 +74,61 @@ class Zone extends Model
     }
 
     /**
-     * @return BelongsTo<SupplyDay, Zone>
+     * @return HasMany<SupplySchedule, Zone>
      */
-    public function supplyDay(): BelongsTo
+    public function supplySchedules(): HasMany
     {
-        return $this->belongsTo(SupplyDay::class);
+        return $this->hasMany(SupplySchedule::class);
+    }
+
+    /**
+     * @return HasMany<SupplyHistory, Zone>
+     */
+    public function supplyHistories(): HasMany
+    {
+        return $this->hasMany(SupplyHistory::class);
+    }
+
+    /**
+     * Log an actual supply run. Use kind "reserve" on reserve weekdays to resupply any area.
+     *
+     * @param  array{
+     *     supplied_on: string,
+     *     supply_day_id?: int|null,
+     *     supply_schedule_id?: int|null,
+     *     start_time?: string|null,
+     *     end_time?: string|null,
+     *     kind?: 'scheduled'|'reserve'|'makeup',
+     *     notes?: string|null,
+     *     recorded_by?: int|null,
+     * }  $attributes
+     */
+    public function recordSupplyHistory(array $attributes): SupplyHistory
+    {
+        $supplyDayId = $attributes['supply_day_id'] ?? null;
+        $kind = $attributes['kind'] ?? 'scheduled';
+
+        if ($supplyDayId !== null) {
+            $isReserveDay = SupplyDay::query()
+                ->whereKey($supplyDayId)
+                ->where('is_reserve', true)
+                ->exists();
+
+            if ($isReserveDay && $kind === 'scheduled') {
+                $kind = 'reserve';
+            }
+        }
+
+        return $this->supplyHistories()->create([
+            'supply_day_id' => $supplyDayId,
+            'supply_schedule_id' => $attributes['supply_schedule_id'] ?? null,
+            'supplied_on' => $attributes['supplied_on'],
+            'start_time' => $attributes['start_time'] ?? null,
+            'end_time' => $attributes['end_time'] ?? null,
+            'kind' => $kind,
+            'notes' => $attributes['notes'] ?? null,
+            'recorded_by' => $attributes['recorded_by'] ?? null,
+        ]);
     }
 
     /**
